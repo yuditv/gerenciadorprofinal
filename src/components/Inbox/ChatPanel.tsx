@@ -1208,6 +1208,8 @@ export function ChatPanel({
           </p>
         )}
       </div>
+
+      {/* Main Chat Area wrapper */}
       </div>
 
       {/* Client Info Panel - Right side (always visible) */}
