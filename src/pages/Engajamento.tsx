@@ -8,25 +8,22 @@ import { EngajamentoBalanceCard } from "@/components/Engajamento/EngajamentoBala
 import { EngajamentoCreateOrderCard } from "@/components/Engajamento/EngajamentoCreateOrderCard";
 import { EngajamentoOrdersTab } from "@/components/Engajamento/EngajamentoOrdersTab";
 import { EngajamentoReportsTab } from "@/components/Engajamento/EngajamentoReportsTab";
-
 export default function Engajamento() {
   const navigate = useNavigate();
-  const { balanceQuery, servicesQuery, categories } = useSmmPanel();
-
+  const {
+    balanceQuery,
+    servicesQuery,
+    categories
+  } = useSmmPanel();
   const handleSidebarSectionChange = (section: string) => {
     // Mantém o padrão do app: trocar "seção" usando querystring na rota principal.
     navigate(`/?section=${encodeURIComponent(section)}`);
   };
-
-  return (
-    <div className="min-h-screen flex flex-col w-full relative theme-engajamento">
+  return <div className="min-h-screen flex flex-col w-full relative theme-engajamento">
       <SubscriptionBanner />
-      <FloatingSidebar
-        activeSection="engajamento"
-        onSectionChange={(section) => handleSidebarSectionChange(section)}
-      />
+      <FloatingSidebar activeSection="engajamento" onSectionChange={section => handleSidebarSectionChange(section)} />
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 px-0 py-0">
         <div className="mx-auto w-full max-w-6xl space-y-6">
           <header className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
@@ -55,15 +52,7 @@ export default function Engajamento() {
                   <EngajamentoBalanceCard balanceQuery={balanceQuery as any} />
                 </div>
                 <div className="md:col-span-2">
-                  <EngajamentoCreateOrderCard
-                    services={servicesQuery.data ?? []}
-                    categories={categories}
-                    isLoadingServices={servicesQuery.isLoading}
-                    isFetchingServices={servicesQuery.isFetching}
-                    isErrorServices={servicesQuery.isError}
-                    servicesError={servicesQuery.error}
-                    refetchServices={() => servicesQuery.refetch()}
-                  />
+                  <EngajamentoCreateOrderCard services={servicesQuery.data ?? []} categories={categories} isLoadingServices={servicesQuery.isLoading} isFetchingServices={servicesQuery.isFetching} isErrorServices={servicesQuery.isError} servicesError={servicesQuery.error} refetchServices={() => servicesQuery.refetch()} />
                 </div>
               </div>
             </TabsContent>
@@ -78,6 +67,5 @@ export default function Engajamento() {
           </Tabs>
         </div>
       </main>
-    </div>
-  );
+    </div>;
 }
