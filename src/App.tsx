@@ -29,6 +29,7 @@ const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Engajamento = lazy(() => import("./pages/Engajamento"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -158,6 +159,11 @@ const AppRoutes = () => (
       <Route path="/filter-numbers" element={
         <ProtectedRoute>
           <FilterNumbers />
+        </ProtectedRoute>
+      } />
+      <Route path="/engajamento" element={
+        <ProtectedRoute>
+          <Engajamento />
         </ProtectedRoute>
       } />
       <Route path="*" element={<NotFound />} />
