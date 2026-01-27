@@ -7,6 +7,38 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
 };
 
+const DEFAULT_DIRECT_GEMINI_MODEL = 'gemini-2.0-flash';
+
+function normalizeDirectGeminiModel(input: string | null | undefined) {
+  const raw = (input ?? '').trim();
+  let normalized = raw;
+
+  // Accept legacy "google/gemini-*" values saved by older UI/gateways.
+  if (normalized.startsWith('google/')) {
+    normalized = normalized.slice('google/'.length);
+  }
+
+  // If anything still has a provider prefix or doesn't look like a direct Gemini model,
+  // fall back to a safe default that works with the Generative Language API.
+  const lower = normalized.toLowerCase();
+  const looksLikeDirectGemini = lower.startsWith('gemini-') && !lower.includes('/');
+
+  const unsupportedForDirectEndpoint =
+    lower.startsWith('gemini-2.5-') ||
+    lower.startsWith('gemini-3-') ||
+    lower.includes('preview');
+
+  if (!raw) {
+    return { requestedModel: null as string | null, normalizedModel: DEFAULT_DIRECT_GEMINI_MODEL };
+  }
+
+  if (!looksLikeDirectGemini || unsupportedForDirectEndpoint) {
+    return { requestedModel: raw, normalizedModel: DEFAULT_DIRECT_GEMINI_MODEL };
+  }
+
+  return { requestedModel: raw, normalizedModel: normalized };
+}
+
 interface ChatRequest {
   agentId: string;
   message: string;
@@ -583,9 +615,10 @@ serve(async (req: Request) => {
     // Check if using native AI (Google Gemini API) or external webhook
     if (agent.use_native_ai) {
       // ============ NATIVE AI INTEGRATION (GOOGLE GEMINI API DIRECT) ============
-      const defaultModel = 'gemini-2.0-flash';
-      const modelToUse = agent.ai_model || defaultModel;
-      console.log(`Using Google Gemini API directly with model: ${modelToUse}`);
+      const { requestedModel, normalizedModel } = normalizeDirectGeminiModel(agent.ai_model);
+      console.log(
+        `[ai-agent-chat] Using Google Gemini API directly. requestedModel=${requestedModel ?? 'null'} normalizedModel=${normalizedModel}`
+      );
       
       const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
       
@@ -755,7 +788,7 @@ INSTRUÇÕES IMPORTANTES:
           }
 
           // Call Google Gemini API directly
-          const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${GEMINI_API_KEY}`;
+          const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${normalizedModel}:generateContent?key=${GEMINI_API_KEY}`;
           
           const aiResponse = await fetch(geminiApiUrl, {
             method: 'POST',
@@ -777,7 +810,7 @@ INSTRUÇÕES IMPORTANTES:
               aiError = 'API key invalid or quota exceeded';
               assistantResponse = 'Desculpe, há um problema com a chave da API. Contate o administrador.';
             } else {
-              aiError = `Gemini API returned status ${aiResponse.status}`;
+              aiError = `Gemini API returned status ${aiResponse.status} (normalizedModel=${normalizedModel}${requestedModel && requestedModel !== normalizedModel ? `, requestedModel=${requestedModel}` : ''})`;
               assistantResponse = 'Desculpe, estou com dificuldades técnicas no momento. Por favor, tente novamente mais tarde.';
             }
           } else {
@@ -785,7 +818,7 @@ INSTRUÇÕES IMPORTANTES:
             
             if (geminiData.error) {
               console.error('Gemini API error:', geminiData.error);
-              aiError = geminiData.error.message;
+              aiError = `${geminiData.error.message} (normalizedModel=${normalizedModel}${requestedModel && requestedModel !== normalizedModel ? `, requestedModel=${requestedModel}` : ''})`;
               assistantResponse = 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.';
             } else if (geminiData.candidates && geminiData.candidates.length > 0) {
               const candidate = geminiData.candidates[0];
@@ -1075,7 +1108,7 @@ INSTRUÇÕES IMPORTANTES:
           source, 
           phone,
           error: aiError,
-          model: agent.use_native_ai ? agent.ai_model : 'webhook',
+          model: agent.use_native_ai ? normalizeDirectGeminiModel(agent.ai_model).normalizedModel : 'webhook',
           extractedInfo: extractedInfo || undefined,
           transferDecision: transferDecision || undefined,
           transferExecuted,
