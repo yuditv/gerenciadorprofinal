@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { BulkDispatchProvider } from "@/contexts/BulkDispatchContext";
+import { FloatingDispatchPanel } from "@/components/BulkDispatcher/FloatingDispatchPanel";
 
 // Lazy load pages for code-splitting
 const MainLayout = lazy(() => import("./layouts/MainLayout").then(m => ({ default: m.MainLayout })));
@@ -171,7 +173,10 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <AppRoutes />
+            <BulkDispatchProvider>
+              <AppRoutes />
+              <FloatingDispatchPanel />
+            </BulkDispatchProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
