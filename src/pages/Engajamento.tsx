@@ -32,6 +32,11 @@ export default function Engajamento() {
 
   const services = servicesQuery.data ?? [];
 
+  const servicesErrorMessage =
+    servicesQuery.error instanceof Error ? servicesQuery.error.message : "Erro desconhecido";
+  const balanceErrorMessage =
+    balanceQuery.error instanceof Error ? balanceQuery.error.message : "Erro desconhecido";
+
   const filteredServices = useMemo(() => {
     const q = search.trim().toLowerCase();
     return services.filter((s) => {
@@ -137,9 +142,7 @@ export default function Engajamento() {
                     Atualizar
                   </Button>
                   {balanceQuery.isError && (
-                    <span className="text-sm text-destructive">
-                      Erro ao consultar
-                    </span>
+                    <span className="text-sm text-destructive">{balanceErrorMessage}</span>
                   )}
                 </div>
               </CardContent>
@@ -168,6 +171,22 @@ export default function Engajamento() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {servicesQuery.isError && (
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <p className="text-xs text-destructive line-clamp-2">{servicesErrorMessage}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => servicesQuery.refetch()}
+                          disabled={servicesQuery.isFetching}
+                          className="gap-2"
+                        >
+                          <RefreshCw className={servicesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                          Tentar
+                        </Button>
+                      </div>
+                    )}
                     {selectedService?.category && (
                       <p className="mt-1 text-xs text-muted-foreground">
                         Categoria: {selectedService.category}
@@ -258,7 +277,20 @@ export default function Engajamento() {
                 {servicesQuery.isLoading ? (
                   <div className="py-10 text-center text-sm text-muted-foreground">Carregando serviços...</div>
                 ) : servicesQuery.isError ? (
-                  <div className="py-10 text-center text-sm text-destructive">Erro ao carregar serviços</div>
+                  <div className="py-10 text-center space-y-3">
+                    <div className="text-sm text-destructive">{servicesErrorMessage}</div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => servicesQuery.refetch()}
+                      disabled={servicesQuery.isFetching}
+                      className="gap-2"
+                    >
+                      <RefreshCw className={servicesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                      Tentar novamente
+                    </Button>
+                  </div>
                 ) : filteredServices.length === 0 ? (
                   <div className="py-10 text-center text-sm text-muted-foreground">Nenhum serviço encontrado</div>
                 ) : (
