@@ -2025,6 +2025,24 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_settings: {
+        Row: {
+          id: number
+          markup_percent: number
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          markup_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          markup_percent?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2879,6 +2897,25 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_user_blocked: { Args: { _user_id: string }; Returns: boolean }
+      wallet_credit: {
+        Args: {
+          p_amount: number
+          p_reference_id?: string
+          p_reference_type?: string
+          p_tx_type?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      wallet_debit: {
+        Args: {
+          p_amount: number
+          p_reference_id?: string
+          p_reference_type?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
