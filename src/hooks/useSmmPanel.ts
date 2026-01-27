@@ -40,8 +40,12 @@ type InvokePayload<T> = {
 };
 
 async function invokeSmm<TPayload, TResult>(body: InvokePayload<TPayload>) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+
   const { data, error } = await supabase.functions.invoke("smm-panel", {
     body,
+    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
   });
 
   if (error) {
