@@ -1,103 +1,91 @@
 
-Contexto e diagnóstico (o que eu vi no seu projeto)
-- O botão “Testar agente” chama a Edge Function `ai-agent-chat` via `supabase.functions.invoke('ai-agent-chat')`.
-- A função está respondendo e funcionando (consigo chamar via teste server-side). Porém, ela está registrando no log:
-  - “Using Google Gemini API directly with model: google/gemini-2.5-flash”
-  - Em seguida: “Google Gemini API error: 404”
-- O motivo do 404 é que o seu código está chamando o endpoint do Google Generative Language API:
-  - `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?...`
-  - Esse endpoint espera nomes de modelo no formato do Gemini “direto” (ex.: `gemini-2.0-flash`, `gemini-1.5-flash`, etc.).
-  - Mas no seu banco / UI, o `ai_model` está sendo salvo como `google/gemini-2.5-flash` (formato típico de “AI Gateway / OpenAI-compatible routing”), o que gera URL inválida do ponto de vista do endpoint do Google → 404.
+Objetivo
+- Fazer a aba **Engajamento** realmente “puxar” (carregar) os serviços do painel SMM (Instaluxo) e preencher a lista + o select em “Criar pedido”.
+- Hoje isso não acontece porque as chamadas para a Edge Function `smm-panel` estão dando **“Failed to fetch”** no navegador, então o React Query não recebe dados e a UI fica vazia.
 
-Resumo do problema em uma frase
-- “Testar Agente” parou porque o app salva o modelo no formato `google/...`, mas a Edge Function está chamando o Gemini direto e precisa de `gemini-...`; com isso, a chamada ao Gemini retorna 404 e o chat cai em erro.
+O que já foi observado (diagnóstico rápido)
+- O front está chamando corretamente: `supabase.functions.invoke("smm-panel", { body: { action: "services" } })`.
+- No Network do navegador aparecem várias tentativas para:
+  - `POST https://tlanmmbgyyxuqvezudir.supabase.co/functions/v1/smm-panel`
+  - com body `{"action":"services"}`
+  - e erro **“Failed to fetch”**.
+- Logs da edge function mostram que ela chegou a receber request (`[smm-panel] request from user=...`), mas não temos logs depois disso, o que indica forte chance de:
+  1) travar/timeout na chamada externa para `https://instaluxo.com/api/v2`, ou
+  2) resposta em formato inesperado (menos provável causar “Failed to fetch”), ou
+  3) algum bloqueio/intermitência (TLS/redirect/firewall) ao acessar `instaluxo.com` a partir do ambiente da Edge Function.
 
-Objetivo da correção (de acordo com sua resposta)
-- Você quer: Usar Gemini direto + você tem `GEMINI_API_KEY`.
-- Então vamos:
-  1) Ajustar a Edge Function para normalizar/validar o nome do modelo para Gemini direto (para não quebrar agentes já criados).
-  2) Ajustar o formulário (Create/Edit Agent) para oferecer e salvar modelos compatíveis com Gemini direto (evitar que volte a quebrar).
-  3) Melhorar o erro mostrado no “Testar Agente” para revelar o motivo real (ex.: “modelo inválido”) em vez da mensagem genérica.
+Pergunta pendente (você já confirmou que tem)
+- Você marcou que tem **JSON de exemplo** do `action=services`. Na implementação, vou usar isso para ajustar o parser (porque muitos painéis SMM retornam formatos diferentes: lista direta, ou objeto com chave `services`, etc.).
 
-Plano de implementação (passo a passo)
+Plano de implementação (o que vou mudar quando você aprovar)
+1) Teste controlado do endpoint `smm-panel` (para ver o erro real)
+   - Vou chamar a Edge Function via ferramenta de teste (server-side), com body:
+     - `{"action":"services"}`
+     - `{"action":"balance"}`
+   - Objetivo: diferenciar “problema de navegador/CORS” vs “problema de execução/fetch externo”.
+   - Vou também olhar os logs da edge function imediatamente após o teste, para pegar o stack/erro real.
 
-1) Corrigir no backend (Edge Function) a compatibilidade de modelos
-Arquivo: `supabase/functions/ai-agent-chat/index.ts`
+2) Fortalecer a Edge Function `supabase/functions/smm-panel/index.ts`
+   2.1) Adicionar timeout e tratamento de falhas de rede
+   - Implementar `AbortController` (ex.: 15s) no `fetch(INSTALUXO_BASE_URL, ...)`.
+   - Se der timeout, retornar JSON claro:
+     - `{ error: "Timeout ao conectar no painel SMM" }` (status 504)
+   - Se der erro de rede/TLS, retornar:
+     - `{ error: "Falha ao conectar no painel SMM", details: "...mensagem..." }` (status 502)
+   - Motivo: hoje a função provavelmente trava em silêncio; com timeout e catch detalhado a UI vai conseguir exibir o erro.
 
-1.1) Criar uma função utilitária (no próprio arquivo) para normalizar `ai_model`
-- Regras:
-  - Se vier no formato `google/gemini-*`, remover o prefixo `google/`.
-  - Se vier `google/gemini-2.5-*` (que não é aceito no endpoint direto), fazer fallback seguro:
-    - Ex.: mapear `gemini-2.5-flash` → `gemini-2.0-flash`
-    - `gemini-2.5-pro` → `gemini-2.0-flash` (ou `gemini-1.5-pro` dependendo da sua preferência; eu vou sugerir `gemini-2.0-flash` por ser mais “atual” e geralmente disponível)
-  - Se vier `google/gemini-3-*` ou `*-preview`, também cair em fallback (`gemini-2.0-flash`) para evitar 404.
-  - Se vier vazio/nulo: usar default `gemini-2.0-flash` (ou manter o default existente, mas hoje ele está como `gemini-2.0-flash` no código e isso é ok).
+   2.2) Logging útil (para não ficar “cego”)
+   - Logar antes e depois do fetch:
+     - action, baseUrl, tempo (ms), status http do Instaluxo, e um pedaço seguro do corpo (sem vazar API key).
+   - Exemplo de logs:
+     - `[smm-panel] calling instaluxo action=services`
+     - `[smm-panel] instaluxo responded status=200 time=532ms`
 
-1.2) Logar claramente a normalização
-- Ex.: `requestedModel=google/gemini-2.5-flash normalizedModel=gemini-2.0-flash`
-- Isso ajuda muito quando um projeto foi “transferido” entre contas e parte dos dados ficou com formatos diferentes.
+   2.3) Normalizar URL e evitar pequenas incompatibilidades
+   - Garantir que `INSTALUXO_BASE_URL` não tenha “//” no final (normalizar com `replace(/\/+$/, '')`), e manter como `https://instaluxo.com/api/v2`.
+   - Isso evita variações de endpoint que alguns painéis tratam mal.
 
-1.3) Usar o modelo normalizado na URL do Gemini
-- Trocar `modelToUse` (atual) por `normalizedModel` no `geminiApiUrl`.
+   2.4) Tornar o retorno da Edge Function “padrão do app”
+   - Em vez de retornar “qualquer coisa que o painel devolveu”, vou padronizar a resposta para o front:
+     - Para `services`: sempre retornar `{ services: SmmService[] }`
+     - Para `balance`: `{ balance, currency }`
+     - Para erros do painel: `{ error: "..." }`
+   - Isso deixa o front simples e resistente a mudanças do provedor.
 
-1.4) Garantir que erros do Gemini não derrubem o endpoint
-- Hoje já existe tratamento e retorno JSON com CORS.
-- Vamos manter isso, mas vamos enriquecer o `details` (por ex. incluir o `normalizedModel` e o `requestedModel`) em caso de 404 para diagnóstico.
+3) Ajustar o hook do front `src/hooks/useSmmPanel.ts`
+   - Atualizar `servicesQuery` para aceitar os formatos comuns:
+     - Se vier `data` como array => usar direto.
+     - Se vier `data.services` como array => usar `data.services`.
+     - Se vier `{ error }` => lançar erro para React Query (para cair em `isError`).
+   - Também vou melhorar a mensagem de erro exibida (para você saber exatamente “por que está vazio”).
 
-2) Corrigir no frontend o “source of truth” do modelo (para parar de salvar `google/...`)
-Arquivo: `src/components/CreateAgentDialog.tsx`
+4) Ajustar a UI `src/pages/Engajamento.tsx` para ficar óbvio quando falhou
+   - Em “Serviços” e no Select do “Criar pedido”:
+     - Se `servicesQuery.isError`, mostrar um texto mais claro (“Falha ao carregar serviços: <mensagem>”) e um botão “Tentar novamente”.
+   - Se `servicesQuery` retornar vazio de verdade (0 serviços), mostrar “O painel retornou 0 serviços” (diferente de erro).
 
-2.1) Atualizar a lista `AI_MODELS`
-- Hoje a UI diz “IA Nativa (Gemini)” mas oferece modelos “google/gemini-2.5-*”.
-- Para Gemini direto, a lista deve ser algo do tipo:
-  - `gemini-2.0-flash` (recomendado)
-  - `gemini-1.5-flash`
-  - `gemini-1.5-pro` (se você quiser opção “mais inteligente”)
-  - (opcional) `gemini-2.0-pro` se você confirmar que usa/tem disponível no seu projeto (nem sempre está liberado; para não quebrar, eu deixo só os mais seguros).
+5) Validação final (checagem de ponta a ponta)
+   - Recarregar `/engajamento`:
+     - Confirmar que o saldo aparece (ou erro claro).
+     - Confirmar que a lista “Serviços” aparece (ou erro claro).
+     - Confirmar que o Select de serviços em “Criar pedido” popula.
+   - Se você colar aqui o JSON real do `action=services`, eu valido se estamos mapeando corretamente os campos (`service`, `name`, `category`, `rate`, `min`, `max`).
 
-2.2) Definir default coerente
-- Onde hoje está `ai_model: 'google/gemini-2.5-flash'`, trocar para `ai_model: 'gemini-2.0-flash'` para ver “funcionando” sem ajuste manual.
+O que eu preciso de você (para fechar 100%)
+- Cole aqui o **JSON de exemplo** do retorno do Instaluxo para `action=services` (pode ser só um pedaço: 2 ou 3 itens já ajuda). Se tiver muita coisa, pode colar apenas o começo e um item do meio.
 
-2.3) Normalizar no submit (proteção extra)
-- Mesmo que algum dado antigo esteja em `google/...`, no `handleSubmit` vamos normalizar antes de enviar ao `updateAgent/createAgent`, garantindo que o banco passe a ficar consistente com Gemini direto.
+Riscos e como vou lidar
+- Se o Instaluxo bloquear requisições do ambiente da Edge Function (anti-bot/firewall):
+  - Vamos detectar pelo erro (TLS/403/timeout).
+  - Aí o plano B é usar o endpoint/host correto alternativo que o painel fornecer (às vezes eles têm domínio “api.” separado) ou liberar IP (se o provedor permitir).
+- Se o formato da resposta for diferente:
+  - Com o JSON de exemplo, eu ajusto o parser para o formato exato.
 
-3) Melhorar a mensagem de erro no “Testar Agente” (para não mascarar)
-Arquivos:
-- `src/components/AIAgentChat.tsx`
-- (possivelmente) `src/hooks/useAIAgents.ts` (somente se precisar padronizar)
+Arquivos que serão alterados (na implementação)
+- `supabase/functions/smm-panel/index.ts` (timeout, logs, parsing/padronização)
+- `src/hooks/useSmmPanel.ts` (aceitar formatos e melhorar erros)
+- `src/pages/Engajamento.tsx` (mensagens/UX de erro e botão “tentar novamente”)
 
-3.1) Em caso de falha, mostrar o erro real retornado pelo backend quando existir
-- Hoje o catch sempre adiciona: “❌ Erro ao processar mensagem…”
-- Vamos alterar para:
-  - Se `error` tiver uma mensagem (do `supabase.functions.invoke`) mostrar um resumo: “Falha na IA: <mensagem curta>”
-  - Se o backend retornar `data.error` (por exemplo “Gemini API returned status 404”), exibir isso em texto menor (para debug).
-- Resultado: se acontecer de novo, você não fica “cego” com erro genérico.
-
-4) Ajuste opcional (recomendado): “Consertar agentes existentes” automaticamente
-- Seu agente atual no banco está com `ai_model = google/gemini-2.5-flash`.
-- Depois das mudanças acima, ele deve funcionar mesmo assim (pela normalização no backend).
-- Mas para deixar o banco limpo e evitar confusão, eu posso também:
-  - Atualizar automaticamente (via UI/admin flow) os agentes `use_native_ai=true` que tenham `ai_model` começando com `google/` para `gemini-2.0-flash`.
-  - Eu vou implementar isso de forma segura, sem mexer em agentes que já estão com `gemini-*`.
-
-Como vamos validar (teste rápido)
-1) Abrir “Agente IA” → “Testar Chat”.
-2) Selecionar o agente “teste”.
-3) Enviar “Oi”.
-4) Confirmar:
-   - Resposta aparece no chat.
-   - Edge logs mostram “normalizedModel=gemini-2.0-flash”.
-5) Se ainda falhar:
-   - Conferir logs da `ai-agent-chat` e a mensagem exibida no chat (agora mais detalhada).
-
-Riscos / pontos de atenção
-- Modelos “2.5” e “3 preview” no formato `google/...` não são aceitos no endpoint Gemini direto usado no seu código hoje. Então precisamos escolher fallbacks seguros.
-- Como você disse que o projeto foi transferido, é comum ter inconsistências entre “como o front salva” e “como o backend espera”. O plano acima corrige os dois lados.
-
-Arquivos que serão alterados (quando você aprovar a implementação)
-- `supabase/functions/ai-agent-chat/index.ts` (normalização/validação de modelo + logs)
-- `src/components/CreateAgentDialog.tsx` (lista de modelos compatíveis com Gemini direto + default + normalização no submit)
-- `src/components/AIAgentChat.tsx` (mensagens de erro mais informativas)
-
-Observação importante
-- Eu vi que você já tem o secret `GEMINI_API_KEY` configurado no projeto, então não vamos depender de nenhuma chave nova para essa correção.
+Critério de sucesso
+- Ao abrir `/engajamento`, a seção “Serviços” carrega e lista os serviços do painel, e o Select de “Criar pedido” deixa escolher qualquer serviço.
+- Se o painel estiver fora do ar, a UI mostra o motivo (timeout/403/etc) em vez de ficar vazia.
