@@ -96,6 +96,21 @@ export function AIAgentChat() {
         source: 'web',
       });
 
+      // If backend returned a structured error, surface it (instead of masking with a generic message)
+      if (result?.error) {
+        setLocalMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          agent_id: selectedAgent.id,
+          user_id: '',
+          session_id: sessionId,
+          role: 'assistant',
+          content: `❌ Falha na IA: ${String(result.error)}`,
+          metadata: { error: true, details: result.error },
+          created_at: new Date().toISOString(),
+        }]);
+        return;
+      }
+
       // Add assistant response
       if (result?.message) {
         setLocalMessages(prev => [...prev, {
@@ -130,8 +145,8 @@ export function AIAgentChat() {
         user_id: '',
         session_id: sessionId,
         role: 'assistant',
-        content: '❌ Erro ao processar mensagem. Por favor, tente novamente.',
-        metadata: { error: true },
+        content: `❌ Erro ao processar mensagem: ${error?.message || 'tente novamente.'}`,
+        metadata: { error: true, details: error?.message },
         created_at: new Date().toISOString(),
       }]);
     }
