@@ -17,15 +17,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useSmmPanel } from "@/hooks/useSmmPanel";
-import { EngajamentoCategoryChips } from "@/components/Engajamento/EngajamentoCategoryChips";
-import { EngajamentoServiceList } from "@/components/Engajamento/EngajamentoServiceList";
 
 export default function Engajamento() {
   const navigate = useNavigate();
   const { balanceQuery, servicesQuery, addOrder, categories } = useSmmPanel();
-
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState<string>("all");
 
   const [serviceId, setServiceId] = useState<string>("");
   const [link, setLink] = useState("");
@@ -38,24 +33,20 @@ export default function Engajamento() {
   const balanceErrorMessage =
     balanceQuery.error instanceof Error ? balanceQuery.error.message : "Erro desconhecido";
 
-  const filteredServices = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return services.filter((s) => {
-      const matchesSearch =
-        !q ||
-        s.name.toLowerCase().includes(q) ||
-        (s.category ?? "").toLowerCase().includes(q) ||
-        String(s.service).includes(q);
-      const matchesCategory = category === "all" || (s.category ?? "") === category;
-      return matchesSearch && matchesCategory;
-    });
-  }, [services, search, category]);
-
   const selectedService = useMemo(() => {
     const id = Number(serviceId);
     if (!id) return null;
     return services.find((s) => s.service === id) ?? null;
   }, [serviceId, services]);
+
+  const estimatedCost = useMemo(() => {
+    if (!selectedService || !selectedService.rate || !quantity) return null;
+    const rate = parseFloat(String(selectedService.rate));
+    const qty = parseInt(quantity, 10);
+    if (isNaN(rate) || isNaN(qty) || qty <= 0) return null;
+    // rate is per 1000
+    return ((rate * qty) / 1000).toFixed(2);
+  }, [selectedService, quantity]);
 
   const handleSidebarSectionChange = (section: string) => {
     // Mantém o padrão do app: trocar "seção" usando querystring na rota principal.
@@ -188,10 +179,22 @@ export default function Engajamento() {
                         </Button>
                       </div>
                     )}
-                    {selectedService?.category && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Categoria: {selectedService.category}
-                      </p>
+                    {selectedService && (
+                      <div className="mt-2 space-y-1 text-xs">
+                        {selectedService.category && (
+                          <p className="text-muted-foreground">Categoria: {selectedService.category}</p>
+                        )}
+                        {selectedService.rate && (
+                          <p className="text-muted-foreground">
+                            Rate: <span className="font-semibold text-foreground">{selectedService.rate}</span> por 1000
+                          </p>
+                        )}
+                        {selectedService.min && selectedService.max && (
+                          <p className="text-muted-foreground">
+                            Mín: {selectedService.min} • Máx: {selectedService.max}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -219,11 +222,12 @@ export default function Engajamento() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm text-muted-foreground">
-                    {selectedService?.min && selectedService?.max
-                      ? `Mín: ${selectedService.min} • Máx: ${selectedService.max}`
-                      : ""}
-                  </div>
+                  {estimatedCost && (
+                    <div className="text-sm font-medium">
+                      Custo estimado: <span className="text-primary tabular-nums">{estimatedCost}</span>
+                    </div>
+                  )}
+                  <div className="flex-1" />
                   <Button
                     type="button"
                     onClick={handleCreateOrder}
@@ -237,45 +241,6 @@ export default function Engajamento() {
               </CardContent>
             </Card>
           </div>
-
-          <Card className="border-primary/15 hover:border-primary/30">
-            <CardHeader className="space-y-1">
-              <CardTitle>Serviços</CardTitle>
-              <CardDescription>Busque e filtre os serviços disponíveis</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="md:col-span-3">
-                  <Label htmlFor="smm-search">Buscar</Label>
-                  <Input
-                    id="smm-search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Ex.: Instagram, likes, followers..."
-                  />
-                </div>
-              </div>
-
-              <EngajamentoCategoryChips
-                categories={categories}
-                value={category}
-                onChange={setCategory}
-                className="pt-1"
-              />
-
-              <Separator />
-
-              <EngajamentoServiceList
-                isLoading={servicesQuery.isLoading}
-                isError={servicesQuery.isError}
-                errorMessage={servicesErrorMessage}
-                isFetching={servicesQuery.isFetching}
-                onRetry={() => servicesQuery.refetch()}
-                services={filteredServices}
-                onSelectService={(id) => setServiceId(String(id))}
-              />
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>
