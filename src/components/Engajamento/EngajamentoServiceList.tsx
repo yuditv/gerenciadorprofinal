@@ -1,3 +1,4 @@
+import * as React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
@@ -10,7 +11,7 @@ type Service = {
   rate?: string | number | null;
 };
 
-type Props = {
+export type EngajamentoServiceListProps = {
   isLoading: boolean;
   isError: boolean;
   errorMessage: string;
@@ -20,17 +21,11 @@ type Props = {
   onSelectService: (serviceId: number) => void;
 };
 
-export function EngajamentoServiceList({
-  isLoading,
-  isError,
-  errorMessage,
-  isFetching,
-  onRetry,
-  services,
-  onSelectService,
-}: Props) {
-  return (
-    <ScrollArea className="h-[420px]">
+export const EngajamentoServiceList = React.forwardRef<HTMLDivElement, EngajamentoServiceListProps>(
+  ({ isLoading, isError, errorMessage, isFetching, onRetry, services, onSelectService }, ref) => {
+    return (
+      <div ref={ref}>
+        <ScrollArea className="h-[420px]">
       {isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Carregando serviços...</div>
       ) : isError ? (
@@ -79,6 +74,10 @@ export function EngajamentoServiceList({
           ))}
         </div>
       )}
-    </ScrollArea>
-  );
-}
+        </ScrollArea>
+      </div>
+    );
+  },
+);
+
+EngajamentoServiceList.displayName = "EngajamentoServiceList";

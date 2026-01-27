@@ -1,18 +1,20 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-type Props = {
+export type EngajamentoCategoryChipsProps = {
   categories: string[];
   value: string;
   onChange: (value: string) => void;
   className?: string;
 };
 
-export function EngajamentoCategoryChips({ categories, value, onChange, className }: Props) {
+export const EngajamentoCategoryChips = React.forwardRef<HTMLDivElement, EngajamentoCategoryChipsProps>(
+  ({ categories, value, onChange, className }, ref) => {
   const items = ["all", ...categories];
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div ref={ref} className={cn("flex flex-wrap items-center gap-2", className)}>
       {items.map((c) => {
         const active = value === c;
         const label = c === "all" ? "Todas" : c;
@@ -37,4 +39,7 @@ export function EngajamentoCategoryChips({ categories, value, onChange, classNam
       })}
     </div>
   );
-}
+  },
+);
+
+EngajamentoCategoryChips.displayName = "EngajamentoCategoryChips";

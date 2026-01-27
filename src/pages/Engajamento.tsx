@@ -115,7 +115,7 @@ export default function Engajamento() {
           </header>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <Card className="md:col-span-1">
+            <Card className="md:col-span-1 border-primary/15 hover:border-primary/30">
               <CardHeader className="space-y-1">
                 <CardTitle>Saldo</CardTitle>
                 <CardDescription>Consulta em tempo real do painel SMM</CardDescription>
@@ -149,7 +149,7 @@ export default function Engajamento() {
               </CardContent>
             </Card>
 
-            <Card className="md:col-span-2">
+            <Card className="md:col-span-2 border-primary/15 hover:border-primary/30">
               <CardHeader className="space-y-1">
                 <CardTitle>Criar pedido</CardTitle>
                 <CardDescription>
@@ -238,14 +238,14 @@ export default function Engajamento() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="border-primary/15 hover:border-primary/30">
             <CardHeader className="space-y-1">
               <CardTitle>Serviços</CardTitle>
               <CardDescription>Busque e filtre os serviços disponíveis</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="md:col-span-2">
+                <div className="md:col-span-3">
                   <Label htmlFor="smm-search">Buscar</Label>
                   <Input
                     id="smm-search"
@@ -253,22 +253,6 @@ export default function Engajamento() {
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Ex.: Instagram, likes, followers..."
                   />
-                </div>
-                <div className="md:col-span-1">
-                  <Label>Categoria</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      {categories.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
 
