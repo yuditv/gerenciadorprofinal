@@ -269,10 +269,12 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                   <CreditCard className="h-4 w-4 mr-2 text-primary" />
                   Histórico de Pagamentos
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/carteira')} className="hover:bg-primary/10">
-                  <Wallet className="h-4 w-4 mr-2 text-primary" />
-                  Carteira
-                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem onClick={() => navigate('/carteira')} className="hover:bg-primary/10">
+                    <Wallet className="h-4 w-4 mr-2 text-primary" />
+                    Carteira
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => navigate('/my-dashboard')} className="hover:bg-primary/10">
                   <BarChart3 className="h-4 w-4 mr-2 text-primary" />
                   Meu Dashboard
