@@ -1173,7 +1173,7 @@ export function ChatPanel({
 
             <Textarea
               ref={textareaRef}
-              placeholder={isPrivate ? "Escreva uma nota privada..." : "Digite sua mensagem... (use / para respostas rápidas)"}
+              placeholder={isPrivate ? "Escreva uma nota privada..." : "Digite sua mensagem..."}
               value={message}
               onChange={(e) => {
                 setMessage(e.target.value);
