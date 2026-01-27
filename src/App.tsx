@@ -30,6 +30,7 @@ const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Engajamento = lazy(() => import("./pages/Engajamento"));
+const Wallet = lazy(() => import("./pages/Wallet"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -164,6 +165,11 @@ const AppRoutes = () => (
       <Route path="/engajamento" element={
         <ProtectedRoute>
           <Engajamento />
+        </ProtectedRoute>
+      } />
+      <Route path="/carteira" element={
+        <ProtectedRoute>
+          <Wallet />
         </ProtectedRoute>
       } />
       <Route path="*" element={<NotFound />} />

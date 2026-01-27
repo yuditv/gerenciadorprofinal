@@ -76,6 +76,10 @@ export default {
           active: "hsl(var(--inbox-active))",
           unread: "hsl(var(--inbox-unread))",
         },
+
+        qr: {
+          DEFAULT: "hsl(var(--qr-surface))",
+        },
       },
       boxShadow: {
         sm: "var(--shadow-sm)",
