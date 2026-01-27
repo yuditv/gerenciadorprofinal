@@ -1,5 +1,24 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+function getUazapiBaseUrl(): string {
+  const raw = (Deno.env.get('UAZAPI_URL') ?? '').trim();
+  const fallback = 'https://zynk2.uazapi.com';
+  const candidate = !raw || raw.includes('PLACEHOLDER_VALUE_TO_BE_REPLACED') ? fallback : raw;
+
+  // Normalize trailing slashes
+  const normalized = candidate.replace(/\/+$/, '');
+
+  // Validate URL early to prevent runtime fetch errors
+  try {
+    // eslint-disable-next-line no-new
+    new URL(normalized);
+  } catch {
+    return fallback;
+  }
+
+  return normalized;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -95,13 +114,8 @@ Deno.serve(async (req) => {
     console.log(`[fetch-messages] Fetching from UAZAPI for chatId: ${chatId}`);
 
     // Call UAZAPI to fetch messages
-    const UAZAPI_URL = Deno.env.get('UAZAPI_URL');
-    if (!UAZAPI_URL) {
-      return new Response(JSON.stringify({ error: 'UAZAPI_URL not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const UAZAPI_URL = getUazapiBaseUrl();
+    console.log(`[fetch-messages] Using UAZAPI base URL: ${UAZAPI_URL}`);
 
     // Helper function for fetch with timeout (no retries to save resources)
     const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 25000) => {

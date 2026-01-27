@@ -6,6 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function getUazapiBaseUrl(): string {
+  const raw = (Deno.env.get('UAZAPI_URL') ?? '').trim();
+  const fallback = 'https://zynk2.uazapi.com';
+  const candidate = !raw || raw.includes('PLACEHOLDER_VALUE_TO_BE_REPLACED') ? fallback : raw;
+  const normalized = candidate.replace(/\/+$/, '');
+
+  try {
+    // eslint-disable-next-line no-new
+    new URL(normalized);
+  } catch {
+    return fallback;
+  }
+
+  return normalized;
+}
+
 interface SendMessageRequest {
   conversationId: string;
   content: string;
@@ -72,7 +88,8 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const uazapiUrl = Deno.env.get('UAZAPI_URL')!;
+    const uazapiUrl = getUazapiBaseUrl();
+    console.log(`[Send Inbox] Using UAZAPI base URL: ${uazapiUrl}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
