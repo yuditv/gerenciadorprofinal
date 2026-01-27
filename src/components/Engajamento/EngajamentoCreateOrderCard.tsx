@@ -35,11 +35,13 @@ export function EngajamentoCreateOrderCard(props: {
   servicesError?: unknown;
   refetchServices: () => unknown;
 }) {
+  const ALL_CATEGORIES_VALUE = "__all__";
+
   const { pricingQuery } = usePricingSettings();
   const { walletQuery } = useWallet();
   const { createOrder } = useSmmOrders();
 
-  const [category, setCategory] = useState<string>("");
+  const [category, setCategory] = useState<string>(ALL_CATEGORIES_VALUE);
   const [search, setSearch] = useState<string>("");
   const [serviceId, setServiceId] = useState<string>("");
   const [link, setLink] = useState("");
@@ -55,7 +57,7 @@ export function EngajamentoCreateOrderCard(props: {
     const q = search.trim().toLowerCase();
     return props.services
       .filter((s) => {
-        if (category && (s.category ?? "").trim() !== category) return false;
+        if (category !== ALL_CATEGORIES_VALUE && (s.category ?? "").trim() !== category) return false;
         if (!q) return true;
         return String(s.service).includes(q) || (s.name ?? "").toLowerCase().includes(q);
       })
@@ -167,7 +169,7 @@ export function EngajamentoCreateOrderCard(props: {
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value={ALL_CATEGORIES_VALUE}>Todas</SelectItem>
                 {props.categories.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
