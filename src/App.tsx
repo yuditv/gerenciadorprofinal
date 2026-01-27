@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BulkDispatchProvider } from "@/contexts/BulkDispatchContext";
 import { FloatingDispatchPanel } from "@/components/BulkDispatcher/FloatingDispatchPanel";
@@ -63,6 +64,29 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading: authLoading } = useAuth();
+  const { isAdmin, isLoading: permsLoading } = useUserPermissions();
+
+  if (authLoading || permsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
@@ -168,9 +192,9 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } />
       <Route path="/carteira" element={
-        <ProtectedRoute>
+        <AdminRoute>
           <Wallet />
-        </ProtectedRoute>
+        </AdminRoute>
       } />
       <Route path="*" element={<NotFound />} />
     </Routes>

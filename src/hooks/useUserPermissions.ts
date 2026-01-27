@@ -58,19 +58,18 @@ export function useUserPermissions() {
         return;
       }
 
-      // Check if admin
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .single();
+      // Check if admin (server-side via SECURITY DEFINER function)
+      const { data: adminStatus, error: adminError } = await supabase.rpc('is_admin', { _user_id: user.id });
+      if (adminError) {
+        // Fallback to non-admin on error (safe default)
+        console.warn('Failed to check admin status:', adminError);
+      }
 
-      const adminStatus = !!roleData;
-      setIsAdmin(adminStatus);
+      const isAdminResolved = !!adminStatus && !adminError;
+      setIsAdmin(isAdminResolved);
 
       // Admins have all permissions
-      if (adminStatus) {
+      if (isAdminResolved) {
         setPermissions({
           ...defaultPermissions,
           can_view_reseller: true,
