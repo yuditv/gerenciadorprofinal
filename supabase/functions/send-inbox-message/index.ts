@@ -216,9 +216,9 @@ serve(async (req: Request) => {
     if (!isPrivate && instance) {
       const phone = conversation.phone;
       const instanceToken = instance.instance_key;
-      // Prefer global token from secrets; fallback to instance_key for legacy setups
+      // Prefer instance_key (session token) as you confirmed; fallback to global secret if needed
       const UAZAPI_TOKEN = (Deno.env.get('UAZAPI_TOKEN') ?? '').trim();
-      const uazapiTokenToUse = UAZAPI_TOKEN || instanceToken;
+      const uazapiTokenToUse = instanceToken || UAZAPI_TOKEN;
 
       console.log(`[Send Inbox] Sending to WhatsApp: ${phone} via instance ${instance.instance_name}`);
 
