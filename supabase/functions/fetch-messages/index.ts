@@ -21,7 +21,7 @@ function getUazapiBaseUrl(): string {
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
 };
 
 Deno.serve(async (req) => {
@@ -117,6 +117,10 @@ Deno.serve(async (req) => {
     const UAZAPI_URL = getUazapiBaseUrl();
     console.log(`[fetch-messages] Using UAZAPI base URL: ${UAZAPI_URL}`);
 
+    // Prefer global token from secrets; fallback to instance_key for legacy setups
+    const UAZAPI_TOKEN = (Deno.env.get('UAZAPI_TOKEN') ?? '').trim();
+    const uazapiTokenToUse = UAZAPI_TOKEN || instanceKey;
+
     // Helper function for fetch with timeout (no retries to save resources)
     const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 25000) => {
       const controller = new AbortController();
@@ -146,7 +150,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'token': instanceKey
+        'token': uazapiTokenToUse
       },
       body: JSON.stringify({
         chatid: chatId,

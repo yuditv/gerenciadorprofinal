@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
 };
 
 function getUazapiBaseUrl(): string {
@@ -216,6 +216,9 @@ serve(async (req: Request) => {
     if (!isPrivate && instance) {
       const phone = conversation.phone;
       const instanceToken = instance.instance_key;
+      // Prefer global token from secrets; fallback to instance_key for legacy setups
+      const UAZAPI_TOKEN = (Deno.env.get('UAZAPI_TOKEN') ?? '').trim();
+      const uazapiTokenToUse = UAZAPI_TOKEN || instanceToken;
 
       console.log(`[Send Inbox] Sending to WhatsApp: ${phone} via instance ${instance.instance_name}`);
 
@@ -261,7 +264,7 @@ serve(async (req: Request) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'token': instanceToken
+               'token': uazapiTokenToUse
             },
             body: JSON.stringify(requestBody)
           });
@@ -309,7 +312,7 @@ serve(async (req: Request) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'token': instanceToken
+               'token': uazapiTokenToUse
             },
             body: JSON.stringify({
               number: formattedPhone,
