@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletTopup } from "@/hooks/useWalletTopup";
 import { usePricingSettings } from "@/hooks/usePricingSettings";
+import { Switch } from "@/components/ui/switch";
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -21,7 +22,7 @@ function formatBRL(value: number) {
 export default function Wallet() {
   const navigate = useNavigate();
   const { walletQuery, transactionsQuery } = useWallet();
-  const { pricingQuery, upsertMarkup } = usePricingSettings();
+  const { pricingQuery, upsertMarkup, setMarkupLocked } = usePricingSettings();
   const { createTopup, checkTopup } = useWalletTopup();
 
   const [topupOpen, setTopupOpen] = useState(false);
@@ -98,11 +99,24 @@ export default function Wallet() {
 
   const saveMarkup = async () => {
     try {
+      if (pricingQuery.data?.markup_locked) {
+        toast.message("Markup travado", { description: "O markup está travado pelo admin." });
+        return;
+      }
       const n = Number(markupDraft.replace(",", "."));
       await upsertMarkup.mutateAsync(n);
       toast.success("Markup salvo");
     } catch (e) {
       toast.error("Falha ao salvar", { description: e instanceof Error ? e.message : "Erro desconhecido" });
+    }
+  };
+
+  const toggleLocked = async (locked: boolean) => {
+    try {
+      await setMarkupLocked.mutateAsync(locked);
+      toast.success(locked ? "Markup travado" : "Markup destravado");
+    } catch (e) {
+      toast.error("Falha ao atualizar", { description: e instanceof Error ? e.message : "Erro desconhecido" });
     }
   };
 
@@ -170,6 +184,20 @@ export default function Wallet() {
                 <CardDescription>Define seu preço final: custo × (1 + markup/100)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium">Markup travado (global obrigatório)</div>
+                    <div className="text-xs text-muted-foreground">
+                      Quando ativado, usuários não podem personalizar o markup.
+                    </div>
+                  </div>
+                  <Switch
+                    checked={pricingQuery.data?.markup_locked ?? true}
+                    onCheckedChange={toggleLocked}
+                    disabled={pricingQuery.isLoading || setMarkupLocked.isPending}
+                  />
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="md:col-span-1">
                     <Label htmlFor="markup">Markup</Label>
@@ -179,10 +207,11 @@ export default function Wallet() {
                       onChange={(e) => setMarkupDraft(e.target.value.replace(/[^0-9.,]/g, ""))}
                       placeholder="50"
                       inputMode="decimal"
+                      disabled={pricingQuery.data?.markup_locked ?? true}
                     />
                   </div>
                   <div className="md:col-span-2 flex items-end gap-2">
-                    <Button type="button" onClick={saveMarkup} disabled={upsertMarkup.isPending}>
+                    <Button type="button" onClick={saveMarkup} disabled={upsertMarkup.isPending || (pricingQuery.data?.markup_locked ?? true)}>
                       {upsertMarkup.isPending ? "Salvando..." : "Salvar"}
                     </Button>
                     <div className="text-sm text-muted-foreground">

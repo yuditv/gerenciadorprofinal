@@ -9,11 +9,14 @@ export function usePricingSettings() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pricing_settings")
-        .select("markup_percent")
+        .select("markup_percent, markup_locked")
         .eq("id", 1)
         .maybeSingle();
       if (error) throw error;
-      return { markup_percent: Number(data?.markup_percent ?? 0) };
+      return {
+        markup_percent: Number(data?.markup_percent ?? 0),
+        markup_locked: Boolean(data?.markup_locked ?? true),
+      };
     },
   });
 
@@ -33,5 +36,18 @@ export function usePricingSettings() {
     },
   });
 
-  return { pricingQuery, upsertMarkup };
+  const setMarkupLocked = useMutation({
+    mutationFn: async (locked: boolean) => {
+      const { error } = await supabase
+        .from("pricing_settings")
+        .upsert({ id: 1, markup_locked: Boolean(locked) }, { onConflict: "id" });
+      if (error) throw error;
+      return Boolean(locked);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["wallet", "pricing"] });
+    },
+  });
+
+  return { pricingQuery, upsertMarkup, setMarkupLocked };
 }

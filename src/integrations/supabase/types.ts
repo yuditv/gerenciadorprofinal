@@ -2028,16 +2028,19 @@ export type Database = {
       pricing_settings: {
         Row: {
           id: number
+          markup_locked: boolean
           markup_percent: number
           updated_at: string
         }
         Insert: {
           id: number
+          markup_locked?: boolean
           markup_percent?: number
           updated_at?: string
         }
         Update: {
           id?: number
+          markup_locked?: boolean
           markup_percent?: number
           updated_at?: string
         }
