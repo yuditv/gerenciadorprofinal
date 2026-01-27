@@ -18,11 +18,15 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useSmmPanel } from "@/hooks/useSmmPanel";
 import { useWallet } from "@/hooks/useWallet";
+import { usePricingSettings } from "@/hooks/usePricingSettings";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 export default function Engajamento() {
   const navigate = useNavigate();
   const { balanceQuery, servicesQuery, addOrder, categories } = useSmmPanel();
   const { walletQuery } = useWallet();
+  const { pricingQuery } = usePricingSettings();
+  const { isAdmin } = useUserPermissions();
 
   const [serviceId, setServiceId] = useState<string>("");
   const [link, setLink] = useState("");
@@ -47,8 +51,27 @@ export default function Engajamento() {
     const qty = parseInt(quantity, 10);
     if (isNaN(rate) || isNaN(qty) || qty <= 0) return null;
     // rate is per 1000
-    return ((rate * qty) / 1000).toFixed(2);
+    return (rate * qty) / 1000;
   }, [selectedService, quantity]);
+
+  const priceBreakdown = useMemo(() => {
+    if (estimatedCost == null) return null;
+    const markup = Number(pricingQuery.data?.markup_percent ?? 0);
+    const providerCost = Number(estimatedCost);
+    if (!Number.isFinite(providerCost) || providerCost <= 0) return null;
+
+    const rawFinal = providerCost * (1 + markup / 100);
+    // sempre para cima (centavos)
+    const finalPrice = Math.ceil(rawFinal * 100) / 100;
+    const profit = Number((finalPrice - providerCost).toFixed(2));
+
+    return {
+      providerCost: Number(providerCost.toFixed(2)),
+      markup,
+      finalPrice: Number(finalPrice.toFixed(2)),
+      profit,
+    };
+  }, [estimatedCost, pricingQuery.data?.markup_percent]);
 
   const handleSidebarSectionChange = (section: string) => {
     // Mantém o padrão do app: trocar "seção" usando querystring na rota principal.
@@ -130,10 +153,17 @@ export default function Engajamento() {
                       {walletQuery.isLoading ? "..." : (walletQuery.data?.credits ?? 0).toFixed(2)}
                       <span className="ml-2 text-xs text-muted-foreground">cr</span>
                     </div>
-                    <Button type="button" size="sm" variant="outline" onClick={() => navigate("/carteira")}
-                      className="gap-2">
-                      Recarregar
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate("/carteira")}
+                        className="gap-2"
+                      >
+                        Recarregar
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -202,7 +232,7 @@ export default function Engajamento() {
                         )}
                         {selectedService.rate && (
                           <p className="text-muted-foreground">
-                            Rate: <span className="font-semibold text-foreground">{selectedService.rate}</span> por 1000
+                            Rate (custo): <span className="font-semibold text-foreground">{selectedService.rate}</span> por 1000
                           </p>
                         )}
                         {selectedService.min && selectedService.max && (
@@ -238,9 +268,14 @@ export default function Engajamento() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  {estimatedCost && (
-                    <div className="text-sm font-medium">
-                      Custo estimado: <span className="text-primary tabular-nums">{estimatedCost}</span>
+                  {priceBreakdown && (
+                    <div className="text-sm space-y-0.5">
+                      <div className="font-medium">
+                        Custo (API): <span className="text-primary tabular-nums">{priceBreakdown.providerCost.toFixed(2)}</span>
+                      </div>
+                      <div className="text-muted-foreground">
+                        Markup (global): <span className="tabular-nums">{priceBreakdown.markup.toFixed(2)}%</span> • Preço final: <span className="tabular-nums">{priceBreakdown.finalPrice.toFixed(2)}</span> • Lucro: <span className="tabular-nums">{priceBreakdown.profit.toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
                   <div className="flex-1" />
