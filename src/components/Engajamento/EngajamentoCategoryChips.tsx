@@ -27,10 +27,16 @@ export const EngajamentoCategoryChips = React.forwardRef<HTMLDivElement, Engajam
             onClick={() => onChange(c)}
             className={cn(
               "rounded-full px-4",
-              "transition-all",
+              "border",
+              "transition-all duration-200",
               active
-                ? "shadow-md"
-                : "border-primary/30 bg-card/50 hover:bg-primary/10 hover:border-primary/45",
+                ? "bg-primary text-primary-foreground border-primary shadow-[0_10px_30px_-12px_hsl(var(--primary)/0.55)]"
+                : [
+                    "bg-card/40 text-foreground",
+                    "border-primary/35",
+                    "hover:bg-primary/10 hover:border-primary/55",
+                    "hover:shadow-[0_10px_30px_-14px_hsl(var(--primary)/0.35)]",
+                  ].join(" "),
             )}
           >
             {label}
