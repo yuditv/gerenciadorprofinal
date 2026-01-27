@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.whatsapp-instances]
 verify_jwt = false
+
+[functions.smm-panel]
+verify_jwt = false
