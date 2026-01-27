@@ -1102,6 +1102,65 @@ export function ChatPanel({
         )}
 
         <div className="flex items-end gap-2">
+          {/* Actions moved OUT of the textarea (prevents the recorder UI from covering the input) */}
+          <div className="flex items-center gap-1 pb-2">
+            <EmojiPickerButton 
+              onEmojiSelect={handleEmojiSelect}
+              disabled={isSending}
+            />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsPrivate(!isPrivate)}
+                >
+                  <Lock className={cn(
+                    "h-4 w-4",
+                    isPrivate ? "text-yellow-500" : "text-muted-foreground"
+                  )} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isPrivate ? 'Nota privada' : 'Tornar nota privada'}
+              </TooltipContent>
+            </Tooltip>
+
+            <FileUploadButton
+              onFileUploaded={handleFileUploaded}
+              disabled={isSending}
+            />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setShowPIXDialog(true)}
+                  disabled={isSending}
+                >
+                  <QrCode className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Gerar PIX</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AudioRecorder
+                  onAudioReady={handleAudioReady}
+                  disabled={isSending || attachments.length > 0}
+                  onRecordingStart={() => sendPresence('recording')}
+                  onRecordingEnd={() => sendPresence('paused')}
+                />
+              </TooltipTrigger>
+              <TooltipContent>Gravar áudio</TooltipContent>
+            </Tooltip>
+          </div>
+
           <div className="flex-1 relative">
             {/* Quick Reply Autocomplete */}
             <QuickReplyAutocomplete
@@ -1124,69 +1183,12 @@ export function ChatPanel({
               }}
               onKeyDown={handleKeyDown}
               className={cn(
-                "min-h-[44px] max-h-32 resize-none pr-20 inbox-input-field",
+                "min-h-[44px] max-h-32 resize-none inbox-input-field",
                 "bg-inbox-input dark:bg-inbox-input",
                 isPrivate && "!border-amber-500/50 dark:!border-amber-500/40"
               )}
               rows={1}
             />
-            <div className="absolute right-2 bottom-2 flex items-center gap-1">
-              <EmojiPickerButton 
-                onEmojiSelect={handleEmojiSelect}
-                disabled={isSending}
-              />
-              
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setIsPrivate(!isPrivate)}
-                  >
-                    <Lock className={cn(
-                      "h-4 w-4",
-                      isPrivate ? "text-yellow-500" : "text-muted-foreground"
-                    )} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {isPrivate ? 'Nota privada' : 'Tornar nota privada'}
-                </TooltipContent>
-              </Tooltip>
-              
-              <FileUploadButton
-                onFileUploaded={handleFileUploaded}
-                disabled={isSending}
-              />
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setShowPIXDialog(true)}
-                    disabled={isSending}
-                  >
-                    <QrCode className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Gerar PIX</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <AudioRecorder
-                    onAudioReady={handleAudioReady}
-                    disabled={isSending || attachments.length > 0}
-                    onRecordingStart={() => sendPresence('recording')}
-                    onRecordingEnd={() => sendPresence('paused')}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>Gravar áudio</TooltipContent>
-              </Tooltip>
-            </div>
           </div>
           
           <Button 

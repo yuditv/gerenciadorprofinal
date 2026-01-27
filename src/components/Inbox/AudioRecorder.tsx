@@ -43,7 +43,8 @@ export function AudioRecorder({ onAudioReady, disabled, onRecordingStart, onReco
     analyserRef.current.getByteTimeDomainData(dataArray);
 
     // Clear canvas
-    ctx.fillStyle = 'hsl(var(--inbox-input))';
+     // Use a higher-contrast fill so waveform is visible on both themes
+     ctx.fillStyle = 'hsl(var(--background))';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw waveform
@@ -241,7 +242,7 @@ export function AudioRecorder({ onAudioReady, disabled, onRecordingStart, onReco
   // If we have a recorded audio, show the preview
   if (audioBlob) {
     return (
-      <div className="flex items-center gap-2 bg-inbox-input rounded-lg px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card/80 backdrop-blur px-3 py-2 shadow-sm">
         <Button
           variant="ghost"
           size="icon"
@@ -289,7 +290,7 @@ export function AudioRecorder({ onAudioReady, disabled, onRecordingStart, onReco
   // If recording, show waveform
   if (isRecording) {
     return (
-      <div className="flex items-center gap-2 bg-inbox-input rounded-lg px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-card/80 backdrop-blur px-3 py-2 shadow-sm">
         <Button
           variant="ghost"
           size="icon"
@@ -300,7 +301,7 @@ export function AudioRecorder({ onAudioReady, disabled, onRecordingStart, onReco
         </Button>
 
         {/* Live waveform canvas */}
-        <div className="flex-1 relative h-8 overflow-hidden rounded">
+        <div className="flex-1 relative h-8 overflow-hidden rounded bg-background/40">
           <canvas 
             ref={canvasRef}
             width={200}
@@ -309,7 +310,7 @@ export function AudioRecorder({ onAudioReady, disabled, onRecordingStart, onReco
           />
           {/* Recording indicator */}
           <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
           </div>
         </div>
 
