@@ -81,6 +81,9 @@
     --inbox-hover: 220 15% 94%;
     --inbox-active: 220 15% 92%;
     --inbox-unread: 0 85% 55%;
+
+    /* QR surface (kept white for PIX scanning) */
+    --qr-surface: 0 0% 100%;
   }
 
   .dark {
@@ -154,6 +157,9 @@
     --inbox-hover: 230 14% 14%;
     --inbox-active: 230 12% 18%;
     --inbox-unread: 0 65% 55%;
+
+    /* QR surface (kept white for PIX scanning) */
+    --qr-surface: 0 0% 100%;
   }
 
   /* ============================================
@@ -204,6 +210,9 @@
     --glass-border: 220 15% 30% / 0.14;
     --glass-shadow: 0 12px 44px hsl(0 0% 0% / 0.32);
     --glass-blur: 22px;
+
+    /* QR surface (kept white for PIX scanning) */
+    --qr-surface: 0 0% 100%;
   }
 }
 

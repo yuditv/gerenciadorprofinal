@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Bot, Flame, Crown, Headset, Search, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp } from "lucide-react";
+import { Users, Bot, Flame, Crown, Headset, Search, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import logoFuturistic from "@/assets/logo-red-futuristic.png";
@@ -268,6 +268,10 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                 <DropdownMenuItem onClick={() => navigate('/payment-history')} className="hover:bg-primary/10">
                   <CreditCard className="h-4 w-4 mr-2 text-primary" />
                   Histórico de Pagamentos
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/carteira')} className="hover:bg-primary/10">
+                  <Wallet className="h-4 w-4 mr-2 text-primary" />
+                  Carteira
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate('/my-dashboard')} className="hover:bg-primary/10">
                   <BarChart3 className="h-4 w-4 mr-2 text-primary" />

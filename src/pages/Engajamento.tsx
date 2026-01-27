@@ -17,10 +17,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useSmmPanel } from "@/hooks/useSmmPanel";
+import { useWallet } from "@/hooks/useWallet";
 
 export default function Engajamento() {
   const navigate = useNavigate();
   const { balanceQuery, servicesQuery, addOrder, categories } = useSmmPanel();
+  const { walletQuery } = useWallet();
 
   const [serviceId, setServiceId] = useState<string>("");
   const [link, setLink] = useState("");
@@ -119,6 +121,20 @@ export default function Engajamento() {
                   <span className="ml-2 text-base text-muted-foreground">
                     {balanceQuery.data?.currency ?? ""}
                   </span>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <div className="text-xs text-muted-foreground">Créditos disponíveis</div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <div className="text-lg font-semibold tabular-nums">
+                      {walletQuery.isLoading ? "..." : (walletQuery.data?.credits ?? 0).toFixed(2)}
+                      <span className="ml-2 text-xs text-muted-foreground">cr</span>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => navigate("/carteira")}
+                      className="gap-2">
+                      Recarregar
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">

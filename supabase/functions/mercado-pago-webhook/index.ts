@@ -513,6 +513,52 @@ serve(async (req) => {
       );
     }
 
+    // Third, try wallet topups
+    const { data: walletTopup } = await supabase
+      .from("wallet_topups")
+      .select("*")
+      .eq("external_id", externalPaymentId.toString())
+      .maybeSingle();
+
+    if (walletTopup && walletTopup.status !== "paid") {
+      console.log("[mercado-pago-webhook] Processing wallet topup:", walletTopup.id);
+
+      // Mark paid
+      await supabase
+        .from("wallet_topups")
+        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("id", walletTopup.id);
+
+      // Upsert wallet balance
+      const { data: existingWallet } = await supabase
+        .from("user_wallets")
+        .select("credits")
+        .eq("user_id", walletTopup.user_id)
+        .maybeSingle();
+
+      const current = Number(existingWallet?.credits ?? 0);
+      const nextCredits = Number((current + Number(walletTopup.credits)).toFixed(2));
+
+      await supabase
+        .from("user_wallets")
+        .upsert({ user_id: walletTopup.user_id, credits: nextCredits }, { onConflict: "user_id" });
+
+      // Ledger
+      await supabase.from("wallet_transactions").insert({
+        user_id: walletTopup.user_id,
+        type: "topup",
+        credits: Number(walletTopup.credits),
+        amount_brl: Number(walletTopup.amount_brl),
+        reference_type: "wallet_topup",
+        reference_id: walletTopup.id,
+      });
+
+      return new Response(
+        JSON.stringify({ received: true, type: "wallet_topup" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("[mercado-pago-webhook] Payment not found or already processed:", externalPaymentId);
     return new Response(
       JSON.stringify({ received: true }),
@@ -529,3 +575,4 @@ serve(async (req) => {
     );
   }
 });
+
