@@ -10,7 +10,14 @@ const corsHeaders = {
 const INSTALUXO_BASE_URL = "https://instaluxo.com/api/v2";
 const FETCH_TIMEOUT_MS = 15000;
 
-type Action = "balance" | "services" | "add" | "status";
+type Action =
+  | "balance"
+  | "services"
+  | "add"
+  | "status"
+  | "refill"
+  | "refill_status"
+  | "cancel";
 
 type RequestBody = {
   action: Action;
@@ -155,7 +162,18 @@ serve(async (req) => {
     const action = body?.action;
     const payload = (body?.payload ?? {}) as Record<string, unknown>;
 
-    if (!action || !["balance", "services", "add", "status"].includes(action)) {
+    if (
+      !action ||
+      ![
+        "balance",
+        "services",
+        "add",
+        "status",
+        "refill",
+        "refill_status",
+        "cancel",
+      ].includes(action)
+    ) {
       return json({ error: "Invalid action" }, 400);
     }
 
@@ -167,6 +185,29 @@ serve(async (req) => {
       if (!service || !Number.isFinite(service)) return json({ error: "service is required" }, 400);
       if (!link) return json({ error: "link is required" }, 400);
       if (!quantity || !Number.isFinite(quantity) || quantity <= 0) return json({ error: "quantity is required" }, 400);
+    }
+
+    if (action === "status") {
+      const order = payload.order;
+      const orders = payload.orders;
+      if (!order && !orders) return json({ error: "order or orders is required" }, 400);
+    }
+
+    if (action === "refill") {
+      const order = payload.order;
+      const orders = payload.orders;
+      if (!order && !orders) return json({ error: "order or orders is required" }, 400);
+    }
+
+    if (action === "refill_status") {
+      const refill = payload.refill;
+      const refills = payload.refills;
+      if (!refill && !refills) return json({ error: "refill or refills is required" }, 400);
+    }
+
+    if (action === "cancel") {
+      const orders = payload.orders;
+      if (!orders) return json({ error: "orders is required" }, 400);
     }
 
     const raw = await callSmmApi(action, payload);

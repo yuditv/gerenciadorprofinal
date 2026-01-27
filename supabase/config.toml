@@ -89,3 +89,6 @@ verify_jwt = false
 
 [functions.smm-panel]
 verify_jwt = false
+
+[functions.smm-orders]
+verify_jwt = false
