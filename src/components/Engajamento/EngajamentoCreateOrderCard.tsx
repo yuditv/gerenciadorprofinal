@@ -37,6 +37,18 @@ export function EngajamentoCreateOrderCard(props: {
 }) {
   const ALL_CATEGORIES_VALUE = "__all__";
 
+  type Platform = "TIKTOK" | "INSTAGRAM" | "FACEBOOK" | "YOUTUBE";
+  const PLATFORM_ORDER: Platform[] = ["TIKTOK", "INSTAGRAM", "FACEBOOK", "YOUTUBE"];
+
+  const detectPlatform = (s: SmmService): Platform | null => {
+    const hay = `${s.category ?? ""} ${s.name ?? ""}`.toLowerCase();
+    if (hay.includes("tiktok")) return "TIKTOK";
+    if (hay.includes("instagram") || hay.includes("insta")) return "INSTAGRAM";
+    if (hay.includes("facebook") || hay.includes("fb")) return "FACEBOOK";
+    if (hay.includes("youtube") || hay.includes("yt")) return "YOUTUBE";
+    return null;
+  };
+
   const { pricingQuery } = usePricingSettings();
   const { walletQuery } = useWallet();
   const { createOrder } = useSmmOrders();
@@ -53,11 +65,23 @@ export function EngajamentoCreateOrderCard(props: {
   const servicesErrorMessage =
     props.servicesError instanceof Error ? props.servicesError.message : "Erro desconhecido";
 
+  const availablePlatforms = useMemo(() => {
+    const present = new Set<Platform>();
+    for (const s of props.services) {
+      const p = detectPlatform(s);
+      if (p) present.add(p);
+    }
+    return PLATFORM_ORDER.filter((p) => present.has(p));
+  }, [props.services]);
+
   const filteredServices = useMemo(() => {
     const q = search.trim().toLowerCase();
     return props.services
       .filter((s) => {
-        if (category !== ALL_CATEGORIES_VALUE && (s.category ?? "").trim() !== category) return false;
+        if (category !== ALL_CATEGORIES_VALUE) {
+          const p = detectPlatform(s);
+          if (!p || p !== category) return false;
+        }
         if (!q) return true;
         return String(s.service).includes(q) || (s.name ?? "").toLowerCase().includes(q);
       })
@@ -164,15 +188,21 @@ export function EngajamentoCreateOrderCard(props: {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
           <div className="md:col-span-2">
             <Label>Categoria</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select
+              value={category}
+              onValueChange={(v) => {
+                setCategory(v);
+                setServiceId("");
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_CATEGORIES_VALUE}>Todas</SelectItem>
-                {props.categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {availablePlatforms.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {p}
                   </SelectItem>
                 ))}
               </SelectContent>
