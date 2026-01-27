@@ -2224,6 +2224,63 @@ export type Database = {
         }
         Relationships: []
       }
+      smm_orders: {
+        Row: {
+          created_at: string
+          credits_spent: number
+          error_message: string | null
+          id: string
+          link: string
+          markup_percent: number
+          price_brl: number
+          profit_brl: number
+          provider_cost_brl: number
+          provider_order_id: string | null
+          provider_rate_per_1000: number | null
+          quantity: number
+          service_id: number
+          service_name: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_spent: number
+          error_message?: string | null
+          id?: string
+          link: string
+          markup_percent: number
+          price_brl: number
+          profit_brl: number
+          provider_cost_brl: number
+          provider_order_id?: string | null
+          provider_rate_per_1000?: number | null
+          quantity: number
+          service_id: number
+          service_name?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_spent?: number
+          error_message?: string | null
+          id?: string
+          link?: string
+          markup_percent?: number
+          price_brl?: number
+          profit_brl?: number
+          provider_cost_brl?: number
+          provider_order_id?: string | null
+          provider_rate_per_1000?: number | null
+          quantity?: number
+          service_id?: number
+          service_name?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       status_schedules: {
         Row: {
           background_color: number | null
@@ -2524,6 +2581,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_pricing_settings: {
+        Row: {
+          created_at: string
+          markup_percent: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          markup_percent?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          markup_percent?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -2591,6 +2669,105 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_wallets: {
+        Row: {
+          created_at: string
+          credits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wallet_topups: {
+        Row: {
+          amount_brl: number
+          created_at: string
+          credits: number
+          expires_at: string
+          external_id: string | null
+          id: string
+          paid_at: string | null
+          pix_code: string | null
+          pix_qr_code: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_brl: number
+          created_at?: string
+          credits: number
+          expires_at: string
+          external_id?: string | null
+          id?: string
+          paid_at?: string | null
+          pix_code?: string | null
+          pix_qr_code?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_brl?: number
+          created_at?: string
+          credits?: number
+          expires_at?: string
+          external_id?: string | null
+          id?: string
+          paid_at?: string | null
+          pix_code?: string | null
+          pix_qr_code?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wallet_transactions: {
+        Row: {
+          amount_brl: number | null
+          created_at: string
+          credits: number
+          id: string
+          reference_id: string | null
+          reference_type: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount_brl?: number | null
+          created_at?: string
+          credits: number
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount_brl?: number | null
+          created_at?: string
+          credits?: number
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       whatsapp_agent_routing: {
         Row: {
