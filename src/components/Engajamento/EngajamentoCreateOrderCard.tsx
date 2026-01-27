@@ -37,16 +37,47 @@ export function EngajamentoCreateOrderCard(props: {
 }) {
   const ALL_CATEGORIES_VALUE = "__all__";
 
-  type Platform = "TIKTOK" | "INSTAGRAM" | "FACEBOOK" | "YOUTUBE";
-  const PLATFORM_ORDER: Platform[] = ["TIKTOK", "INSTAGRAM", "FACEBOOK", "YOUTUBE"];
+  const extractPlatform = (s: SmmService): string | null => {
+    // Objetivo: Categoria = "plataforma" (TikTok/Instagram/etc) e NÃO o texto completo do serviço.
+    // A maioria dos painéis vem com category tipo "Instagram - Followers".
+    const raw = String(s.category ?? "").trim();
+    if (!raw) return null;
 
-  const detectPlatform = (s: SmmService): Platform | null => {
-    const hay = `${s.category ?? ""} ${s.name ?? ""}`.toLowerCase();
-    if (hay.includes("tiktok")) return "TIKTOK";
-    if (hay.includes("instagram") || hay.includes("insta")) return "INSTAGRAM";
-    if (hay.includes("facebook") || hay.includes("fb")) return "FACEBOOK";
-    if (hay.includes("youtube") || hay.includes("yt")) return "YOUTUBE";
-    return null;
+    // separadores comuns
+    const head = raw.split(/\s*[-|/\\>]\s*/)[0]?.trim();
+    const clean = (head || raw).trim();
+    if (!clean) return null;
+
+    // normaliza variações mais comuns
+    const lower = clean.toLowerCase();
+    const map: Record<string, string> = {
+      insta: "INSTAGRAM",
+      instagram: "INSTAGRAM",
+      ig: "INSTAGRAM",
+      tiktok: "TIKTOK",
+      tik: "TIKTOK",
+      youtube: "YOUTUBE",
+      yt: "YOUTUBE",
+      facebook: "FACEBOOK",
+      fb: "FACEBOOK",
+      twitter: "TWITTER",
+      x: "X",
+      telegram: "TELEGRAM",
+      whatsapp: "WHATSAPP",
+      spotify: "SPOTIFY",
+      twitch: "TWITCH",
+      kwai: "KWAI",
+      pinterest: "PINTEREST",
+      linkedin: "LINKEDIN",
+      snapchat: "SNAPCHAT",
+      discord: "DISCORD",
+      threads: "THREADS",
+    };
+
+    // pega a primeira palavra como chave (ex.: "Instagram Reels" -> "instagram")
+    const firstWord = lower.split(/\s+/)[0] ?? lower;
+    const normalized = map[firstWord];
+    return normalized ?? clean.toUpperCase();
   };
 
   const { pricingQuery } = usePricingSettings();
@@ -66,12 +97,29 @@ export function EngajamentoCreateOrderCard(props: {
     props.servicesError instanceof Error ? props.servicesError.message : "Erro desconhecido";
 
   const availablePlatforms = useMemo(() => {
-    const present = new Set<Platform>();
+    const present = new Set<string>();
     for (const s of props.services) {
-      const p = detectPlatform(s);
+      const p = extractPlatform(s);
       if (p) present.add(p);
     }
-    return PLATFORM_ORDER.filter((p) => present.has(p));
+
+    const preferred = [
+      "INSTAGRAM",
+      "TIKTOK",
+      "WHATSAPP",
+      "YOUTUBE",
+      "FACEBOOK",
+      "TELEGRAM",
+      "TWITTER",
+      "X",
+    ];
+
+    const rest = Array.from(present)
+      .filter((p) => !preferred.includes(p))
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+    const ordered = preferred.filter((p) => present.has(p));
+    return [...ordered, ...rest];
   }, [props.services]);
 
   const filteredServices = useMemo(() => {
@@ -79,7 +127,7 @@ export function EngajamentoCreateOrderCard(props: {
     return props.services
       .filter((s) => {
         if (category !== ALL_CATEGORIES_VALUE) {
-          const p = detectPlatform(s);
+          const p = extractPlatform(s);
           if (!p || p !== category) return false;
         }
         if (!q) return true;
