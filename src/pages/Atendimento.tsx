@@ -392,7 +392,7 @@ export default function Atendimento() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-full min-h-0 flex flex-col bg-background overflow-hidden">
       {/* Subscription Expired Banner */}
       {subscriptionExpired && (
         <motion.div
