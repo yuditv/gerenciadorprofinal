@@ -41,32 +41,13 @@ const COLORS = [
 ];
 
 const AI_MODELS = [
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', description: 'Recomendado (compatível com Gemini direto)' },
-  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Rápido e estável' },
-  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', description: 'Mais inteligente (pode ser mais lento)' },
+  { value: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash (Preview)', description: 'Padrão (rápido e capaz)' },
+  { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Equilíbrio velocidade/qualidade' },
+  { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', description: 'Mais inteligente, raciocínio complexo' },
+  { value: 'openai/gpt-5-mini', label: 'GPT-5 Mini', description: 'Rápido e econômico (OpenAI)' },
 ];
 
-const DEFAULT_DIRECT_GEMINI_MODEL = 'gemini-2.0-flash';
-
-function normalizeDirectGeminiModel(model: string | null | undefined) {
-  const raw = (model ?? '').trim();
-  let normalized = raw;
-
-  if (normalized.startsWith('google/')) {
-    normalized = normalized.slice('google/'.length);
-  }
-
-  const lower = normalized.toLowerCase();
-  const looksLikeDirectGemini = lower.startsWith('gemini-') && !lower.includes('/');
-  const unsupportedForDirectEndpoint =
-    lower.startsWith('gemini-2.5-') ||
-    lower.startsWith('gemini-3-') ||
-    lower.includes('preview');
-
-  if (!raw) return DEFAULT_DIRECT_GEMINI_MODEL;
-  if (!looksLikeDirectGemini || unsupportedForDirectEndpoint) return DEFAULT_DIRECT_GEMINI_MODEL;
-  return normalized;
-}
+const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 
 export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAgentDialogProps) {
   const { createAgent, updateAgent } = useAIAgents();
@@ -83,7 +64,7 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
     is_chat_enabled: true,
     use_native_ai: true,
     system_prompt: '',
-    ai_model: DEFAULT_DIRECT_GEMINI_MODEL,
+    ai_model: DEFAULT_LOVABLE_MODEL,
     // Message sending defaults
     response_delay_min: 2,
     response_delay_max: 5,
@@ -126,7 +107,7 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
         is_chat_enabled: editingAgent.is_chat_enabled,
         use_native_ai: editingAgent.use_native_ai ?? true,
         system_prompt: editingAgent.system_prompt || '',
-        ai_model: normalizeDirectGeminiModel(editingAgent.ai_model || DEFAULT_DIRECT_GEMINI_MODEL),
+        ai_model: editingAgent.ai_model || DEFAULT_LOVABLE_MODEL,
         // Message sending config
         response_delay_min: editingAgent.response_delay_min ?? 2,
         response_delay_max: editingAgent.response_delay_max ?? 5,
@@ -167,7 +148,7 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
         is_chat_enabled: true,
         use_native_ai: true,
         system_prompt: '',
-        ai_model: DEFAULT_DIRECT_GEMINI_MODEL,
+        ai_model: DEFAULT_LOVABLE_MODEL,
         response_delay_min: 2,
         response_delay_max: 5,
         max_lines_per_message: 0,
@@ -201,17 +182,10 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
       return; // Webhook URL is required for non-native agents
     }
     
-    const payload: CreateAgentInput = {
-      ...formData,
-      ai_model: formData.use_native_ai
-        ? normalizeDirectGeminiModel(formData.ai_model)
-        : formData.ai_model,
-    };
-
     if (isEditing && editingAgent) {
-      await updateAgent.mutateAsync({ id: editingAgent.id, ...payload });
+      await updateAgent.mutateAsync({ id: editingAgent.id, ...formData });
     } else {
-      await createAgent.mutateAsync(payload);
+      await createAgent.mutateAsync(formData);
     }
     
     onOpenChange(false);

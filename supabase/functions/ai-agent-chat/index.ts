@@ -7,36 +7,38 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
 };
 
-const DEFAULT_DIRECT_GEMINI_MODEL = 'gemini-2.0-flash';
+const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 
-function normalizeDirectGeminiModel(input: string | null | undefined) {
+const LOVABLE_ALLOWED_MODELS = new Set([
+  'openai/gpt-5-mini',
+  'openai/gpt-5',
+  'openai/gpt-5-nano',
+  'openai/gpt-5.2',
+  'google/gemini-2.5-pro',
+  'google/gemini-2.5-flash',
+  'google/gemini-2.5-flash-lite',
+  'google/gemini-2.5-flash-image',
+  'google/gemini-3-pro-preview',
+  'google/gemini-3-flash-preview',
+  'google/gemini-3-pro-image-preview',
+]);
+
+function normalizeLovableModel(input: string | null | undefined) {
   const raw = (input ?? '').trim();
-  let normalized = raw;
+  if (!raw) return { requestedModel: null as string | null, normalizedModel: DEFAULT_LOVABLE_MODEL };
 
-  // Accept legacy "google/gemini-*" values saved by older UI/gateways.
-  if (normalized.startsWith('google/')) {
-    normalized = normalized.slice('google/'.length);
+  // If agent was previously configured for direct Gemini (e.g. "gemini-1.5-pro"),
+  // map to a safe default available in Lovable AI.
+  if (raw.startsWith('gemini-')) {
+    return { requestedModel: raw, normalizedModel: DEFAULT_LOVABLE_MODEL };
   }
 
-  // If anything still has a provider prefix or doesn't look like a direct Gemini model,
-  // fall back to a safe default that works with the Generative Language API.
-  const lower = normalized.toLowerCase();
-  const looksLikeDirectGemini = lower.startsWith('gemini-') && !lower.includes('/');
-
-  const unsupportedForDirectEndpoint =
-    lower.startsWith('gemini-2.5-') ||
-    lower.startsWith('gemini-3-') ||
-    lower.includes('preview');
-
-  if (!raw) {
-    return { requestedModel: null as string | null, normalizedModel: DEFAULT_DIRECT_GEMINI_MODEL };
+  // Keep provider-prefixed models if supported.
+  if (LOVABLE_ALLOWED_MODELS.has(raw)) {
+    return { requestedModel: raw, normalizedModel: raw };
   }
 
-  if (!looksLikeDirectGemini || unsupportedForDirectEndpoint) {
-    return { requestedModel: raw, normalizedModel: DEFAULT_DIRECT_GEMINI_MODEL };
-  }
-
-  return { requestedModel: raw, normalizedModel: normalized };
+  return { requestedModel: raw, normalizedModel: DEFAULT_LOVABLE_MODEL };
 }
 
 interface ChatRequest {
@@ -614,17 +616,14 @@ serve(async (req: Request) => {
 
     // Check if using native AI (Google Gemini API) or external webhook
     if (agent.use_native_ai) {
-      // ============ NATIVE AI INTEGRATION (GOOGLE GEMINI API DIRECT) ============
-      const { requestedModel, normalizedModel } = normalizeDirectGeminiModel(agent.ai_model);
-      console.log(
-        `[ai-agent-chat] Using Google Gemini API directly. requestedModel=${requestedModel ?? 'null'} normalizedModel=${normalizedModel}`
-      );
-      
-      const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-      
-      if (!GEMINI_API_KEY) {
-        console.error('GEMINI_API_KEY not configured');
-        aiError = 'Google Gemini API key not configured';
+      // ============ NATIVE AI INTEGRATION (LOVABLE AI GATEWAY) ============
+      const { requestedModel, normalizedModel } = normalizeLovableModel(agent.ai_model);
+      console.log(`[ai-agent-chat] Using Lovable AI Gateway. requestedModel=${requestedModel ?? 'null'} normalizedModel=${normalizedModel}`);
+
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) {
+        console.error('[ai-agent-chat] LOVABLE_API_KEY not configured');
+        aiError = 'Lovable AI key not configured';
         assistantResponse = 'Desculpe, o serviço de IA não está configurado corretamente. Contate o administrador.';
       } else {
         try {
@@ -638,7 +637,7 @@ serve(async (req: Request) => {
 
           // Build system prompt with client context and anti-hallucination rules
           const baseSystemPrompt = agent.system_prompt || 'Você é um assistente útil e prestativo. Responda sempre em português brasileiro.';
-          
+
           // Anti-hallucination rules
           const antiHallucinationRules = agent.anti_hallucination_enabled !== false ? `
 
@@ -673,7 +672,7 @@ serve(async (req: Request) => {
    - Se o cliente pedir algo fora do seu escopo, direcione para um atendente humano
 ` : '';
 
-          // ============ CANNED RESPONSES INTEGRATION ============
+          // ============ CANNED RESPONSES INTEGRATION ==========
           let cannedResponsesContext = '';
           if (agent.use_canned_responses !== false) {
             const { data: cannedResponses, error: cannedError } = await supabaseAdmin
@@ -681,12 +680,12 @@ serve(async (req: Request) => {
               .select('short_code, content')
               .or(`user_id.eq.${agent.created_by},is_global.eq.true`)
               .order('short_code');
-            
+
             if (cannedError) {
               console.error('[ai-agent-chat] Error fetching canned responses:', cannedError);
             } else if (cannedResponses && cannedResponses.length > 0) {
               console.log(`[ai-agent-chat] Loaded ${cannedResponses.length} canned responses for context`);
-              
+
               cannedResponsesContext = `
 
 ## RESPOSTAS RÁPIDAS DISPONÍVEIS (BASE DE CONHECIMENTO)
@@ -707,18 +706,15 @@ INSTRUÇÕES IMPORTANTES:
           const enrichedSystemPrompt = baseSystemPrompt + antiHallucinationRules + cannedResponsesContext + clientContext;
 
           // Build messages array with system prompt and history
-          const messages: AIMessage[] = [
-            { role: 'system', content: enrichedSystemPrompt },
-          ];
+          const messages: AIMessage[] = [{ role: 'system', content: enrichedSystemPrompt }];
 
           // Add history (excluding the message we just saved)
           if (history && history.length > 0) {
             for (const msg of history) {
-              // Skip the last user message since we'll add it fresh
               if (msg.role === 'user' && msg.content === message) continue;
               messages.push({
                 role: msg.role as 'user' | 'assistant',
-                content: msg.content
+                content: msg.content,
               });
             }
           }
@@ -726,152 +722,87 @@ INSTRUÇÕES IMPORTANTES:
           // Add current user message
           messages.push({ role: 'user', content: message });
 
-          console.log(`Sending ${messages.length} messages to Google Gemini API`);
-
-          // Convert messages to Gemini format
-          const geminiContents = [];
-          let systemInstruction = '';
-          
-          for (const msg of messages) {
-            if (msg.role === 'system') {
-              systemInstruction = msg.content;
-            } else {
-              geminiContents.push({
-                role: msg.role === 'user' ? 'user' : 'model',
-                parts: [{ text: msg.content }]
-              });
-            }
-          }
-
-          // Build tools array for Gemini format
-          const geminiTools: any[] = [];
-          const functionDeclarations: any[] = [];
-          
-          // Add extraction tool if memory auto-extract is enabled
+          // Build OpenAI-compatible tools array (Lovable AI Gateway)
+          const tools: any[] = [];
           if (agent.memory_enabled && agent.memory_auto_extract && phone) {
-            functionDeclarations.push(extractionToolDef.function);
+            tools.push({ type: 'function', function: extractionToolDef.function });
           }
-          
-          // Add transfer tool if there are available target agents
+
           const transferTool = buildTransferTool(availableTargetAgents);
           if (transferTool) {
-            functionDeclarations.push(transferTool.function);
+            tools.push({ type: 'function', function: transferTool.function });
             console.log(`[ai-agent-chat] Transfer tool added with ${availableTargetAgents.length} target agents`);
           }
-          
-          // Add PIX generation tool if there are available plans
+
           const pixTool = buildPIXTool(availablePlans);
           if (pixTool) {
-            functionDeclarations.push(pixTool.function);
+            tools.push({ type: 'function', function: pixTool.function });
             console.log(`[ai-agent-chat] PIX tool added with ${availablePlans.length} plans`);
           }
-          
-          if (functionDeclarations.length > 0) {
-            geminiTools.push({ functionDeclarations });
-          }
 
-          // Prepare Gemini request body
-          const geminiRequestBody: any = {
-            contents: geminiContents,
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1000,
-            }
-          };
-          
-          if (systemInstruction) {
-            geminiRequestBody.systemInstruction = { parts: [{ text: systemInstruction }] };
-          }
-          
-          if (geminiTools.length > 0) {
-            geminiRequestBody.tools = geminiTools;
-          }
+          console.log(`[ai-agent-chat] Sending ${messages.length} messages to Lovable AI Gateway`);
 
-          // Call Google Gemini API directly
-          const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${normalizedModel}:generateContent?key=${GEMINI_API_KEY}`;
-          
-          const aiResponse = await fetch(geminiApiUrl, {
+          const gatewayResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json'
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              'Content-Type': 'application/json',
             },
-            body: JSON.stringify(geminiRequestBody)
+            body: JSON.stringify({
+              model: normalizedModel,
+              messages,
+              ...(tools.length > 0 ? { tools } : {}),
+            }),
           });
 
-          if (!aiResponse.ok) {
-            const errorText = await aiResponse.text();
-            console.error('Google Gemini API error:', aiResponse.status, errorText);
-            
-            // Handle specific error codes
-            if (aiResponse.status === 429) {
-              aiError = 'Rate limit exceeded';
+          if (!gatewayResp.ok) {
+            const t = await gatewayResp.text();
+            console.error('[ai-agent-chat] Lovable AI Gateway error:', gatewayResp.status, t);
+            if (gatewayResp.status === 429) {
+              aiError = 'Rate limits exceeded';
               assistantResponse = 'Desculpe, estamos com muitas requisições no momento. Por favor, tente novamente em alguns segundos.';
-            } else if (aiResponse.status === 403) {
-              aiError = 'API key invalid or quota exceeded';
-              assistantResponse = 'Desculpe, há um problema com a chave da API. Contate o administrador.';
+            } else if (gatewayResp.status === 402) {
+              aiError = 'Payment required';
+              assistantResponse = 'Desculpe, a IA está sem créditos no momento. Contate o administrador.';
             } else {
-              aiError = `Gemini API returned status ${aiResponse.status} (normalizedModel=${normalizedModel}${requestedModel && requestedModel !== normalizedModel ? `, requestedModel=${requestedModel}` : ''})`;
+              aiError = `AI gateway returned status ${gatewayResp.status}`;
               assistantResponse = 'Desculpe, estou com dificuldades técnicas no momento. Por favor, tente novamente mais tarde.';
             }
           } else {
-            const geminiData = await aiResponse.json();
-            
-            if (geminiData.error) {
-              console.error('Gemini API error:', geminiData.error);
-              aiError = `${geminiData.error.message} (normalizedModel=${normalizedModel}${requestedModel && requestedModel !== normalizedModel ? `, requestedModel=${requestedModel}` : ''})`;
+            const gatewayData: AIResponse = await gatewayResp.json();
+            if (gatewayData.error?.message) {
+              aiError = gatewayData.error.message;
               assistantResponse = 'Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.';
-            } else if (geminiData.candidates && geminiData.candidates.length > 0) {
-              const candidate = geminiData.candidates[0];
-              const content = candidate.content;
-              
-              // Extract text response
-              if (content && content.parts) {
-                for (const part of content.parts) {
-                  if (part.text) {
-                    assistantResponse += part.text;
+            } else {
+              const msg = gatewayData.choices?.[0]?.message;
+              if (msg?.content) assistantResponse = msg.content;
+
+              const toolCalls = msg?.tool_calls || [];
+              for (const tc of toolCalls) {
+                const fn = tc?.function?.name;
+                const argsStr = tc?.function?.arguments;
+                if (!fn || !argsStr) continue;
+                try {
+                  const parsedArgs = JSON.parse(argsStr);
+                  if (fn === 'save_client_info') {
+                    extractedInfo = parsedArgs as ExtractedClientInfo;
+                    console.log('[ai-agent-chat] Extracted client info:', extractedInfo);
+                  } else if (fn === 'transfer_to_specialist') {
+                    transferDecision = parsedArgs as TransferDecision;
+                    console.log('[ai-agent-chat] AI decided to transfer:', transferDecision);
+                  } else if (fn === 'generate_pix_payment') {
+                    pixDecision = parsedArgs as PIXGenerationDecision;
+                    console.log('[ai-agent-chat] AI decided to generate PIX:', pixDecision);
                   }
-                  
-                  // Check for function calls (tool calls in Gemini format)
-                  if (part.functionCall) {
-                    const functionCall = part.functionCall;
-                    const functionName = functionCall.name;
-                    const functionArgs = functionCall.args;
-                    
-                    if (functionName === 'save_client_info') {
-                      try {
-                        extractedInfo = functionArgs as ExtractedClientInfo;
-                        console.log('[ai-agent-chat] Extracted client info:', extractedInfo);
-                      } catch (parseErr) {
-                        console.error('[ai-agent-chat] Error parsing save_client_info arguments:', parseErr);
-                      }
-                    } else if (functionName === 'transfer_to_specialist') {
-                      try {
-                        transferDecision = functionArgs as TransferDecision;
-                        console.log('[ai-agent-chat] AI decided to transfer:', transferDecision);
-                      } catch (parseErr) {
-                        console.error('[ai-agent-chat] Error parsing transfer_to_specialist arguments:', parseErr);
-                      }
-                    } else if (functionName === 'generate_pix_payment') {
-                      try {
-                        pixDecision = functionArgs as PIXGenerationDecision;
-                        console.log('[ai-agent-chat] AI decided to generate PIX:', pixDecision);
-                      } catch (parseErr) {
-                        console.error('[ai-agent-chat] Error parsing generate_pix_payment arguments:', parseErr);
-                      }
-                    }
-                  }
+                } catch (e) {
+                  console.error('[ai-agent-chat] Error parsing tool arguments:', fn, e);
                 }
               }
-              
-              console.log('Google Gemini API response received successfully');
-            } else {
-              aiError = 'No response from Gemini';
-              assistantResponse = 'Desculpe, não recebi uma resposta válida. Por favor, tente novamente.';
             }
           }
-        } catch (fetchError: unknown) {
-          console.error('Error calling Google Gemini API:', fetchError);
-          aiError = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+        } catch (err) {
+          console.error('[ai-agent-chat] Error calling Lovable AI Gateway:', err);
+          aiError = err instanceof Error ? err.message : 'Unknown error';
           assistantResponse = 'Desculpe, não foi possível conectar ao serviço de IA. Por favor, tente novamente.';
         }
       }
@@ -1108,7 +1039,7 @@ INSTRUÇÕES IMPORTANTES:
           source, 
           phone,
           error: aiError,
-          model: agent.use_native_ai ? normalizeDirectGeminiModel(agent.ai_model).normalizedModel : 'webhook',
+          model: agent.use_native_ai ? (agent.ai_model || DEFAULT_LOVABLE_MODEL) : 'webhook',
           extractedInfo: extractedInfo || undefined,
           transferDecision: transferDecision || undefined,
           transferExecuted,
