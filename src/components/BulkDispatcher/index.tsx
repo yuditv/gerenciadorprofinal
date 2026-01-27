@@ -13,7 +13,8 @@ import { PhonePreview } from './PhonePreview';
 import { BottomPanel } from './BottomPanel';
 import { DispatchProgress } from './DispatchProgress';
 import { ConfigManager } from './ConfigManager';
-import { useBulkDispatch, DispatchMessage } from '@/hooks/useBulkDispatch';
+import { DispatchMessage } from '@/hooks/useBulkDispatch';
+import { useBulkDispatchContext } from '@/contexts/BulkDispatchContext';
 import { useDispatchConfigs } from '@/hooks/useDispatchConfigs';
 import { useWhatsAppInstances } from '@/hooks/useWhatsAppInstances';
 import { useContactsSupabase } from '@/hooks/useContactsSupabase';
@@ -61,7 +62,7 @@ export function BulkDispatcher() {
     resumeDispatch,
     cancelDispatch,
     loadConfig,
-  } = useBulkDispatch();
+  } = useBulkDispatchContext();
   
   const {
     configs: savedConfigs,
