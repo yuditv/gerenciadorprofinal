@@ -117,9 +117,9 @@ Deno.serve(async (req) => {
     const UAZAPI_URL = getUazapiBaseUrl();
     console.log(`[fetch-messages] Using UAZAPI base URL: ${UAZAPI_URL}`);
 
-    // Prefer global token from secrets; fallback to instance_key for legacy setups
+    // Prefer instance_key (session token) as you confirmed; fallback to global secret if needed
     const UAZAPI_TOKEN = (Deno.env.get('UAZAPI_TOKEN') ?? '').trim();
-    const uazapiTokenToUse = UAZAPI_TOKEN || instanceKey;
+    const uazapiTokenToUse = instanceKey || UAZAPI_TOKEN;
 
     // Helper function for fetch with timeout (no retries to save resources)
     const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 25000) => {
