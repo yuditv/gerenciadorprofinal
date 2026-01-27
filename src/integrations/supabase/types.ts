@@ -2247,54 +2247,90 @@ export type Database = {
       }
       smm_orders: {
         Row: {
+          cancelled_at: string | null
           created_at: string
           credits_spent: number
           error_message: string | null
           id: string
+          last_synced_at: string | null
           link: string
           markup_percent: number
+          meta: Json
           price_brl: number
           profit_brl: number
+          profit_real_brl: number | null
+          provider_charge: number | null
           provider_cost_brl: number
+          provider_currency: string | null
           provider_order_id: string | null
           provider_rate_per_1000: number | null
+          provider_refill_id: string | null
+          provider_refill_status: string | null
+          provider_remains: number | null
+          provider_start_count: number | null
+          provider_status: string | null
           quantity: number
+          requested_refill_at: string | null
           service_id: number
           service_name: string | null
           status: string
           user_id: string
         }
         Insert: {
+          cancelled_at?: string | null
           created_at?: string
           credits_spent: number
           error_message?: string | null
           id?: string
+          last_synced_at?: string | null
           link: string
           markup_percent: number
+          meta?: Json
           price_brl: number
           profit_brl: number
+          profit_real_brl?: number | null
+          provider_charge?: number | null
           provider_cost_brl: number
+          provider_currency?: string | null
           provider_order_id?: string | null
           provider_rate_per_1000?: number | null
+          provider_refill_id?: string | null
+          provider_refill_status?: string | null
+          provider_remains?: number | null
+          provider_start_count?: number | null
+          provider_status?: string | null
           quantity: number
+          requested_refill_at?: string | null
           service_id: number
           service_name?: string | null
           status?: string
           user_id: string
         }
         Update: {
+          cancelled_at?: string | null
           created_at?: string
           credits_spent?: number
           error_message?: string | null
           id?: string
+          last_synced_at?: string | null
           link?: string
           markup_percent?: number
+          meta?: Json
           price_brl?: number
           profit_brl?: number
+          profit_real_brl?: number | null
+          provider_charge?: number | null
           provider_cost_brl?: number
+          provider_currency?: string | null
           provider_order_id?: string | null
           provider_rate_per_1000?: number | null
+          provider_refill_id?: string | null
+          provider_refill_status?: string | null
+          provider_remains?: number | null
+          provider_start_count?: number | null
+          provider_status?: string | null
           quantity?: number
+          requested_refill_at?: string | null
           service_id?: number
           service_name?: string | null
           status?: string
