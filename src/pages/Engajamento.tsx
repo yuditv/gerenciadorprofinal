@@ -14,10 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useSmmPanel } from "@/hooks/useSmmPanel";
+import { EngajamentoCategoryChips } from "@/components/Engajamento/EngajamentoCategoryChips";
+import { EngajamentoServiceList } from "@/components/Engajamento/EngajamentoServiceList";
 
 export default function Engajamento() {
   const navigate = useNavigate();
@@ -90,7 +91,7 @@ export default function Engajamento() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col w-full relative">
+    <div className="min-h-screen flex flex-col w-full relative theme-engajamento">
       <SubscriptionBanner />
       <FloatingSidebar
         activeSection="engajamento"
@@ -101,7 +102,7 @@ export default function Engajamento() {
         <div className="mx-auto w-full max-w-6xl space-y-6">
           <header className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shadow-sm">
                 <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <div>
@@ -271,55 +272,24 @@ export default function Engajamento() {
                 </div>
               </div>
 
+              <EngajamentoCategoryChips
+                categories={categories}
+                value={category}
+                onChange={setCategory}
+                className="pt-1"
+              />
+
               <Separator />
 
-              <ScrollArea className="h-[420px]">
-                {servicesQuery.isLoading ? (
-                  <div className="py-10 text-center text-sm text-muted-foreground">Carregando serviços...</div>
-                ) : servicesQuery.isError ? (
-                  <div className="py-10 text-center space-y-3">
-                    <div className="text-sm text-destructive">{servicesErrorMessage}</div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => servicesQuery.refetch()}
-                      disabled={servicesQuery.isFetching}
-                      className="gap-2"
-                    >
-                      <RefreshCw className={servicesQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-                      Tentar novamente
-                    </Button>
-                  </div>
-                ) : filteredServices.length === 0 ? (
-                  <div className="py-10 text-center text-sm text-muted-foreground">Nenhum serviço encontrado</div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredServices.slice(0, 500).map((s) => (
-                      <button
-                        key={s.service}
-                        type="button"
-                        onClick={() => setServiceId(String(s.service))}
-                        className="w-full text-left rounded-lg border border-border px-3 py-3 hover:bg-muted/30 transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-medium">
-                              #{s.service} — {s.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {s.category ?? "Sem categoria"}
-                            </div>
-                          </div>
-                          <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                            {s.rate ? `Rate: ${s.rate}` : ""}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
+              <EngajamentoServiceList
+                isLoading={servicesQuery.isLoading}
+                isError={servicesQuery.isError}
+                errorMessage={servicesErrorMessage}
+                isFetching={servicesQuery.isFetching}
+                onRetry={() => servicesQuery.refetch()}
+                services={filteredServices}
+                onSelectService={(id) => setServiceId(String(id))}
+              />
             </CardContent>
           </Card>
         </div>

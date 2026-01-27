@@ -155,6 +155,56 @@
     --inbox-active: 230 12% 18%;
     --inbox-unread: 0 65% 55%;
   }
+
+  /* ============================================
+     Engajamento (SMM) scoped theme
+     Dark clean + red primary + subtle purple accent
+     Apply by adding className="theme-engajamento" to a wrapper element.
+     ============================================ */
+  .theme-engajamento {
+    --background: 230 18% 7%;
+    --foreground: 220 12% 90%;
+
+    --card: 230 16% 10%;
+    --card-foreground: 220 12% 90%;
+
+    --popover: 230 16% 10%;
+    --popover-foreground: 220 12% 90%;
+
+    /* Red primary */
+    --primary: 0 78% 56%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Purple accent (requested) */
+    --accent: 270 78% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --secondary: 230 14% 15%;
+    --secondary-foreground: 220 12% 84%;
+
+    --muted: 230 12% 17%;
+    --muted-foreground: 220 8% 56%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 230 14% 20%;
+    --input: 230 14% 13%;
+    --ring: 0 78% 56%;
+
+    /* More “panel-like” glow, but still clean */
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.18);
+    --shadow-md: 0 6px 18px hsl(0 0% 0% / 0.28);
+    --shadow-lg: 0 12px 30px hsl(0 0% 0% / 0.34);
+    --shadow-xl: 0 18px 56px hsl(0 0% 0% / 0.40);
+    --shadow-glow: 0 0 52px hsl(0 78% 56% / 0.12);
+
+    /* Glass */
+    --glass-bg: 230 18% 12% / 0.88;
+    --glass-border: 220 15% 30% / 0.14;
+    --glass-shadow: 0 12px 44px hsl(0 0% 0% / 0.32);
+    --glass-blur: 22px;
+  }
 }
 
 @layer base {
@@ -177,6 +227,16 @@
       radial-gradient(ellipse 100% 80% at 20% 0%, hsl(0 90% 50% / 0.12), transparent 50%),
       radial-gradient(ellipse 60% 50% at 80% 100%, hsl(15 95% 50% / 0.08), transparent 50%),
       radial-gradient(ellipse 80% 60% at 50% 50%, hsl(260 30% 20% / 0.15), transparent);
+  }
+
+  /* Background vignette + red/purple glows for the Engajamento page */
+  .theme-engajamento {
+    background-color: hsl(var(--background));
+    background-image:
+      radial-gradient(ellipse 80% 70% at 80% 12%, hsl(var(--accent) / 0.16), transparent 55%),
+      radial-gradient(ellipse 110% 85% at 18% 0%, hsl(var(--primary) / 0.14), transparent 55%),
+      radial-gradient(ellipse 80% 70% at 50% 55%, hsl(230 30% 10% / 0.35), transparent 70%);
+    background-attachment: fixed;
   }
 
   /* Smoother font rendering */
