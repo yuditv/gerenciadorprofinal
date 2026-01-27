@@ -1,12 +1,18 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  // Supabase JS adds extra headers (e.g. x-supabase-client-platform) that must be allowed for CORS preflight.
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-};
+function getCorsHeaders(req: Request) {
+  // Some environments send requests with credentials. In that case, "*" is not allowed.
+  const origin = req.headers.get('origin') ?? '*';
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Credentials': 'true',
+    // Supabase JS adds extra headers (e.g. x-supabase-client-platform) that must be allowed for CORS preflight.
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+  };
+}
 
 const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 
@@ -337,7 +343,7 @@ async function saveClientMemory(
 serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: getCorsHeaders(req) });
   }
 
   try {
@@ -359,7 +365,7 @@ serve(async (req: Request) => {
     if (!body) {
       return new Response(
         JSON.stringify({ error: 'Invalid JSON body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -377,7 +383,7 @@ serve(async (req: Request) => {
     if (!agentId || !message) {
       return new Response(
         JSON.stringify({ error: 'agentId and message are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -396,7 +402,7 @@ serve(async (req: Request) => {
     if (!agentOwnerId) {
       return new Response(
         JSON.stringify({ error: 'Agent not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -460,7 +466,7 @@ serve(async (req: Request) => {
       console.error('Agent not found:', agentError);
       return new Response(
         JSON.stringify({ error: 'Agent not found or inactive' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -468,14 +474,14 @@ serve(async (req: Request) => {
     if (source === 'web' && !agent.is_chat_enabled) {
       return new Response(
         JSON.stringify({ error: 'Agent is not enabled for web chat' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
     if (source === 'whatsapp' && !agent.is_whatsapp_enabled) {
       return new Response(
         JSON.stringify({ error: 'Agent is not enabled for WhatsApp' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
     }
 
@@ -1075,7 +1081,7 @@ INSTRUÇÕES IMPORTANTES:
       }),
       { 
         status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } 
       }
     );
 
@@ -1086,7 +1092,7 @@ INSTRUÇÕES IMPORTANTES:
         error: 'Internal server error', 
         details: error instanceof Error ? error.message : 'Unknown error' 
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
   }
 });
