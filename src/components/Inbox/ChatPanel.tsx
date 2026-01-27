@@ -277,7 +277,8 @@ export function ChatPanel({
   };
 
   const handleSend = async () => {
-    if ((!message.trim() && attachments.length === 0) || isSending) return;
+    // Allow sending multiple messages quickly; each message has its own optimistic state.
+    if ((!message.trim() && attachments.length === 0)) return;
     
     // Capturar valores antes de limpar
     const messageToSend = message.trim();
@@ -305,7 +306,7 @@ export function ChatPanel({
       }
     } else {
       // Apenas texto
-      onSendMessage(messageToSend, privateToSend);
+      await onSendMessage(messageToSend, privateToSend);
     }
   };
 

@@ -23,7 +23,9 @@ export function useInboxMessages(conversationId: string | null) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+  // Do not block the UI while a message is in-flight; allow multiple sends.
+  // We keep a counter to still expose a global "isSending" for spinners if needed.
+  const [sendingCount, setSendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const isSyncingRef = useRef(false);
@@ -84,7 +86,7 @@ export function useInboxMessages(conversationId: string | null) {
 
     // Add optimistic message immediately
     setMessages(prev => [...prev, optimisticMessage]);
-    setIsSending(true);
+    setSendingCount(c => c + 1);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -154,7 +156,7 @@ export function useInboxMessages(conversationId: string | null) {
       });
       return false;
     } finally {
-      setIsSending(false);
+      setSendingCount(c => Math.max(0, c - 1));
     }
   };
 
@@ -433,7 +435,7 @@ export function useInboxMessages(conversationId: string | null) {
   return {
     messages,
     isLoading,
-    isSending,
+    isSending: sendingCount > 0,
     isSyncing,
     isDeleting,
     sendMessage,

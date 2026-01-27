@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Send, Smartphone, User, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface SendWhatsAppDialogProps {
   client: Client | null;
@@ -34,6 +33,10 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
 
     setIsSending(true);
 
+    // UX: clear immediately to feel responsive; restore on failure.
+    const messageToSend = message.trim();
+    setMessage('');
+
     try {
       const instance = instances.find(i => i.id === selectedInstance);
       if (!instance?.instance_key) {
@@ -44,7 +47,7 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
         body: {
           instanceKey: instance.instance_key,
           phone: client.whatsapp.replace(/\D/g, ''),
-          message: message.trim(),
+          message: messageToSend,
         },
       });
 
@@ -52,10 +55,11 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
       if (data?.error) throw new Error(data.error);
 
       toast.success('Mensagem enviada com sucesso!');
-      setMessage('');
       onOpenChange(false);
     } catch (error: any) {
       console.error('Error sending message:', error);
+      // Restore what user typed if send failed
+      setMessage(prev => prev || messageToSend);
       toast.error(error.message || 'Erro ao enviar mensagem');
     } finally {
       setIsSending(false);
@@ -73,7 +77,16 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
   if (!client) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          handleClose();
+          return;
+        }
+        onOpenChange(true);
+      }}
+    >
       <DialogContent className="sm:max-w-md glass-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
