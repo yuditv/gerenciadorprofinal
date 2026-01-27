@@ -93,24 +93,28 @@ const handler = async (req: Request): Promise<Response> => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    // Generate a magic link for email verification
+    const origin = req.headers.get('origin') || 'https://id-preview--cb514275-a2d5-4bb5-bc84-94edde26937f.lovable.app';
+    const redirectTo = `${origin}/email-confirmed`;
+
+    // NOTE: In current @supabase/auth-js types, `generateLink({ type: 'signup' })` requires a password.
+    // This function only sends verification emails, so we use:
+    // - 'invite' for new signups (creates/invites a user without requiring password here)
+    // - 'magiclink' for resends / existing users
+    const primaryLinkType: 'invite' | 'magiclink' = type === 'signup' ? 'invite' : 'magiclink';
+
     const { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
-      email: email,
-      options: {
-        redirectTo: `${req.headers.get('origin') || 'https://id-preview--cb514275-a2d5-4bb5-bc84-94edde26937f.lovable.app'}/email-confirmed`
-      }
+      type: primaryLinkType,
+      email,
+      options: { redirectTo },
     });
 
     if (linkError) {
-      // If user already exists, try to send a magic link instead
-      if (linkError.message.includes('already been registered')) {
+      // If user already exists (or invite is not allowed), fall back to magic link
+      if (linkError.message?.toLowerCase().includes('already been registered')) {
         const { data: magicData, error: magicError } = await supabaseAdmin.auth.admin.generateLink({
           type: 'magiclink',
-          email: email,
-          options: {
-            redirectTo: `${req.headers.get('origin') || 'https://id-preview--cb514275-a2d5-4bb5-bc84-94edde26937f.lovable.app'}/email-confirmed`
-          }
+          email,
+          options: { redirectTo },
         });
 
         if (magicError) {
