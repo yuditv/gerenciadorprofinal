@@ -1,131 +1,189 @@
 
-Objetivo
-- Implementar um sistema de lucro (markup) para revenda: se o custo da API for R$10, você vende por R$13 (ou conforme %), e o sistema cobra o valor final do seu saldo em créditos.
-- Como você escolheu: markup global (admin), cobrar preço final, e arredondar “sempre para cima”.
+Objetivo (completo, “os 3”)
+- (1) Deixar bem claro no /engajamento o que é “Rate (custo)” (custo do provedor) e o que é “Preço final” (custo + markup), exibindo lucro estimado e bloqueando compra sem saldo.
+- (2) Registrar vendas/pedidos de forma auditável para você conseguir apurar lucro por período/pedido (inclusive lucro “real” quando a API retorna o charge).
+- (3) Implementar painel de acompanhamento do pedido: consultar status, atualizar status em lote, solicitar refill e cancelar (quando suportado), tudo integrado na UI.
 
-Situação atual (o que existe hoje)
-- A tela /carteira já tem um campo “Markup (%)”, mas ele hoje é “por usuário” (tabela `user_pricing_settings`).
-- A tela /engajamento ainda cria pedido direto pela edge function `smm-panel` (ação `add`) sem passar pelo sistema de cobrança/markup de forma segura.
-- Já existem as tabelas do sistema financeiro (user_wallets, wallet_transactions, wallet_topups, smm_orders).
+O código PHP ajuda?
+Sim. Ele é útil principalmente para:
+- Confirmar os “actions” válidos (services, add, status, balance, refill, refill_status, cancel).
+- Confirmar os nomes exatos dos campos esperados (order vs orders, refill vs refills, comments, runs, interval etc).
+- Deixar claro que existe “multiStatus” (status com `orders=1,2,3`) e multiRefill/multiRefillStatus, que vamos espelhar no Edge Function para ganhar performance no painel de pedidos.
 
-Problema que vamos corrigir
-- Hoje dá para “criar pedido” sem o backend calcular e cobrar o preço final com lucro de forma confiável (alguém poderia manipular rate/quantidade no client, ou o pedido não ficar auditado/cobrado como deveria).
+Diagnóstico do que está acontecendo hoje (por que “não sobe o rate” e “não tira lucro”)
+- Hoje o front está correto ao NÃO “subir o rate”: rate é custo do provedor (API), não deve mudar com markup.
+- O problema real é que o seu fluxo atual ainda cria pedido direto via Edge Function `smm-panel` (proxy) e não faz cobrança/lançamento do “preço final” nem grava o pedido na tabela `smm_orders` de forma completa.
+- Consequência: você até “vê” o lucro estimado na tela, mas o sistema não registra, não soma em relatório, e não controla status/refill/cancel porque não existe uma camada de “order management” no backend.
 
-Solução proposta (visão geral)
-1) Criar configuração global de markup (só admin altera)
-2) Criar uma edge function nova para “comprar/cobrar e enviar pedido SMM” de forma segura (server-side)
-3) Atualizar o frontend do Engajamento para:
-   - Mostrar: custo da API, markup, preço final, lucro
-   - Bloquear pedido se não tiver créditos suficientes
-   - Ao clicar “Criar pedido”, chamar a nova função segura (não mais `smm-panel add` direto)
+Arquitetura proposta (alto nível)
+1) Manter `smm-panel` como “proxy técnico” (chamada externa Instaluxo), mas ampliar ações suportadas:
+   - adicionar: refill, refill_status, cancel
+   - permitir: status em lote (orders) e refill_status em lote (refills)
+2) Criar um novo Edge Function “orquestrador” (ex.: `smm-orders`) que:
+   - valida usuário (JWT)
+   - calcula custos/preço com base no serviceId e no markup global (pricing_settings)
+   - debita créditos com atomicidade (via função SQL `wallet_debit`)
+   - cria registro em `smm_orders` com status “pending”
+   - chama a Instaluxo (action add)
+   - em sucesso: salva provider_order_id e status “submitted”
+   - em falha: reembolsa créditos (via `wallet_credit`) e marca pedido “failed/refunded”
+   - para status/refill/cancel: consulta Instaluxo, atualiza colunas do pedido e retorna resultado padronizado
+3) Frontend:
+   - /engajamento vira um “hub” com Tabs: “Criar pedido” | “Meus pedidos” | “Relatórios”
+   - “Criar pedido”: UI mais inteligente (campos extras dependendo do tipo do serviço)
+   - “Meus pedidos”: tabela com ações (atualizar status, refill, cancelar)
+   - “Relatórios”: somatórios e gráficos (lucro estimado, lucro real por charge, total por período)
 
-1) Banco de Dados (nova migration)
-1.1) Criar tabela de configuração global
-- Nova tabela (exemplo): `public.pricing_settings`
-  - id (int, PK, default 1 ou sempre 1)
-  - markup_percent numeric(8,2) not null default 0
-  - updated_at timestamptz default now()
-- RLS:
-  - SELECT: permitir para usuários autenticados (todos precisam ler para mostrar o preço)
-  - INSERT/UPDATE: somente admin (usando `public.is_admin(auth.uid())`)
+Parte A — UI completa de preço/lucro (e bloqueios)
+1) Ajustar o cálculo e exibição no /engajamento:
+   - Manter “Rate (custo)” como custo do provedor (sem markup).
+   - Exibir claramente:
+     - Custo provedor (estimado): provider_cost_brl = (rate/1000) * qty
+     - Markup global (%): pricing_settings.markup_percent
+     - Preço final (cobrado do usuário em créditos): final_price_brl = provider_cost_brl * (1 + markup/100)
+     - Lucro estimado: profit_brl = final_price_brl - provider_cost_brl
+   - Adicionar aviso quando o saldo de créditos for menor que o preço final.
+   - Botão “Criar pedido” bloqueado se:
+     - dados inválidos
+     - saldo insuficiente
+     - ou se o serviço exigir “comments” e comments estiver vazio.
+2) Melhorar seleção de serviços sem mudar layout macro:
+   - Usar o `categories` já calculado no hook para filtrar serviços por categoria (select “Categoria” + select “Serviço”).
+   - Adicionar busca (Input) para filtrar por nome/id.
+   - Limitar itens renderizados com filtro + slice (já tem slice(0,400), vamos tornar isso mais útil ao usuário).
 
-1.2) (Opcional, mas recomendado) Funções SQL para débito/crédito atômicos
-Para evitar problemas de concorrência (duas compras ao mesmo tempo gastando o mesmo saldo), criar funções:
-- `wallet_debit(user_id uuid, amount numeric, reference_type text, reference_id text)`:
-  - trava o registro do wallet (SELECT ... FOR UPDATE), valida saldo, atualiza `user_wallets`, insere `wallet_transactions` tipo `spend`
-- `wallet_credit(...)` para refunds:
-  - atualiza saldo e insere ledger tipo `refund`
-Essas funções serão SECURITY DEFINER e só chamadas pela edge function (com service role), mantendo segurança e consistência.
+Parte B — Registro de pedidos e lucro (venda/relatório)
+A tabela `smm_orders` já existe, mas hoje está subutilizada. Vamos evoluir para conseguir:
+- “lucro estimado” (baseado no rate)
+- “lucro real” (baseado no charge retornado pela API quando disponível)
+- histórico, status e auditoria
 
-2) Backend (Edge Function nova: `smm-order`)
-Criar `supabase/functions/smm-order/index.ts` com:
-- Autenticação: exigir Bearer token e obter user id (como já é feito em outros endpoints)
-- Inputs (do client):
-  - service_id, quantity, link
-- Passos:
-  1. Buscar o serviço e o rate real do provedor (não confiar no client):
-     - chamar Instaluxo `action=services` e localizar o `service_id`
-  2. Calcular custos:
-     - provider_cost = (rate_per_1000 * quantity) / 1000
-     - markup_percent = buscar em `pricing_settings.markup_percent`
-     - price_final = provider_cost * (1 + markup/100)
-     - arredondamento “sempre pra cima”: price_final = ceil(price_final*100)/100
-     - profit = price_final - provider_cost (2 casas)
-     - credits_needed = price_final (1 crédito = R$1)
-  3. Validar saldo:
-     - se credits < credits_needed: retornar erro “Saldo insuficiente”
-  4. Debitar saldo e registrar auditoria:
-     - debitar via função SQL (ou, se você preferir simplificar no primeiro release, debitar via sequência de upsert com cuidado; mas a recomendação é função SQL atômica)
-     - criar registro em `smm_orders` status `pending` com:
-       - provider_cost_brl, price_brl, credits_spent, profit_brl, markup_percent, service_name, provider_rate_per_1000, link, quantity
-  5. Chamar Instaluxo `action=add` (criar pedido real)
-  6. Sucesso:
-     - atualizar `smm_orders` para `submitted` e salvar `provider_order_id`
-  7. Falha externa:
-     - atualizar `smm_orders` para `failed` (e `refunded` se refund feito)
-     - estornar créditos via `wallet_credit` e ledger `refund`
+1) Migração SQL (necessária)
+Adicionar colunas em `public.smm_orders` para suportar gestão completa:
+- provider_currency (text, nullable)
+- provider_charge (numeric, nullable)  — charge retornado pela API (normalmente na moeda do painel)
+- provider_status (text, nullable)     — status textual da API (pending/completed/…)
+- provider_remains (integer, nullable)
+- provider_start_count (integer, nullable)
+- last_synced_at (timestamptz, nullable)
+- requested_refill_at (timestamptz, nullable)
+- provider_refill_id (text, nullable)
+- provider_refill_status (text, nullable)
+- cancelled_at (timestamptz, nullable)
+- meta (jsonb, default '{}'::jsonb) — para salvar payload extra (comments/runs/interval etc) sem quebrar schema
+- profit_real_brl (numeric, nullable) — quando houver charge, lucro real = price_brl - charge_brl_convertido (se mesma moeda, ou armazenar raw e calcular apenas se BRL)
 
-Resposta da função para o frontend
-- Retornar um payload padronizado:
-  - order_id (uuid interno), provider_order_id (se houver)
-  - provider_cost_brl, price_brl, profit_brl, credits_spent, markup_percent
-  - status
+Observação importante: como a API pode retornar currency/charge em outra moeda, podemos começar “sem conversão” (armazenar raw charge+currency) e manter lucro_real como “disponível só se currency for BRL” ou “se a instalação operar em BRL”. Alternativa é criar uma tabela de câmbio, mas eu não incluiria isso agora sem necessidade.
 
-3) Frontend
-3.1) Engajamento (/engajamento)
-- Parar de usar `useSmmPanel().addOrder` para criar pedidos.
-- Continuar usando `useSmmPanel` apenas para listar serviços e mostrar rate/min/max (informativo).
-- Adicionar um hook novo `useSmmOrder()` (mutation) que chama a edge function `smm-order`.
-- Buscar o markup global para exibir o “preço de venda”:
-  - criar `useGlobalPricingSettings()` que lê `pricing_settings`
-- Exibir breakdown antes de criar:
-  - Custo da API (provider_cost)
-  - Markup (%) (global)
-  - Preço final (credits_needed)
-  - Lucro (profit)
-- Bloqueio:
-  - Se credits < credits_needed: desabilitar botão e mostrar “Saldo insuficiente, recarregue”
-- UX:
-  - Toast de sucesso com número do pedido (provider_order_id)
-  - Toast de erro com mensagem amigável
+2) RLS (provavelmente já ok para SELECT do próprio usuário)
+- Já existe policy de SELECT do próprio user em smm_orders.
+- Para INSERT/UPDATE de pedidos: faremos via Edge Function usando Service Role, então não dependemos de permitir escrita via client (mais seguro).
 
-3.2) Carteira (/carteira)
-Como você escolheu “markup global (admin)”:
-- Para usuários comuns:
-  - Mostrar o markup atual (somente leitura)
-  - Remover/ocultar o botão “Salvar” (ou desabilitar input)
-- Para admin:
-  - Manter edição e salvar no `pricing_settings`
-Implementação:
-- Criar checagem de admin (já existe `public.is_admin` no banco; no client podemos:
-  - ou consultar uma tabela/flag existente de role (se já houver hook de permissões)
-  - ou criar um endpoint simples/uso de hook existente `useUserPermissions`/`useProfile` para saber se é admin
-  - caso não exista forma confiável no client, dá para mostrar o input para todos mas a gravação só vai funcionar para admin (RLS bloqueia). Melhor UX: esconder/desabilitar para não-admin.
+3) Hook(s) novos no frontend
+- `useSmmOrders()`:
+  - query listando últimos pedidos do usuário (order by created_at desc, limit 50/100)
+  - query de agregados para relatório (sum(profit_brl), sum(price_brl), count, por range de datas)
+  - mutations chamando Edge Function `smm-orders` para:
+    - createOrder
+    - refreshStatus (um pedido)
+    - refreshStatuses (lote)
+    - requestRefill
+    - cancelOrders
 
-4) Segurança/Consistência (regras importantes)
-- O rate e o preço final NÃO podem vir do client: só o server calcula.
-- O débito/refund deve acontecer server-side (edge function + service role), nunca no front.
-- Registrar tudo em `smm_orders` e `wallet_transactions` para auditoria.
+Parte C — Status, refill e cancel no painel (completo)
+1) Expandir `smm-panel` (proxy) para suportar:
+- action: "refill" (payload: order | orders)
+- action: "refill_status" (payload: refill | refills)
+- action: "cancel" (payload: orders)
+- action: "status" suportar tanto order quanto orders
 
-5) Testes e validação
-- Testar fluxo:
-  1) Usuário sem saldo tenta comprar: bloqueia e/ou erro “Saldo insuficiente”
-  2) Usuário com saldo compra: ledger registra “spend”, `smm_orders` vira `submitted`
-  3) Forçar erro do provedor (ex.: service inválido): `smm_orders` vira `failed/refunded` e ledger registra “refund”
-- Verificar logs da edge function `smm-order` para debug e rastreio.
+2) Criar Edge Function `smm-orders` (orquestrador seguro)
+Endpoints/ações sugeridas (body.action):
+- create:
+  - input: serviceId, link, quantity, comments?, runs?, interval?
+  - fluxo:
+    1) validar usuário
+    2) buscar pricing_settings (markup_percent)
+    3) buscar o serviço (via smm-panel/services ou callSmmApi('services') e localizar serviceId)
+    4) calcular provider_cost_brl (rate/1000*qty) e final price
+    5) debitar wallet (wallet_debit(user, finalPrice, reference_type='smm_order', reference_id=orderId))
+    6) inserir smm_orders (pending)
+    7) chamar Instaluxo action add
+    8) atualizar smm_orders (submitted + provider_order_id + provider fields se vierem)
+    9) em erro: wallet_credit refund + status=failed/refunded
+- status:
+  - input: orderId (nosso UUID) ou provider_order_id
+  - chama Instaluxo status, atualiza provider_status/charge/remains/start_count/currency/last_synced_at
+- status_multi:
+  - input: array de provider_order_id
+  - chama Instaluxo status (orders=1,2,3) e atualiza em lote
+- refill:
+  - input: orderId (nosso UUID)
+  - chama Instaluxo refill (order=provider_order_id), salva provider_refill_id + requested_refill_at
+- refill_status:
+  - input: refillId(s) e atualiza provider_refill_status
+- cancel:
+  - input: orderId(s)
+  - chama Instaluxo cancel(orders=...), marca cancelled_at
 
-Entregáveis (o que vai mudar no código)
-- Nova migration: `pricing_settings` + RLS + (opcional) funções SQL `wallet_debit/wallet_credit`
-- Nova edge function: `smm-order`
-- Frontend:
-  - Hook novo `useGlobalPricingSettings`
-  - Hook novo `useSmmOrder`
-  - Atualização do Engajamento para usar `smm-order` e mostrar custo/preço/lucro
-  - Atualização da Carteira para markup global e edição só para admin
+Observação: nem todo serviço aceita refill/cancel. A API retorna erro; a UI deve mostrar a mensagem e desabilitar ações quando o serviço indicar refill/cancel=false (essas flags já existem no tipo SmmService).
 
-Observação importante (sobre o “lucro”)
-- O sistema vai cobrar do seu saldo o “preço final” (custo + lucro). Isso garante que você tem um valor de venda “interno” consistente.
-- O dinheiro do “lucro” em si não é automaticamente sacado para fora (Mercado Pago/PIX) porque isso depende de você vender para seus clientes. O sistema vai registrar o lucro por pedido (profit_brl) e te dar relatórios, e você recebe do seu cliente por fora (ou podemos criar um módulo de cobrança para seus clientes depois).
+3) UI “Meus pedidos” no /engajamento
+- Tabela com colunas:
+  - Data, Serviço, Quantidade, Preço (créditos), Lucro (estimado), Status (badge), Provider Order ID
+- Ações por linha:
+  - “Atualizar status”
+  - “Refill” (se refill=true)
+  - “Cancelar” (se cancel=true e status permitir)
+- Ação em lote:
+  - selecionar pedidos e “Atualizar status (lote)” para reduzir chamadas
 
-Próximos passos que eu preciso para implementar sem erro
-- Confirmar qual conta será “admin” para editar o markup global (pode ser por role já existente no banco).
+4) UI “Relatórios” no /engajamento
+- Cards:
+  - Lucro estimado (soma profit_brl)
+  - Total vendido (soma price_brl)
+  - Total de pedidos
+- Filtro rápido:
+  - Hoje / 7 dias / 30 dias / Mês atual
+- Export:
+  - Exportar CSV (usando util já existente ou criar uma função simples) com pedidos do período
+
+Sequência de implementação (dependências)
+1) Conferir tabelas e colunas atuais (já confirmado que `smm_orders` existe) e criar migração para novas colunas + índices (ex.: index em (user_id, created_at desc), index em provider_order_id).
+2) Atualizar Edge Function `smm-panel` (proxy) para refill/refill_status/cancel e status multi.
+3) Criar Edge Function `smm-orders` para compra segura + status/refill/cancel com persistência em `smm_orders` e débito/estorno.
+4) Frontend:
+   - Ajustar /engajamento:
+     - Tabs
+     - Form com campos dinâmicos (comments / dripfeed)
+     - Bloqueio por saldo (walletQuery.credits < finalPrice)
+   - Criar painel “Meus pedidos”
+   - Criar painel “Relatórios” com agregações e export
+5) Observabilidade:
+   - Log estruturado nas Edge Functions (já existe log no smm-panel)
+   - Adicionar mensagens de erro padronizadas para UI (toast com detalhe)
+
+Casos especiais e “pegadinhas” que vamos tratar
+- Serviços “Custom Comments”: exigir textarea `comments` (linhas separadas).
+- Serviços “Drip-feed”: exibir runs/interval e validar números > 0 quando preenchidos.
+- Serviços tipo “Package”: alguns não exigem quantity; a API aceita sem quantity. Vamos permitir quantity opcional quando o serviço indicar isso (heurística: se min/max estiver vazio e type sugerir package, ou permitir “quantity” opcional com validação condicional).
+- Moeda/charge: armazenar charge e currency como veio; lucro “real” só se currency for BRL (ou deixar como “lucro real (quando disponível)”).
+- Segurança: toda criação/cancel/refill deve ser server-side; o client nunca decide preço final.
+
+O que você verá no final (resultado esperado)
+- Você muda o markup no /carteira (admin) e imediatamente:
+  - o “Preço final” e o “Lucro estimado” mudam no /engajamento
+  - o botão de compra passa a cobrar o preço final (créditos)
+- Cada pedido fica registrado em “Meus pedidos”, com:
+  - status atualizável
+  - refill/cancel quando disponível
+- Em “Relatórios” você consegue “tirar seu lucro” no sentido de:
+  - ver total de lucro por período
+  - exportar a lista de pedidos e lucro
+  - acompanhar lucro real quando a API informar charge
+
+Checklist técnico (para eu implementar em modo default)
+- SQL migration: alterar `smm_orders` + índices.
+- Edge Functions: atualizar `smm-panel`; adicionar `smm-orders`.
+- Hooks: `useSmmOrders` (novo) + ajustes em `useSmmPanel` (status/refill/cancel).
+- Página: `src/pages/Engajamento.tsx` com Tabs e novos painéis.
