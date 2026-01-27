@@ -1,0 +1,91 @@
+project_id = "tlanmmbgyyxuqvezudir"
+
+[functions.whatsapp-instances]
+verify_jwt = false
+
+[functions.send-whatsapp-uazapi]
+verify_jwt = false
+
+[functions.campaigns]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.send-payment-notification]
+verify_jwt = false
+
+[functions.generate-warming-message]
+verify_jwt = false
+
+[functions.warming-scheduler]
+verify_jwt = false
+
+[functions.warming-worker]
+verify_jwt = false
+
+[functions.scheduled-dispatcher]
+verify_jwt = false
+
+[functions.renewal-reminder-scheduler]
+verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = false
+
+[functions.ai-agent-chat]
+verify_jwt = false
+
+[functions.whatsapp-ai-webhook]
+verify_jwt = false
+
+[functions.whatsapp-inbox-webhook]
+verify_jwt = false
+
+[functions.send-inbox-message]
+verify_jwt = false
+
+[functions.generate-copy]
+verify_jwt = false
+
+[functions.mercado-pago-pix]
+verify_jwt = false
+
+[functions.mercado-pago-webhook]
+verify_jwt = false
+
+[functions.subscription-expiry-scheduler]
+verify_jwt = false
+
+[functions.send-whatsapp-status]
+verify_jwt = false
+
+[functions.status-scheduler]
+verify_jwt = false
+
+[functions.fetch-messages]
+verify_jwt = false
+
+[functions.send-presence]
+verify_jwt = false
+
+[functions.crm-uazapi]
+verify_jwt = false
+
+[functions.ai-buffer-processor]
+verify_jwt = false
+
+[functions.send-owner-notification]
+verify_jwt = false
+
+[functions.vpn-test-generator]
+verify_jwt = false
+
+[functions.sync-chats]
+verify_jwt = false
+
+[functions.verify-registration]
+verify_jwt = false
+
+[functions.generate-client-pix]
+verify_jwt = false
