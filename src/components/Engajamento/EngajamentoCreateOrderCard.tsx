@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { SmmService } from "@/hooks/useSmmPanel";
+import { EngajamentoServiceList } from "@/components/Engajamento/EngajamentoServiceList";
 import { usePricingSettings } from "@/hooks/usePricingSettings";
 import { useSmmOrders } from "@/hooks/useSmmOrders";
+import { useSmmFavorites } from "@/hooks/useSmmFavorites";
 import { useWallet } from "@/hooks/useWallet";
 
 function computeProviderCost(rate: string | undefined, quantity: number) {
@@ -36,6 +38,7 @@ export function EngajamentoCreateOrderCard(props: {
   refetchServices: () => unknown;
 }) {
   const ALL_CATEGORIES_VALUE = "__all__";
+  const FAVORITES_CATEGORY_VALUE = "__favorites__";
 
   const extractPlatform = (s: SmmService): string | null => {
     // Objetivo: Categoria = "plataforma" (TikTok/Instagram/etc) e NÃO o texto completo do serviço.
@@ -83,6 +86,7 @@ export function EngajamentoCreateOrderCard(props: {
   const { pricingQuery } = usePricingSettings();
   const { walletQuery } = useWallet();
   const { createOrder } = useSmmOrders();
+  const favorites = useSmmFavorites({ limit: 200 });
 
   const [category, setCategory] = useState<string>(ALL_CATEGORIES_VALUE);
   const [search, setSearch] = useState<string>("");
@@ -126,6 +130,9 @@ export function EngajamentoCreateOrderCard(props: {
     const q = search.trim().toLowerCase();
     return props.services
       .filter((s) => {
+        if (category === FAVORITES_CATEGORY_VALUE) {
+          return favorites.favoriteIdSet.has(s.service);
+        }
         if (category !== ALL_CATEGORIES_VALUE) {
           const p = extractPlatform(s);
           if (!p || p !== category) return false;
@@ -134,7 +141,7 @@ export function EngajamentoCreateOrderCard(props: {
         return String(s.service).includes(q) || (s.name ?? "").toLowerCase().includes(q);
       })
       .slice(0, 500);
-  }, [props.services, category, search]);
+  }, [props.services, category, search, favorites.favoriteIdSet]);
 
   const selectedService = useMemo(() => {
     const id = Number(serviceId);
@@ -248,6 +255,7 @@ export function EngajamentoCreateOrderCard(props: {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_CATEGORIES_VALUE}>Todas</SelectItem>
+                <SelectItem value={FAVORITES_CATEGORY_VALUE}>⭐ Favoritos</SelectItem>
                 {availablePlatforms.map((p) => (
                   <SelectItem key={p} value={p}>
                     {p}
@@ -263,38 +271,18 @@ export function EngajamentoCreateOrderCard(props: {
           </div>
 
           <div className="md:col-span-2">
-            <Label>Serviço</Label>
-            <Select value={serviceId} onValueChange={setServiceId}>
-              <SelectTrigger>
-                <SelectValue placeholder={props.isLoadingServices ? "Carregando..." : "Selecione"} />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredServices.map((s) => (
-                  <SelectItem key={s.service} value={String(s.service)}>
-                    #{s.service} — {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {props.isErrorServices && (
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="text-xs text-destructive line-clamp-2">{servicesErrorMessage}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => props.refetchServices()}
-                  disabled={props.isFetchingServices}
-                  className="gap-2"
-                >
-                  <RefreshCw
-                    className={props.isFetchingServices ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-                  />
-                  Tentar
-                </Button>
-              </div>
-            )}
+            <Label>Serviços</Label>
+            <EngajamentoServiceList
+              isLoading={props.isLoadingServices}
+              isError={props.isErrorServices}
+              errorMessage={servicesErrorMessage}
+              isFetching={props.isFetchingServices}
+              onRetry={() => props.refetchServices()}
+              services={filteredServices}
+              onSelectService={(id) => setServiceId(String(id))}
+              isFavorite={(id) => favorites.isFavorite(id)}
+              onToggleFavorite={(id) => favorites.toggleFavorite(id)}
+            />
           </div>
 
           <div className="md:col-span-4">

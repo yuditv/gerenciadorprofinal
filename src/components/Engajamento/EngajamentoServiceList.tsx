@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Service = {
@@ -19,10 +19,25 @@ export type EngajamentoServiceListProps = {
   onRetry: () => void;
   services: Service[];
   onSelectService: (serviceId: number) => void;
+  isFavorite?: (serviceId: number) => boolean;
+  onToggleFavorite?: (serviceId: number) => void;
 };
 
 export const EngajamentoServiceList = React.forwardRef<HTMLDivElement, EngajamentoServiceListProps>(
-  ({ isLoading, isError, errorMessage, isFetching, onRetry, services, onSelectService }, ref) => {
+  (
+    {
+      isLoading,
+      isError,
+      errorMessage,
+      isFetching,
+      onRetry,
+      services,
+      onSelectService,
+      isFavorite,
+      onToggleFavorite,
+    },
+    ref,
+  ) => {
     return (
       <div ref={ref}>
         <ScrollArea className="h-[420px]">
@@ -67,7 +82,34 @@ export const EngajamentoServiceList = React.forwardRef<HTMLDivElement, Engajamen
                   <div className="text-xs text-muted-foreground">{s.category ?? "Sem categoria"}</div>
                 </div>
                 <div className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                  {s.rate ? `Rate: ${s.rate}` : ""}
+                  <div className="flex items-center gap-2 justify-end">
+                    {typeof isFavorite === "function" && typeof onToggleFavorite === "function" && (
+                      <button
+                        type="button"
+                        className={cn(
+                          "inline-flex items-center justify-center rounded-lg border border-border/70",
+                          "h-8 w-8 hover:border-primary/35 transition-colors",
+                        )}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onToggleFavorite(s.service);
+                        }}
+                        aria-label={isFavorite(s.service) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+                        title={isFavorite(s.service) ? "Favorito" : "Favoritar"}
+                      >
+                        <Star
+                          className={cn(
+                            "h-4 w-4",
+                            isFavorite(s.service)
+                              ? "fill-primary text-primary"
+                              : "text-muted-foreground",
+                          )}
+                        />
+                      </button>
+                    )}
+                    <span>{s.rate ? `Rate: ${s.rate}` : ""}</span>
+                  </div>
                 </div>
               </div>
             </button>
