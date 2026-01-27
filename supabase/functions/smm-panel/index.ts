@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const INSTALUXO_BASE_URL = "https://instaluxo.com/api/v2";
+const FETCH_TIMEOUT_MS = 15000;
 
 type Action = "balance" | "services" | "add" | "status";
 
@@ -27,6 +28,15 @@ function getApiKey(): string {
   const key = (Deno.env.get("INSTALUXO_SMM_API_KEY") ?? "").trim();
   if (!key) throw new Error("Missing INSTALUXO_SMM_API_KEY secret");
   return key;
+}
+
+function safeSnippet(input: string, maxLen = 400) {
+  const clean = input.replace(/\s+/g, " ").trim();
+  return clean.length > maxLen ? `${clean.slice(0, maxLen)}…` : clean;
+}
+
+function normalizeBaseUrl(url: string) {
+  return url.replace(/\/+$/, "");
 }
 
 async function requireUserId(req: Request): Promise<string> {
@@ -53,6 +63,8 @@ async function requireUserId(req: Request): Promise<string> {
 async function callSmmApi(action: Action, payload: Record<string, unknown> = {}) {
   const key = getApiKey();
 
+  const baseUrl = normalizeBaseUrl(INSTALUXO_BASE_URL);
+
   const form = new URLSearchParams();
   form.set("key", key);
   form.set("action", action);
@@ -61,20 +73,73 @@ async function callSmmApi(action: Action, payload: Record<string, unknown> = {})
     form.set(k, String(v));
   }
 
-  const res = await fetch(INSTALUXO_BASE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: form,
-  });
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  const text = await res.text();
+  console.log(`[smm-panel] calling instaluxo action=${action} baseUrl=${baseUrl}`);
+
   try {
-    return JSON.parse(text);
-  } catch {
-    return { error: `Invalid API response (${res.status})`, raw: text };
+    const res = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: form,
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+    const elapsedMs = Date.now() - startedAt;
+    console.log(
+      `[smm-panel] instaluxo responded action=${action} status=${res.status} timeMs=${elapsedMs} bodySnippet=${safeSnippet(text)}`,
+    );
+
+    if (!res.ok) {
+      return {
+        error: `Erro do painel SMM (HTTP ${res.status})`,
+        details: safeSnippet(text),
+      };
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {
+        error: `Resposta inválida do painel SMM (HTTP ${res.status})`,
+        details: safeSnippet(text),
+      };
+    }
+  } catch (e) {
+    const elapsedMs = Date.now() - startedAt;
+
+    if (e instanceof DOMException && e.name === "AbortError") {
+      console.error(`[smm-panel] timeout action=${action} timeMs=${elapsedMs}`);
+      return { error: "Timeout ao conectar no painel SMM" };
+    }
+
+    console.error(`[smm-panel] network error action=${action} timeMs=${elapsedMs}`, e);
+    return {
+      error: "Falha ao conectar no painel SMM",
+      details: e instanceof Error ? e.message : String(e),
+    };
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+function asServicesPayload(data: unknown) {
+  // Painéis SMM costumam retornar:
+  // 1) array direto
+  // 2) { services: [...] }
+  // 3) { data: [...] } (menos comum)
+  if (Array.isArray(data)) return { services: data };
+  if (data && typeof data === "object") {
+    const d = data as Record<string, unknown>;
+    if (Array.isArray(d.services)) return { services: d.services };
+    if (Array.isArray(d.data)) return { services: d.data };
+  }
+  return { services: [] as unknown[] };
 }
 
 serve(async (req) => {
@@ -104,8 +169,25 @@ serve(async (req) => {
       if (!quantity || !Number.isFinite(quantity) || quantity <= 0) return json({ error: "quantity is required" }, 400);
     }
 
-    const data = await callSmmApi(action, payload);
-    return json(data);
+    const raw = await callSmmApi(action, payload);
+
+    // Padroniza erro
+    if (raw && typeof raw === "object" && "error" in (raw as Record<string, unknown>)) {
+      const r = raw as Record<string, unknown>;
+      // 504 para timeout, 502 para falha externa
+      const msg = String(r.error ?? "Erro desconhecido");
+      const status = msg.toLowerCase().includes("timeout") ? 504 : 502;
+      return json({ error: msg, details: r.details }, status);
+    }
+
+    // Padroniza resposta para o front
+    if (action === "services") {
+      const { services } = asServicesPayload(raw);
+      return json({ services });
+    }
+
+    // balance/status/add: retorna como veio
+    return json(raw);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
     const status = message === "Unauthorized" ? 401 : 500;

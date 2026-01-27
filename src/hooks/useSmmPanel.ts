@@ -6,6 +6,7 @@ export interface SmmBalanceResponse {
   balance?: string;
   currency?: string;
   error?: string;
+  details?: string;
 }
 
 export interface SmmService {
@@ -24,7 +25,14 @@ export interface SmmService {
 export interface SmmAddOrderResponse {
   order?: number;
   error?: string;
+  details?: string;
 }
+
+type SmmServicesResponse = {
+  services?: SmmService[];
+  error?: string;
+  details?: string;
+};
 
 type InvokePayload<T> = {
   action: "balance" | "services" | "add" | "status";
@@ -43,15 +51,30 @@ async function invokeSmm<TPayload, TResult>(body: InvokePayload<TPayload>) {
   return data as TResult;
 }
 
+function throwIfApiError<T extends { error?: string; details?: string }>(data: T): T {
+  if (data?.error) {
+    const msg = data.details ? `${data.error}: ${data.details}` : data.error;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 export function useSmmPanel() {
   const balanceQuery = useQuery({
     queryKey: ["smm", "balance"],
-    queryFn: () => invokeSmm<undefined, SmmBalanceResponse>({ action: "balance" }),
+    queryFn: async () => {
+      const res = await invokeSmm<undefined, SmmBalanceResponse>({ action: "balance" });
+      return throwIfApiError(res);
+    },
   });
 
   const servicesQuery = useQuery({
     queryKey: ["smm", "services"],
-    queryFn: () => invokeSmm<undefined, SmmService[]>({ action: "services" }),
+    queryFn: async () => {
+      const res = await invokeSmm<undefined, SmmServicesResponse>({ action: "services" });
+      const ok = throwIfApiError(res);
+      return ok.services ?? [];
+    },
   });
 
   const addOrder = useMutation({
@@ -59,7 +82,10 @@ export function useSmmPanel() {
       service: number;
       link: string;
       quantity: number;
-    }) => invokeSmm<typeof payload, SmmAddOrderResponse>({ action: "add", payload }),
+    }) =>
+      invokeSmm<typeof payload, SmmAddOrderResponse>({ action: "add", payload }).then(
+        (r) => throwIfApiError(r),
+      ),
   });
 
   const categories = useMemo(() => {
