@@ -81,6 +81,9 @@ verify_jwt = false
 [functions.vpn-test-generator]
 verify_jwt = false
 
+[functions.servex-metadata]
+verify_jwt = false
+
 [functions.wallet-pix]
 verify_jwt = false
 

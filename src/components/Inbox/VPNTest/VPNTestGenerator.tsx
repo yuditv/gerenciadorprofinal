@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,13 @@ import { VPNTestTemplate } from "@/components/Inbox/VPNTest/VPNTestTemplate";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function sanitizeValues(values: VPNTestFormValues): VPNTestFormValues {
   return {
@@ -29,6 +36,8 @@ export function VPNTestGenerator({
   initialValues?: Partial<VPNTestFormValues>;
 }) {
   const { toast } = useToast();
+
+  type Option = { id: number; name: string };
 
   const stopPointer = (e: React.PointerEvent) => {
     // Prevent parent overlays/handlers from stealing focus and blocking typing.
@@ -49,7 +58,61 @@ export function VPNTestGenerator({
   const [categoryId, setCategoryId] = useState<string>("");
   const [ownerId, setOwnerId] = useState<string>("");
 
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [availableCategories, setAvailableCategories] = useState<Option[]>([]);
+  const [availableOwners, setAvailableOwners] = useState<Option[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>("");
+
   const needsRequiredFields = /campos obrigat[óo]rios faltando/i.test(apiError || "");
+
+  const canGenerate =
+    !isGenerating &&
+    (!needsRequiredFields ||
+      (availableCategories.length === 0 || selectedCategoryId || categoryId) &&
+      (availableOwners.length === 0 || selectedOwnerId || ownerId));
+
+  const fetchServexMetadata = async () => {
+    setIsLoadingMetadata(true);
+    setMetadataError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("servex-metadata", {
+        body: {},
+      });
+      if (error) throw new Error(error.message);
+
+      const categories = Array.isArray((data as any)?.categories) ? ((data as any).categories as Option[]) : [];
+      const owners = Array.isArray((data as any)?.owners) ? ((data as any).owners as Option[]) : [];
+      const tried = Array.isArray((data as any)?.tried) ? ((data as any).tried as Array<any>) : [];
+
+      const hasCloudflare403 = tried.some((t) => Number(t?.status) === 403);
+      if (hasCloudflare403) {
+        setMetadataError(
+          "Servex bloqueou a listagem (403/Cloudflare). Não dá para listar Category/Owner automaticamente aqui — use os campos manuais.",
+        );
+      }
+
+      setAvailableCategories(categories);
+      setAvailableOwners(owners);
+
+      // Auto-pick when there is exactly one option.
+      if (categories.length === 1) setSelectedCategoryId(String(categories[0].id));
+      if (owners.length === 1) setSelectedOwnerId(String(owners[0].id));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setMetadataError(message);
+    } finally {
+      setIsLoadingMetadata(false);
+    }
+  };
+
+  // Prefetch so dropdowns are ready when the panel asks for required fields.
+  useEffect(() => {
+    void fetchServexMetadata();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Still generate initial credentials locally (required to send to API),
   // but we don't expose a "regenerate local" button to the user.
@@ -66,8 +129,16 @@ export function VPNTestGenerator({
         password: values.password,
         v2ray_enabled: values.v2rayEnabled,
         v2ray_uuid: values.v2rayUuid,
-        ...(categoryId.trim() ? { category_id: Number(categoryId) } : {}),
-        ...(ownerId.trim() ? { owner_id: Number(ownerId) } : {}),
+        ...(selectedCategoryId.trim()
+          ? { category_id: Number(selectedCategoryId) }
+          : categoryId.trim()
+            ? { category_id: Number(categoryId) }
+            : {}),
+        ...(selectedOwnerId.trim()
+          ? { owner_id: Number(selectedOwnerId) }
+          : ownerId.trim()
+            ? { owner_id: Number(ownerId) }
+            : {}),
       };
 
       const { data, error } = await supabase.functions.invoke("vpn-test-generator", {
@@ -127,7 +198,7 @@ export function VPNTestGenerator({
           <Wifi className="h-4 w-4 text-primary" />
           <span>Modo online (Servex)</span>
         </div>
-        <Button size="sm" onClick={generateOnPanel} disabled={isGenerating}>
+        <Button size="sm" onClick={generateOnPanel} disabled={!canGenerate}>
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -160,31 +231,92 @@ export function VPNTestGenerator({
             </p>
           </div>
 
+          {metadataError ? (
+            <div className="text-xs text-muted-foreground">
+              Não consegui listar categorias/owners automaticamente ({metadataError.slice(0, 140)}). Use os campos
+              manuais abaixo.
+            </div>
+          ) : null}
+
+          {isLoadingMetadata ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Carregando opções do Servex...
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Category ID</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="Ex.: 1"
-                onPointerDownCapture={stopPointer}
-              />
+              {availableCategories.length ? (
+                <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                  <SelectTrigger onPointerDownCapture={stopPointer}>
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCategories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name} (#{c.id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="Ex.: 1"
+                  onPointerDownCapture={stopPointer}
+                />
+              )}
             </div>
 
             <div className="space-y-2">
               <Label>Owner ID</Label>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={ownerId}
-                onChange={(e) => setOwnerId(e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="Ex.: 1"
-                onPointerDownCapture={stopPointer}
-              />
+              {availableOwners.length ? (
+                <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
+                  <SelectTrigger onPointerDownCapture={stopPointer}>
+                    <SelectValue placeholder="Selecione um owner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableOwners.map((o) => (
+                      <SelectItem key={o.id} value={String(o.id)}>
+                        {o.name} (#{o.id})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="Ex.: 1"
+                  onPointerDownCapture={stopPointer}
+                />
+              )}
             </div>
           </div>
+
+          {!isLoadingMetadata && !metadataError ? (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Se as opções não aparecerem, clique para atualizar.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={fetchServexMetadata}
+                disabled={isLoadingMetadata}
+              >
+                Atualizar lista
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
