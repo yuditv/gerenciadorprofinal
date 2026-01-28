@@ -48,7 +48,8 @@ serve(async (req) => {
     // NOTE: Servex constraint: username and password must be <= 20 chars.
     const randomNumber = Math.floor(Math.random() * 1_000_000) + 1;
     const v2rayUuid = crypto.randomUUID();
-    const username = `teste${randomNumber}`; // max 11 chars
+    const usernameRaw = `teste${randomNumber}`;
+    const username = usernameRaw.trim().slice(0, 20);
 
     // Short password (<= 20) to satisfy Servex validation
     const makePassword = (len = 12) => {
@@ -57,7 +58,13 @@ serve(async (req) => {
       const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // no ambiguous chars
       return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
     };
-    const password = makePassword(12);
+    const password = makePassword(12).trim().slice(0, 20);
+
+    console.log("🧾 Lengths:", {
+      usernameLen: username.length,
+      passwordLen: password.length,
+      v2rayUuidLen: v2rayUuid.length,
+    });
 
     const payload = {
       username,
