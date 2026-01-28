@@ -59,6 +59,7 @@ import { SubscriptionPlansDialog } from '@/components/SubscriptionPlansDialog';
 import { InstanceSettingsDialog } from '@/components/InstanceSettingsDialog';
 import { PlanLimitAlert } from '@/components/PlanLimitAlert';
 import { motion } from 'framer-motion';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 // Lazy load pages
 const Contacts = lazy(() => import('@/pages/Contacts'));
@@ -98,8 +99,11 @@ export default function WhatsApp() {
   const [activeTab, setActiveTab] = useState('dispatch');
   const [showPlans, setShowPlans] = useState(false);
 
+  const { isAdmin, isLoading: isPermissionsLoading } = useUserPermissions();
+
   // Subscription status
-  const subscriptionExpired = planType === 'expired';
+  // Evita “flash” durante troca de abas/navegação aguardando permissões; Admin nunca deve ver bloqueio.
+  const subscriptionExpired = !isPermissionsLoading && !isAdmin && planType === 'expired';
 
   // Instance/Campaign dialogs
   const [selectedInstance, setSelectedInstance] = useState<WhatsAppInstance | null>(null);
