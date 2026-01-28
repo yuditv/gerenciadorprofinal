@@ -15,7 +15,6 @@ export function generateOfflineValues(input?: Partial<VPNTestFormValues>): VPNTe
   const v2rayUuid = crypto.randomUUID();
 
   return {
-    categoryId: input?.categoryId ?? 1,
     username: input?.username?.trim().slice(0, 20) || username,
     password: input?.password?.trim().slice(0, 20) || password,
     connectionLimit: input?.connectionLimit ?? 1,

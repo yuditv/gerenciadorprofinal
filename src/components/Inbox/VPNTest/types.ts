@@ -1,7 +1,6 @@
 export type VPNTestMode = "api" | "offline";
 
 export interface VPNTestFormValues {
-  categoryId: number;
   username: string;
   password: string;
   connectionLimit: number;

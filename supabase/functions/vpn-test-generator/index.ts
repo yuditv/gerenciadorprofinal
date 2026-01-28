@@ -43,7 +43,13 @@ serve(async (req) => {
     const url = "https://servex.ws/api/clients";
 
     // Params can be provided by the client (modal). Defaults are safe.
-    const category_id = Number((requestBody as any)?.category_id ?? 1);
+    const categoryRaw = (requestBody as any)?.category_id;
+    const categoryParsed = categoryRaw !== undefined && categoryRaw !== null && categoryRaw !== ""
+      ? Number(categoryRaw)
+      : undefined;
+    const category_id = Number.isFinite(categoryParsed as number) && (categoryParsed as number) > 0
+      ? (categoryParsed as number)
+      : undefined;
     const duration = Number((requestBody as any)?.duration ?? 60); // minutes (per Servex docs)
     const connection_limit = Number((requestBody as any)?.connection_limit ?? 1);
     const owner_id = (requestBody as any)?.owner_id !== undefined && (requestBody as any)?.owner_id !== null && (requestBody as any)?.owner_id !== ""
@@ -81,10 +87,10 @@ serve(async (req) => {
     const payload = {
       username,
       password,
-      category_id,
       connection_limit,
       duration,
       type: "test",
+      ...(category_id !== undefined ? { category_id } : {}),
       ...(v2rayEnabled ? { v2ray_uuid: v2rayUuid } : {}),
       ...(owner_id ? { owner_id } : {}),
     };
@@ -128,9 +134,9 @@ serve(async (req) => {
       v2ray_uuid: v2rayUuid,
       duration: String(duration),
       type: "test",
-      category_id: String(category_id),
+      category_id: category_id !== undefined ? String(category_id) : undefined,
       connection_limit: String(connection_limit),
-      owner_id: String(owner_id),
+      owner_id: owner_id !== undefined ? String(owner_id) : undefined,
       servex: data,
     };
 

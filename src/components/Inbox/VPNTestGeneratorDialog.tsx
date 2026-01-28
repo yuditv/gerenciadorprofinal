@@ -28,7 +28,6 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
   const { toast } = useToast();
 
   const defaultValues = useMemo<VPNTestFormValues>(() => generateOfflineValues({
-    categoryId: 1,
     connectionLimit: 1,
     minutes: 60,
     v2rayEnabled: true,
@@ -44,7 +43,6 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
     try {
       const { data, error: fnError } = await supabase.functions.invoke('vpn-test-generator', {
         body: {
-          category_id: formValues.categoryId,
           duration: formValues.minutes,
           connection_limit: formValues.connectionLimit,
           owner_id: formValues.ownerId,
@@ -72,7 +70,6 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
           ...formValues,
           username: String(data.username ?? formValues.username).slice(0, 20),
           password: String(data.password ?? formValues.password).slice(0, 20),
-          categoryId: normalizeNumberish(data.category_id ?? formValues.categoryId, formValues.categoryId),
           connectionLimit: normalizeNumberish(data.connection_limit ?? formValues.connectionLimit, formValues.connectionLimit),
           minutes: normalizeNumberish(data.duration ?? formValues.minutes, formValues.minutes),
           v2rayEnabled: formValues.v2rayEnabled,
@@ -94,7 +91,7 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
         setRawResponse({ offline: true, values: offline });
         setError("Servex bloqueou a requisição (Cloudflare). Geramos os dados offline para você copiar e criar no painel manualmente.");
       } else if (/Categoria não encontrada|404/i.test(message)) {
-        setError("Categoria inválida/não permitida. Ajuste o Category ID e tente novamente.");
+        setError("A Servex recusou a criação do teste (categoria/plano não permitido na sua conta). Como o painel não mostra o ID, use o modo Offline para copiar os dados e crie manualmente no painel.");
       } else {
         setError("Erro ao gerar teste. Verifique sua conexão e tente novamente.");
       }
