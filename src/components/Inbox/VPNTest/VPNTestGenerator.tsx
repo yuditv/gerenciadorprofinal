@@ -30,6 +30,11 @@ export function VPNTestGenerator({
 }) {
   const { toast } = useToast();
 
+  const stopPointer = (e: React.PointerEvent) => {
+    // Prevent parent overlays/handlers from stealing focus and blocking typing.
+    e.stopPropagation();
+  };
+
   const defaultValues = useMemo<VPNTestFormValues>(
     () => generateOfflineValues(initialValues),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,7 +149,10 @@ export function VPNTestGenerator({
       ) : null}
 
       {needsRequiredFields ? (
-        <div className="rounded-lg border bg-card p-4 space-y-4">
+        <div
+          className="rounded-lg border bg-card p-4 space-y-4"
+          onPointerDownCapture={stopPointer}
+        >
           <div>
             <p className="text-sm font-medium text-foreground">Campos obrigatórios do seu painel</p>
             <p className="text-xs text-muted-foreground">
@@ -156,20 +164,24 @@ export function VPNTestGenerator({
             <div className="space-y-2">
               <Label>Category ID</Label>
               <Input
+                type="text"
                 inputMode="numeric"
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="Ex.: 1"
+                onPointerDownCapture={stopPointer}
               />
             </div>
 
             <div className="space-y-2">
               <Label>Owner ID</Label>
               <Input
+                type="text"
                 inputMode="numeric"
                 value={ownerId}
                 onChange={(e) => setOwnerId(e.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="Ex.: 1"
+                onPointerDownCapture={stopPointer}
               />
             </div>
           </div>
