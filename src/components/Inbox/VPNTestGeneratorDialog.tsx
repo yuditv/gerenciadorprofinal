@@ -3,6 +3,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { VPNTestGenerator } from "@/components/Inbox/VPNTest/VPNTestGenerator";
@@ -23,6 +24,9 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
             <Wifi className="h-5 w-5 text-primary" />
             Teste VPN (Offline)
           </DialogTitle>
+          <DialogDescription>
+            Gere usuário/senha/UUID localmente e copie o template para criar no painel.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-auto pr-1">
