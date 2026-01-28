@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bot, Plus, Settings, Trash2, Power, ExternalLink, 
-  MessageSquare, Smartphone, Globe, Pencil, Link2, Shuffle, Users, Settings2, AlertTriangle
+  MessageSquare, Smartphone, Globe, Pencil, Link2, Shuffle, Users, Settings2, AlertTriangle, Sparkles
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAIAgents, type AIAgent } from "@/hooks/useAIAgents";
 import { CreateAgentDialog } from "./CreateAgentDialog";
+import { CreateBotWizardDialog } from "./CreateBotWizardDialog";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { WhatsAppAgentRouting } from "./WhatsAppAgentRouting";
 import { AIAgentTransferRules } from "./AIAgentTransferRules";
@@ -32,6 +33,7 @@ export function AIAgentAdmin() {
   } = usePlanLimits();
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AIAgent | null>(null);
   const [deletingAgent, setDeletingAgent] = useState<AIAgent | null>(null);
   const [selectedPrincipalAgent, setSelectedPrincipalAgent] = useState<string | null>(null);
@@ -91,6 +93,16 @@ export function AIAgentAdmin() {
           </TabsTrigger>
         </TabsList>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsWizardOpen(true)}
+            className="gap-2"
+            disabled={!canCreate}
+            title={!canCreate ? `Limite de ${maxAgents === -1 ? '∞' : maxAgents} agentes atingido` : undefined}
+          >
+            <Sparkles className="h-4 w-4" />
+            Criar Bot (Wizard)
+          </Button>
           <Button 
             variant="outline"
             onClick={() => setIsMaintenanceOpen(true)} 
@@ -343,6 +355,12 @@ export function AIAgentAdmin() {
           }
         }}
         editingAgent={editingAgent}
+      />
+
+      {/* Wizard */}
+      <CreateBotWizardDialog
+        open={isWizardOpen}
+        onOpenChange={setIsWizardOpen}
       />
 
       {/* Delete Confirmation */}
