@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { RefreshCw, Copy, Loader2, Wifi, User, Lock, Calendar, Clock, Server, Globe } from "lucide-react";
+import { useMemo, useState } from "react";
+import { RefreshCw, Copy, Loader2, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -10,28 +10,32 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { VPNTestForm } from "@/components/Inbox/VPNTest/VPNTestForm";
+import { VPNTestFields } from "@/components/Inbox/VPNTest/VPNTestFields";
+import type { VPNTestResult, VPNTestFormValues } from "@/components/Inbox/VPNTest/types";
+import { generateOfflineValues, normalizeNumberish } from "@/components/Inbox/VPNTest/utils";
 
 interface VPNTestGeneratorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface VPNTestCredentials {
-  username?: string;
-  password?: string;
-  expiresAt?: string;
-  duration?: string;
-  server?: string;
-  protocol?: string;
-  [key: string]: string | undefined;
-}
-
 export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [credentials, setCredentials] = useState<VPNTestCredentials | null>(null);
+  const [result, setResult] = useState<VPNTestResult | null>(null);
   const [rawResponse, setRawResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const defaultValues = useMemo<VPNTestFormValues>(() => generateOfflineValues({
+    categoryId: 1,
+    connectionLimit: 1,
+    minutes: 60,
+    v2rayEnabled: true,
+    ownerId: 1,
+  }), []);
+
+  const [formValues, setFormValues] = useState<VPNTestFormValues>(defaultValues);
 
   const generateTest = async () => {
     setIsLoading(true);
@@ -50,21 +54,37 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
       
       console.log("🔍 VPN API Response:", JSON.stringify(data, null, 2));
       setRawResponse(data);
-      
-      // Try to extract common fields
-      const extracted: VPNTestCredentials = {
-        username: data.username || data.user || data.login || '',
-        password: data.password || data.pass || data.senha || '',
-        expiresAt: data.expiresAt || data.expires_at || data.expiration || data.validade || '',
-        duration: data.duration || data.duracao || '',
-        server: data.server || data.servidor || data.host || '',
-        protocol: data.protocol || data.protocolo || data.type || '',
+
+      const next: VPNTestResult = {
+        mode: "api",
+        values: {
+          ...formValues,
+          username: String(data.username ?? formValues.username).slice(0, 20),
+          password: String(data.password ?? formValues.password).slice(0, 20),
+          categoryId: normalizeNumberish(data.category_id ?? formValues.categoryId, formValues.categoryId),
+          connectionLimit: normalizeNumberish(data.connection_limit ?? formValues.connectionLimit, formValues.connectionLimit),
+          minutes: normalizeNumberish(data.duration ?? formValues.minutes, formValues.minutes),
+          v2rayEnabled: formValues.v2rayEnabled,
+          v2rayUuid: String(data.v2ray_uuid ?? formValues.v2rayUuid),
+        },
+        raw: data,
       };
-      
-      setCredentials(extracted);
+
+      setResult(next);
     } catch (err) {
       console.error("Erro ao gerar teste VPN:", err);
-      setError("Erro ao gerar teste. Verifique sua conexão e tente novamente.");
+
+      const message = err instanceof Error ? err.message : String(err);
+      const shouldFallbackOffline = /403|just a moment|cloudflare/i.test(message);
+
+      if (shouldFallbackOffline) {
+        const offline = generateOfflineValues(formValues);
+        setResult({ mode: "offline", values: offline });
+        setRawResponse({ offline: true, values: offline });
+        setError("Servex bloqueou a requisição (Cloudflare). Geramos os dados offline para você copiar e criar no painel manualmente.");
+      } else {
+        setError("Erro ao gerar teste. Verifique sua conexão e tente novamente.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -109,67 +129,11 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      setCredentials(null);
+      setResult(null);
       setRawResponse(null);
       setError(null);
     }
     onOpenChange(newOpen);
-  };
-
-  const CredentialRow = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
-    <div className="flex items-center py-2 px-3 rounded-md hover:bg-muted/50 transition-colors gap-2">
-      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-      <span className="text-sm text-muted-foreground shrink-0 whitespace-nowrap">{label}:</span>
-      <span className="text-sm font-medium truncate flex-1" title={value}>{value || '-'}</span>
-      {value && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0"
-          onClick={() => copyField(label, value)}
-        >
-          <Copy className="h-3.5 w-3.5" />
-        </Button>
-      )}
-    </div>
-  );
-
-  // Render all fields from rawResponse dynamically
-  const renderDynamicFields = () => {
-    if (!rawResponse || typeof rawResponse !== 'object') return null;
-    
-    const iconMap: Record<string, any> = {
-      username: User,
-      user: User,
-      login: User,
-      password: Lock,
-      pass: Lock,
-      senha: Lock,
-      expires: Calendar,
-      expiresAt: Calendar,
-      expires_at: Calendar,
-      expiration: Calendar,
-      validade: Calendar,
-      duration: Clock,
-      duracao: Clock,
-      server: Server,
-      servidor: Server,
-      host: Server,
-    };
-    
-    return Object.entries(rawResponse).map(([key, value]) => {
-      if (value === null || value === undefined || value === '') return null;
-      const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-      const Icon = iconMap[key] || Globe;
-      return (
-        <CredentialRow 
-          key={key} 
-          icon={Icon} 
-          label={key} 
-          value={stringValue} 
-        />
-      );
-    });
   };
 
   return (
@@ -206,18 +170,23 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
               {error}
             </div>
           )}
+
+          <div className="rounded-lg border bg-card p-4 shrink-0">
+            <VPNTestForm values={formValues} onChange={setFormValues} />
+          </div>
           
-          {rawResponse && (
+          {result && (
             <ScrollArea className="flex-1 min-h-0">
               <div className="space-y-4 pr-4">
-                <div className="rounded-lg border bg-card">
-                  <div className="px-3 py-2 border-b">
-                    <h4 className="text-sm font-semibold text-foreground">Dados do Teste</h4>
-                  </div>
-                  <div className="divide-y">
-                    {renderDynamicFields()}
-                  </div>
-                </div>
+                <VPNTestFields
+                  username={result.values.username}
+                  password={result.values.password}
+                  connectionLimit={result.values.connectionLimit}
+                  minutes={result.values.minutes}
+                  v2rayEnabled={result.values.v2rayEnabled}
+                  v2rayUuid={result.values.v2rayUuid}
+                  onCopy={copyField}
+                />
               </div>
             </ScrollArea>
           )}
