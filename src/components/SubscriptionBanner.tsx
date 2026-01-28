@@ -11,7 +11,10 @@ export function SubscriptionBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
   const { subscription, isLoading } = useSubscription();
-  const { isAdmin } = useUserPermissions();
+  const { isAdmin, isLoading: isPermissionsLoading } = useUserPermissions();
+
+  // Evita “flash” do banner enquanto o status de admin ainda está sendo resolvido
+  if (isPermissionsLoading) return null;
 
   // Admins não veem banner de assinatura
   if (isAdmin) return null;
