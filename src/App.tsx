@@ -32,6 +32,7 @@ const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Engajamento = lazy(() => import("./pages/Engajamento"));
 const Wallet = lazy(() => import("./pages/Wallet"));
+  const VPNTest = lazy(() => import("./pages/VPNTest"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -181,6 +182,11 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } />
       <Route path="/install" element={<Install />} />
+      <Route path="/vpn-test" element={
+        <ProtectedRoute>
+          <VPNTest />
+        </ProtectedRoute>
+      } />
       <Route path="/filter-numbers" element={
         <ProtectedRoute>
           <FilterNumbers />

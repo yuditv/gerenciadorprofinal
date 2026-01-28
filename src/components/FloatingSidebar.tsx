@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Bot, Flame, Crown, Headset, Search, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp, Wallet } from "lucide-react";
+import { Users, Bot, Flame, Crown, Headset, Search, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp, Wallet, Wifi } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import logoFuturistic from "@/assets/logo-red-futuristic.png";
@@ -79,6 +79,14 @@ const menuItems: MenuItem[] = [
     permissionKey: "can_view_inbox",
   },
   {
+    id: "vpn",
+    title: "VPN",
+    icon: Wifi,
+    color: "text-sky-500",
+    bgColor: "bg-sky-500",
+    permissionKey: "can_view_inbox",
+  },
+  {
     id: "ai-agent",
     title: "Agente IA",
     icon: Bot,
@@ -119,6 +127,8 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
       navigate('/admin');
     } else if (item.id === 'engajamento') {
       navigate('/engajamento');
+    } else if (item.id === 'vpn') {
+      navigate('/vpn-test');
     } else {
       onSectionChange(item.id);
     }

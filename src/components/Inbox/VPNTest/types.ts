@@ -7,7 +7,6 @@ export interface VPNTestFormValues {
   minutes: number;
   v2rayEnabled: boolean;
   v2rayUuid: string;
-  ownerId?: number;
 }
 
 export interface VPNTestResult {
