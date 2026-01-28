@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface UserPermissions {
   can_view_dashboard: boolean;
@@ -46,15 +47,20 @@ const defaultPermissions: UserPermissions = {
 };
 
 export function useUserPermissions() {
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissions);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const fetchPermissions = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Se o auth ainda está resolvendo, não finalize permissões.
+      if (isAuthLoading) return;
+
+      // Usuário deslogado: permissões padrão + não-admin.
       if (!user) {
-        setIsLoading(false);
+        setIsAdmin(false);
+        setPermissions(defaultPermissions);
         return;
       }
 
@@ -113,13 +119,21 @@ export function useUserPermissions() {
     } catch (error) {
       console.error('Error fetching permissions:', error);
     } finally {
-      setIsLoading(false);
+      // Só conclui loading quando o auth já estiver resolvido.
+      if (!isAuthLoading) setIsLoading(false);
     }
-  }, []);
+  }, [user, isAuthLoading]);
 
   useEffect(() => {
+    // Mantém o loading enquanto o AuthProvider não concluiu.
+    if (isAuthLoading) {
+      setIsLoading(true);
+      return;
+    }
+
+    setIsLoading(true);
     fetchPermissions();
-  }, [fetchPermissions]);
+  }, [fetchPermissions, isAuthLoading]);
 
   return {
     permissions,
