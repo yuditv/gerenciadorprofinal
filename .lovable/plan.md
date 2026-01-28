@@ -1,105 +1,122 @@
 
-Objetivo
-- Fazer o “Agente IA” entender áudios no Inbox/WhatsApp: ele não “ouve” áudio diretamente; a forma correta é transcrever (speech-to-text) e entregar o texto para o agente.
-- Você escolheu: Inbox + WhatsApp + Agente IA, modo Automático, salvar no banco, idioma pt-BR.
+Objetivo (o que você perguntou)
+- Hoje: o “bot” que foi criado pelo Wizard é um bot conversacional (IA). Ele responde como chat normal (texto/áudio transcrito) e não é, por padrão, um “menu 1/2/3” de automação numérica.
+- Você quer: um modo de atendimento estilo URA/automação, onde o cliente digita “1”, “2”, “3”… para escolher opções.
+- Você escolheu agora: **Resposta numérica**, **Menu simples**, **Gatilho manual**, e **Lembrar etapa** (ou seja, o bot precisa “saber” que está aguardando a opção do menu).
 
-O que existe hoje (diagnóstico rápido)
-- O Inbox já recebe e exibe áudio (player) e o WhatsApp webhook consegue baixar mídia (inclusive áudio) via UAZAPI.
-- Porém, quando chega um áudio, normalmente o campo `message` fica vazio e o AI é chamado com `message: message` (texto), então o agente não tem conteúdo para “entender”.
-- Há um buffer (`ai_message_buffer`) que junta mensagens antes de chamar o AI; ele hoje junta `message || caption || ''` — áudio sem transcript vira vazio e atrapalha a resposta.
+O que já existe no projeto (base que vamos aproveitar)
+- Inbox já envia mensagens pelo `send-inbox-message` e registra em `chat_inbox_messages`.
+- O webhook `whatsapp-inbox-webhook` já cria/atualiza conversas (`conversations`) e salva mensagens.
+- A estrutura `Conversation` usada no frontend já considera `conversation.metadata` (mesmo que o types do Supabase esteja desatualizado), então podemos guardar estado de menu ali sem criar tabela nova.
 
-Solução proposta (alto nível)
-1) Transcrever automaticamente todo áudio recebido no WhatsApp/Inbox (pt-BR).
-2) Salvar a transcrição no banco no `metadata` da mensagem (para reaproveitar e aparecer para todos).
-3) Quando a mensagem for áudio, alimentar o buffer/Agente IA com o texto transcrito (ex.: “(ÁUDIO) <transcrição>”), para o agente responder normalmente.
-4) Mostrar o texto transcrito embaixo do player de áudio no Inbox.
+O que vamos construir (comportamento final)
+1) No Inbox, você terá um botão “Iniciar Menu” (manual) para a conversa atual.
+2) Ao clicar:
+   - O sistema envia uma mensagem com um menu simples (ex.: “1 - Suporte / 2 - Vendas / 3 - Financeiro”).
+   - O sistema salva na conversa um “estado do menu” (ex.: aguardando escolha, etapa atual).
+3) Quando o cliente responder com um número:
+   - O sistema identifica que a conversa está “em modo menu” e que está aguardando opção.
+   - Responde automaticamente com o texto configurado daquela opção.
+   - Atualiza o estado para “concluído” (ou para próxima etapa, se você quiser evoluir depois).
 
-Decisão técnica: qual provedor de transcrição
-- No seu projeto já existe `OPENAI_API_KEY` configurada como secret.
-- Não existe `ELEVENLABS_API_KEY`.
-- Para evitar depender de nova chave agora, a implementação vai usar OpenAI Speech-to-Text (Whisper) via Edge Function.
-- Bônus: o código do webhook já sugere que o UAZAPI pode retornar `transcription?` no download; se realmente vier, vamos aproveitar primeiro (zero custo extra) e só chamar OpenAI como fallback.
+Decisões importantes (com base no que você aprovou)
+- Formato: o cliente vai digitar número (não botões do WhatsApp).
+- Gatilho: manual (você decide quando iniciar o menu).
+- Persistência: vamos armazenar estado na conversa (`conversations.metadata`) para lembrar etapa.
+- Escopo: menu simples (uma etapa), mas estruturado para poder virar multi-etapas depois.
 
-Mudanças planejadas (passo a passo)
+Implementação (passos)
+A) Configuração do menu (onde ficam as opções e respostas)
+- Adicionar no Wizard do Agente IA (CreateBotWizardDialog) uma etapa opcional “Menu Numérico (manual)”.
+- Campos nessa etapa:
+  - “Ativar menu numérico” (toggle)
+  - “Mensagem do menu” (texto base)
+  - Lista de opções (ex.: 1..9) com:
+    - Número (1,2,3…)
+    - Título curto (ex.: “Suporte”)
+    - Resposta automática (texto que o bot envia ao cliente ao escolher)
+- Onde salvar essa configuração:
+  - Salvar como JSON dentro do agente em `ai_agents.consultation_context` (ou outro campo textual disponível) para não precisar criar tabela.
+  - Estrutura sugerida (exemplo):
+    ```json
+    {
+      "numeric_menu": {
+        "enabled": true,
+        "prompt": "Olá! Escolha uma opção:\n1 - Suporte\n2 - Vendas\n3 - Financeiro",
+        "options": {
+          "1": { "reply": "Beleza! Vamos para suporte. Me diga qual app você usa e o erro." },
+          "2": { "reply": "Perfeito! Para vendas, qual plano você quer? 1 mês / 3 meses / 12 meses" },
+          "3": { "reply": "Certo! Para financeiro, você quer 1) 2ª via 2) status do pagamento 3) renovar" }
+        }
+      }
+    }
+    ```
+  - Isso deixa o bot “bem completo” porque o mesmo agente continua com memória/anti-spam/ferramentas, mas ganha um “modo automação” adicional.
 
-A) Backend — nova Edge Function de transcrição
-1. Criar uma Edge Function, por exemplo: `supabase/functions/transcribe-audio/index.ts`
-   - Entrada: `{ mediaUrl: string, mimeType?: string, language?: "pt" | "pt-BR", source?: "whatsapp" | "inbox" }`
-   - Comportamento:
-     - Baixar o arquivo do `mediaUrl` (arrayBuffer/blob).
-     - Montar `multipart/form-data` e chamar OpenAI `POST https://api.openai.com/v1/audio/transcriptions`
-       - `model`: `whisper-1` (ou equivalente suportado)
-       - `language`: `pt` (para melhorar em pt-BR)
-     - Retornar JSON: `{ text: string, provider: "openai", language: "pt", durationMs?: number }`
-   - Segurança:
-     - `verify_jwt = false` no `supabase/config.toml`, mas validar no código:
-       - Permitir chamadas internas com Service Role (usadas pelo webhook).
-       - Para chamadas do app, exigir usuário autenticado (ou no mínimo token válido) para não virar endpoint público de “transcrever qualquer URL”.
-   - Tratamento de erro:
-     - Retornar erros claros (ex.: 400 sem URL, 415 tipo não suportado, 429 rate limit, 500).
+B) Inbox UI: botão manual “Iniciar Menu”
+- No `src/components/Inbox/ChatPanel.tsx`:
+  - Adicionar um item no menu de ações (Dropdown/More options) algo como:
+    - “Iniciar Menu do Bot”
+    - (Opcional) “Encerrar Menu”
+  - Regras para habilitar o botão:
+    - Ter conversa selecionada
+    - Ter `conversation.active_agent_id` definido (ou o agente ativo do roteamento)
+    - O agente ter `numeric_menu.enabled === true`
+- Ao clicar “Iniciar Menu”:
+  1) Buscar o agente ativo da conversa (via Supabase) para obter `numeric_menu.prompt`.
+  2) Enviar a mensagem do menu usando o fluxo normal do Inbox (chamando `onSendMessage()` com o texto do menu).
+  3) Atualizar `conversations.metadata` para guardar o estado:
+     - `metadata.bot_menu = { mode: "numeric", status: "waiting_choice", started_at, agent_id }`
 
-2. Atualizar `supabase/config.toml` para registrar a function com `verify_jwt = false`.
+C) Webhook: interpretar resposta numérica do cliente e responder automaticamente
+- No `supabase/functions/whatsapp-inbox-webhook/index.ts`, no fluxo de mensagens recebidas (incoming):
+  1) Depois de garantir que `conversation` existe e depois de salvar a mensagem recebida (para manter histórico), carregar:
+     - `conversation.metadata`
+     - `conversation.active_agent_id` (ou consultar agente vinculado)
+     - Config do agente (`ai_agents.consultation_context`)
+  2) Se `conversation.metadata.bot_menu.status === "waiting_choice"`:
+     - Ler `message` (texto recebido) e extrair um número simples (ex.: regex `^\s*(\d+)\s*$`).
+     - Se o número existir no `numeric_menu.options`:
+       - Enviar a resposta automática (via UAZAPI send text ou pela função de envio já existente no webhook).
+       - Registrar essa resposta no `chat_inbox_messages` como `sender_type: 'ai'` (ou como o padrão atual de mensagens automatizadas no seu webhook), com metadata indicando que veio do menu.
+       - Atualizar `conversations.metadata.bot_menu` para:
+         - `status: "done"` (menu simples)
+         - `selected_option: "2"` etc.
+         - `completed_at`
+     - Se o cliente digitar algo inválido:
+       - Responder “Opção inválida, responda com 1, 2 ou 3” e manter `waiting_choice`.
 
-B) WhatsApp Inbox Webhook — transcrever e salvar no banco automaticamente
-3. Ajustar `downloadMediaFromUAZAPI` (ou o trecho que consome a resposta) para capturar `data.transcription` quando existir.
-4. No fluxo do `whatsapp-inbox-webhook`:
-   - Após determinar `mediaUrl`, `mediaType`, `mimetype`:
-     - Se for áudio (`mediaType === "audio"` ou `mimetype` começar com `audio/`):
-       1) Determinar `transcriptText`:
-          - Prioridade 1: transcription vinda do UAZAPI (se existir e não vier vazia).
-          - Prioridade 2: chamar `transcribe-audio` com `mediaUrl` e `language: "pt"`.
-       2) Ao inserir a mensagem em `chat_inbox_messages`, salvar:
-          - `content`: pode continuar vazio (ou manter um placeholder), mas
-          - `metadata.transcription = { text, provider, language, created_at }`
-          - `metadata.media_kind = "audio"` (opcional, ajuda UI).
-       3) Para o buffer e para o AI:
-          - Quando for áudio, alimentar `message` (o texto usado pelo buffer) com algo como:
-            - `"(ÁUDIO) " + transcriptText`
-          - Assim o `ai_message_buffer` terá conteúdo real e o agente vai entender o que foi dito.
+D) “Lembrar etapa” (persistência) e como isso funciona na prática
+- Como o gatilho é manual e o menu é simples, “lembrar etapa” significa:
+  - Depois que você inicia, a conversa fica “aguardando escolha”.
+  - Depois que o cliente escolhe, marcamos como “done” para não ficar preso no menu.
+- (Opcional, para ficar mais avançado depois) Podemos permitir:
+  - “0 - Voltar” / “9 - Falar com humano”
+  - multi-etapas com `step_id` e `data` dentro do `metadata.bot_menu`
 
-5. Garantir idempotência e custo controlado:
-   - Se a mesma mensagem já tiver `metadata.transcription.text`, não transcrever de novo.
-   - Se falhar a transcrição, registrar `metadata.transcription_error` (para debug) e seguir o fluxo sem quebrar a conversa.
+E) Segurança, robustez e manutenção
+- Evitar conflitos com IA:
+  - Quando o menu estiver `waiting_choice`, o webhook deve priorizar o menu (não chamar IA para aquela mensagem).
+  - Depois de `done`, volta ao fluxo normal (IA/roteamento/anti-spam).
+- Logs:
+  - Registrar no metadata da mensagem: `{ bot_menu: { selected: "1", agent_id, version } }`
+- Tipos:
+  - Atualizar o tipo do Supabase/TS para incluir `conversations.metadata` (o frontend já usa, mas o types.ts parece desatualizado).
 
-C) Buffer Processor — compatibilidade com áudio transcrito
-6. Confirmar que o buffer usa o texto que o webhook inseriu (a mensagem que entra no `ai_message_buffer`).
-7. Se necessário, ajustar o formato de “combinedMessage” para deixar claro que aquilo veio de áudio (prefixo “(ÁUDIO)”).
+Critérios de aceite (o que vamos validar no final)
+1) No Inbox, clicar “Iniciar Menu do Bot” envia o menu ao cliente.
+2) A conversa fica com estado “aguardando escolha”.
+3) Cliente responde “1” e o sistema responde automaticamente com a mensagem configurada.
+4) O estado do menu é marcado como concluído e não intercepta mais mensagens.
+5) Toda a conversa fica registrada no histórico (mensagens do cliente + resposta do menu).
 
-D) Frontend — mostrar transcrição abaixo do player no Inbox
-8. Em `src/components/Inbox/ChatPanel.tsx`:
-   - Na renderização do áudio (`msg.media_type?.startsWith('audio/') ? <AudioPlayer .../>`):
-     - Logo abaixo do player, se existir `msg.metadata.transcription.text`, renderizar um bloco:
-       - Título pequeno: “Transcrição”
-       - Texto: `metadata.transcription.text`
-       - Opcional: badge “pt-BR” e “OpenAI” (provider)
-   - Manter visual discreto para não poluir.
+Arquivos que provavelmente serão alterados (visão técnica)
+- `src/components/CreateBotWizardDialog.tsx` (nova etapa e persistir config no agente)
+- `src/components/Inbox/ChatPanel.tsx` (botão manual para iniciar/encerrar menu)
+- `supabase/functions/whatsapp-inbox-webhook/index.ts` (interceptar resposta numérica e responder)
+- `src/integrations/supabase/types.ts` (opcional: corrigir schema/types do `conversations.metadata`)
 
-E) Testes manuais (checklist)
-9. Testar no Inbox:
-   - Receber um áudio pelo WhatsApp → verificar:
-     - Player aparece
-     - Transcrição aparece embaixo
-     - A mensagem AI (se AI estiver habilitado) responde com base na transcrição (não “pergunta o que você disse”).
-10. Testar cenários de erro:
-   - Áudio muito grande / URL inválida → UI não quebra, apenas não mostra transcrição e loga erro em metadata.
-   - Rate limit (429) → comportamento amigável (sem travar o fluxo).
-11. Validar custo:
-   - Reenviar/atualizar página não deve gerar nova transcrição (porque fica salva no banco).
+Observação importante (expectativa)
+- Esse “menu numérico” é automação determinística. Ele funciona muito bem para “triagem” e “atalhos”.
+- A IA continua existindo e pode assumir depois do menu (ex.: após escolher “1 - Suporte”, a IA pode continuar o atendimento normalmente com aquele contexto). Se você quiser isso já na primeira versão, eu encaixo: após enviar a resposta do menu, marcamos um “assunto” e deixamos a IA seguir.
 
-Riscos e como vamos mitigar
-- Áudios longos: pode ficar caro/lento.
-  - Mitigação: limitar tamanho/duração (ex.: recusar > X MB), e/ou truncar/avisar.
-- Endpoint público: alguém poderia abusar da transcrição.
-  - Mitigação: exigir auth para chamadas do app; para webhook usar service role internamente.
-- Diferentes formatos de áudio (ogg/opus/webm/mp3):
-  - Mitigação: baixar como arquivo e enviar ao OpenAI; garantir filename coerente e mimetype.
-
-Entregáveis (o que você vai ver pronto)
-- Transcrição automática de áudio recebidos no WhatsApp/Inbox, salva no banco.
-- Inbox exibindo transcrição embaixo do áudio.
-- Agente IA respondendo baseado no texto transcrito (via buffer/ai-agent-chat), ou seja: “entende o áudio” indiretamente, do jeito correto.
-
-Notas técnicas (para referência)
-- Onde salvar: `chat_inbox_messages.metadata.transcription.text` (jsonb), sem necessidade de migration.
-- Linguagem: usar `pt` (ou `pt-BR` se o provedor aceitar) para melhorar transcrição em português.
-- AIAgentChat (chat web de teste) não vai “ouvir” áudio automaticamente nessa fase; o foco é Inbox/WhatsApp como você marcou. Depois podemos estender para permitir enviar áudio no teste do agente também.
