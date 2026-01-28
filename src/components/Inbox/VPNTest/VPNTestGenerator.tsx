@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, RefreshCw, Wifi } from "lucide-react";
+import { Loader2, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { VPNTestForm } from "@/components/Inbox/VPNTest/VPNTestForm";
@@ -40,14 +40,8 @@ export function VPNTestGenerator({
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const regenerateLocal = () => {
-    const next = generateOfflineValues({
-      connectionLimit: values.connectionLimit,
-      minutes: values.minutes,
-      v2rayEnabled: values.v2rayEnabled,
-    });
-    setValues(next);
-  };
+  // Still generate initial credentials locally (required to send to API),
+  // but we don't expose a "regenerate local" button to the user.
 
   const generateOnPanel = async () => {
     setIsGenerating(true);
@@ -120,25 +114,19 @@ export function VPNTestGenerator({
           <Wifi className="h-4 w-4 text-primary" />
           <span>Modo online (Servex)</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={generateOnPanel} disabled={isGenerating}>
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Gerando...
-              </>
-            ) : (
-              <>
-                <Wifi className="h-4 w-4 mr-2" />
-                Gerar no painel
-              </>
-            )}
-          </Button>
-          <Button variant="outline" size="sm" onClick={regenerateLocal} disabled={isGenerating}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Regerar local
-          </Button>
-        </div>
+        <Button size="sm" onClick={generateOnPanel} disabled={isGenerating}>
+          {isGenerating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Gerando...
+            </>
+          ) : (
+            <>
+              <Wifi className="h-4 w-4 mr-2" />
+              Gerar no painel
+            </>
+          )}
+        </Button>
       </div>
 
       {apiError ? (
