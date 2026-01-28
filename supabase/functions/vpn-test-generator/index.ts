@@ -12,12 +12,19 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get("SERVEX_API_KEY");
+    const apiKeyRaw = Deno.env.get("SERVEX_API_KEY");
     
-    if (!apiKey) {
+    if (!apiKeyRaw) {
       console.error("SERVEX_API_KEY not configured");
       throw new Error("API key not configured");
     }
+
+    // Servex docs: Authorization must be sent as Bearer Token.
+    // Accept secret values with or without the "Bearer " prefix.
+    const apiKey = apiKeyRaw.trim();
+    const authorizationHeader = apiKey.toLowerCase().startsWith("bearer ")
+      ? apiKey
+      : `Bearer ${apiKey}`;
 
     console.log("Fetching VPN client/test from servex.ws...");
     
@@ -28,8 +35,8 @@ serve(async (req) => {
       method: "GET",
       headers: {
         "Accept": "application/json",
-        // Servex sometimes expects the raw token (not Bearer). We send multiple headers for compatibility.
-        "Authorization": apiKey,
+        "Authorization": authorizationHeader,
+        // Compatibility headers (some gateways still look for these)
         "X-API-Key": apiKey,
         "apikey": apiKey,
         "User-Agent": "LovableSupabaseEdgeFunction/1.0",
