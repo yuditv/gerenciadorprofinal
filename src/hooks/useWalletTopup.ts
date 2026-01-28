@@ -21,9 +21,13 @@ export function useWalletTopup() {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
+      if (!accessToken) {
+        throw new Error("Sessão expirada. Faça login novamente para gerar o PIX.");
+      }
+
       const { data, error } = await supabase.functions.invoke("wallet-pix", {
         body: { action: "create", amount_brl },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
       if (error) throw new Error(error.message);
@@ -37,9 +41,13 @@ export function useWalletTopup() {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
+      if (!accessToken) {
+        throw new Error("Sessão expirada. Faça login novamente para verificar o pagamento.");
+      }
+
       const { data, error } = await supabase.functions.invoke("wallet-pix", {
         body: { action: "check", topup_id },
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
