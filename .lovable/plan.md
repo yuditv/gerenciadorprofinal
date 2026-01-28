@@ -1,139 +1,147 @@
 
-Objetivo
-- Você não vê “Category” no painel, mas a API do Servex está retornando erro 400 “Campos obrigatórios faltando”.
-- Vamos adicionar no app um fluxo “listar e escolher” (automático) para descobrir Category/Owner via API e você só seleciona, sem precisar saber IDs.
+Resumo de como está a recarga de saldo (Engajamento / Carteira)
 
-O que está acontecendo (diagnóstico)
-- Logs do Edge Function `vpn-test-generator` mostram chamadas válidas, mas a resposta do Servex é:
-  - HTTP 400 com body: `{"error":"Campos obrigatórios faltando"}`
-- Isso indica que, na sua conta/painel, o endpoint `POST /api/clients` exige algum campo adicional (muito comum: `category_id` e/ou `owner_id`), mesmo que no painel visual isso esteja “implícito”.
+1) Onde o usuário vê e usa
+- No Engajamento (cartão “Saldo”):
+  - Mostra “Créditos disponíveis” vindo do hook `useWallet()` (tabela `user_wallets.credits`).
+  - Admin vê o botão “Recarregar” que leva para `/carteira`.
+- Na página `/carteira`:
+  - Mostra saldo em créditos (1 crédito = R$ 1,00) e histórico (`wallet_transactions`).
+  - Abre um modal para “Recarregar via PIX”:
+    - Você informa o valor (mínimo R$ 1,00).
+    - Clica “Gerar PIX” -> cria uma cobrança PIX no Mercado Pago.
+    - Exibe QR Code + código copia/cola.
+    - Faz polling a cada 8s chamando “Verificar” automaticamente (e tem botão manual “Verificar”).
 
-Solução proposta (alto nível)
-1) Criar um novo Edge Function para “catálogo do Servex” (metadata)
-- Nome sugerido: `servex-metadata`
-- Funções:
-  - Buscar lista de categorias (category) e/ou owners (owner) via endpoints do Servex.
-  - Normalizar a resposta para o frontend (ex.: `[{ id, name }]`).
-  - Ter estratégia de “tentativas” (probing) porque a documentação não está clara:
-    - Tentar vários caminhos comuns (ex.: `/api/categories`, `/api/category`, `/api/owners`, `/api/users`, etc.) até encontrar um que retorne JSON com lista.
+2) Como o frontend fala com o backend
+- O frontend usa `useWalletTopup()` que chama a Edge Function `wallet-pix` via:
+  - action="create" com `amount_brl`
+  - action="check" com `topup_id`
+- O frontend passa o token do usuário no header `Authorization: Bearer <access_token>` (isso é importante para identificar o usuário no backend).
 
-2) Modificar o Frontend (VPNTestGenerator.tsx)
-- **Fluxo inicial**:
-  a. Ao abrir o modal, exibir um loading/spinner inicial enquanto chama `servex-metadata`.
-  b. Se retornar categorias, armazenar no estado (`availableCategories`) e se retornar owners, `availableOwners`.
-  c. Se vierem listas não-vazias:
-    - Mostrar um `<Select>` para categoria (e/ou owner se vier).
-    - Exigir seleção antes de liberar o botão "Gerar no painel" se a lista tiver mais de 1 item.
-    - Se a lista tiver apenas 1 item (categoria ou owner único), auto-selecionar.
-  d. Se não retornar nada (probing falhou), "fallback": mostrar opcionalmente um campo manual Category/Owner com helper text.
+3) O que a Edge Function `wallet-pix` faz
+- action="create"
+  - Valida valor mínimo
+  - Faz `fetch("https://api.mercadopago.com/v1/payments")` com `MERCADO_PAGO_ACCESS_TOKEN` (secret)
+  - Se Mercado Pago responde OK:
+    - Extrai `pix_code` e `pix_qr_code`
+    - Salva um registro em `wallet_topups` com status `pending`
+    - Retorna `topup` para o frontend mostrar o QR/code
+- action="check"
+  - Lê a recarga em `wallet_topups` do usuário
+  - Faz `fetch("https://api.mercadopago.com/v1/payments/{external_id}")`
+  - Se Mercado Pago diz `approved`:
+    - Atualiza `wallet_topups` para `paid`
+    - Upsert em `user_wallets` somando os créditos
+    - Insere ledger em `wallet_transactions` (type="topup")
+    - Retorna `wallet_credits` atualizado
 
-- **Integração com a geração**:
-  - Quando o usuário clicar "Gerar no painel", o payload já vai com `category_id` e `owner_id` (quando presentes).
+4) Webhook do Mercado Pago (importante)
+- Existe também `mercado-pago-webhook`, que valida o pagamento no Mercado Pago e processa alguns fluxos (assinatura, client_pix_payments, etc.).
+- Pelo trecho que vimos, ele usa `MERCADO_PAGO_ACCESS_TOKEN` e consulta `GET /v1/payments/{id}` para validar.
+- Ou seja: tanto o “create/check” (wallet-pix) quanto o webhook dependem de conseguir chamar a API do Mercado Pago via Edge Functions.
 
-- **Error handling**:
-  - Se o 400 ainda ocorrer (improvável se a lista for válida, mas pode acontecer se houver outro campo obrigatório), mostrar a mensagem de erro com "campos faltando" explícitos (se possível, parseando o response do Servex).
+Confirmação: a credencial do Mercado Pago está configurada?
+- Sim: existe um Secret chamado **`MERCADO_PAGO_ACCESS_TOKEN`** configurado no projeto.
+- Observação importante: o fato do secret existir não garante que:
+  1) o valor está correto/ativo (token válido), e/ou
+  2) as chamadas de saída do Supabase para o domínio do Mercado Pago estão permitidas (egress/policy).
 
-3) Estratégia de "tentativas" (Probing) no servex-metadata
-- Tentamos GET em múltiplos endpoints (caminhos possíveis):
-  - `/api/categories`
-  - `/api/category`
-  - `/api/clients/categories`
-  - `/api/owners`
-  - `/api/users`
-  - (E se o Servex tiver algum endpoint de "schema" ou "metadata", tentamos também).
-- A primeira tentativa que retornar:
-  - 200 OK + JSON array com pelo menos 1 elemento → normalize e devolve como `categories` ou `owners`.
-  - Se nenhuma tentativa der 200 OK, não é erro crítico, apenas não conseguimos descobrir. Retornamos vazio.
+Sobre o erro “Edge function returned 502: At least one policy returned UNAUTHORIZED.”
+O que isso normalmente significa (no contexto Supabase Edge)
+- Esse erro não é “RLS do banco” (as operações no banco estão usando Service Role e tendem a passar).
+- Esse erro costuma indicar bloqueio pelo “Policy Agent” da infraestrutura ao tentar fazer uma chamada externa (egress), ou alguma regra de rede/segurança negando a requisição.
+- No seu caso, o ponto mais provável é o `fetch(...)` para `https://api.mercadopago.com/v1/payments` dentro da `wallet-pix` (e possivelmente também afetando o webhook).
 
-4) Logs ampliados para suporte
-- Se a seleção manual vier vazia ou se o 400 ainda ocorrer após escolher, mostrar no modal o log bruto/parcial da resposta (de forma amigável, permitindo o usuário "copiar erro" para debug).
+Objetivo do ajuste
+- Manter o fluxo de recarga funcionando mesmo quando ocorrer bloqueio/erro do Mercado Pago, e melhorar o diagnóstico para ficar claro se é:
+  A) token inválido/sem permissão (401/403 vindo do MP)
+  B) bloqueio de egress/policy (erro “At least one policy returned UNAUTHORIZED.”)
+  C) WAF/Cloudflare/HTML response (parse JSON falha)
+  D) problema momentâneo (timeout / 5xx do MP)
 
-Detalhes técnicos
+Plano de correção (código + diagnóstico)
 
-Edge Function: `servex-metadata`
-- Localização: `supabase/functions/servex-metadata/index.ts`
-- Método: `GET` (ou POST com um parâmetro `scope` se quisermos forçar fetch de category ou owner).
-- Autenticação: Usa o mesmo `SERVEX_API_KEY`.
-- Timeout: 15 segundos (AbortController) tal como em `vpn-test-generator`.
-- Response:
-  ```typescript
-  {
-    categories?: Array<{ id: number, name: string }>,
-    owners?: Array<{ id: number, name: string }>,
-    error?: string
-  }
-  ```
+Etapa 1 — Confirmar onde o erro acontece (rápido e objetivo)
+1.1) Checar logs recentes da Edge Function `wallet-pix` na tentativa de “Gerar PIX”.
+- Ver se o erro acontece antes ou depois do `fetch` ao Mercado Pago.
+- Se a função nem chega a logar `mpResponse.status`, é forte sinal de bloqueio antes da resposta (policy agent).
 
-Alterações no Front-end
-- **VPNTestGenerator.tsx**
-  1. Criar estado:
-     ```typescript
-     const [availableCategories, setAvailableCategories] = useState<Array<{ id: number; name: string }>>([])
-     const [availableOwners, setAvailableOwners] = useState<Array<{ id: number; name: string }>>([])
-     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
-     const [selectedOwnerId, setSelectedOwnerId] = useState<number | null>(null)
-     const [isLoadingMetadata, setIsLoadingMetadata] = useState(false)
-     ```
-  2. useEffect "on mount" (ou logo após `open=true` se for modal-driven):
-     ```typescript
-     useEffect(() => {
-       if (modalOpen) {
-         fetchMetadata()
-       }
-     }, [modalOpen])
-     ```
-     Função `fetchMetadata` chama `servex-metadata` e popula os arrays.
-  3. Renderizar:
-     - Se `isLoadingMetadata`: spinner ("Carregando categorias do painel...").
-     - Se `availableCategories.length > 0`:
-       - `<Select>` com opções (id/name).
-       - Se `length === 1`, seleciona automaticamente.
-     - Se `availableOwners.length > 0`: idem.
-     - Botão "Gerar no painel" só ativa se (categorias.length === 0 ou selectedCategoryId !== null) && (owners.length === 0 ou selectedOwnerId !== null).
-  4. Payload de `generateOnPanel` inclui:
-     ```typescript
-     category_id: selectedCategoryId ?? undefined,
-     owner_id: selectedOwnerId ?? undefined,
-     ```
+1.2) Fazer uma chamada de teste direta para `wallet-pix` (action=create) no ambiente atual e capturar retorno completo.
+- Resultado esperado para confirmar:
+  - Se 502 com “policy unauthorized” -> egress/policy.
+  - Se 401/403 com JSON do MP -> token/permissão.
 
-- **Manter o bloco de "Campos obrigatórios faltando" (fallback manual):**
-  - Se a probing não achar nada, continuamos mostrando os inputs manuais (Category ID / Owner ID) como "plano B".
+Etapa 2 — Melhorar robustez do `wallet-pix` (mudanças no código)
+2.1) Envolver o `fetch` do Mercado Pago com:
+- Timeout via `AbortController` (ex.: 15s, como já foi feito no `smm-panel` em outras partes do projeto).
+- Headers mais completos (alguns WAFs ficam menos agressivos):
+  - `User-Agent: gerenciadorpro/1.0 (supabase-edge)`
+  - `Accept: application/json`
+  - manter `Content-Type` e `Authorization`
 
-Fluxo final (resumo)
-1. Usuário abre modal VPN
-2. App chama `servex-metadata` para listar categorias/owners
-3. Se retornar:
-   - Mostra Select dropdown
-   - Usuário escolhe (ou se só 1, auto-seleciona)
-   - Clique "Gerar no painel" → payload já inclui IDs
-4. Edge Function `vpn-test-generator` envia POST com category_id/owner_id
-5. Servex cria teste com sucesso → retorna dados → UI exibe para copiar
-6. Se ainda der 400, mostramos erro claramente (com possibilidade de "copiar erro").
+2.2) Tornar o parsing resiliente
+- Hoje faz `await mpResponse.json()` sempre.
+- Se o Mercado Pago (ou alguma camada) devolver HTML/texto, isso pode estourar e virar erro genérico.
+- Ajuste:
+  - ler `const raw = await mpResponse.text()`
+  - tentar `JSON.parse(raw)` com try/catch
+  - se não for JSON, logar os primeiros caracteres do raw e devolver erro amigável
 
-Melhorias extras (opcionais, mas boas):
-- Se o probing descobrir que o painel tem uma categoria default (ex.: primeira da lista se tiver "is_default"), auto-seleciona.
-- Se existir endpoint de "schema" no Servex (improvável mas possível), usamos.
-- Criar botão "Atualizar lista de categorias" pra reforçar a busca se o painel mudou.
+2.3) Melhorar mensagens de erro retornadas ao frontend
+- Quando der erro de policy agent:
+  - retornar algo como:
+    - `error: "Bloqueio de rede ao acessar Mercado Pago (egress/policy)."`
+    - `details: "Supabase Edge não conseguiu sair para api.mercadopago.com. Verifique allowlist/egress no projeto ou use um proxy externo."`
+- Quando der 401/403 do MP:
+  - `error: "Mercado Pago rejeitou a credencial (token inválido ou sem permissão)."`
+- Quando der 5xx:
+  - `error: "Mercado Pago indisponível no momento."`
 
-Estrutura de arquivos (resumo)
-```
-supabase/functions/servex-metadata/
-  index.ts           # Edge Function novo para probing de categories/owners
+2.4) Aplicar a mesma robustez no “check” (consulta de status)
+- Mesmo pacote de melhorias: timeout + parse robusto + mensagens claras.
 
-supabase/config.toml  # Adicionar [functions.servex-metadata] verify_jwt = false
+Etapa 3 — Ajuste no frontend para orientar quando for bloqueio externo
+3.1) No modal de recarga (/carteira), se o erro vier com “bloqueio de rede / policy”:
+- Mostrar uma mensagem objetiva para você/admin:
+  - “O Supabase bloqueou a saída para o Mercado Pago. Isso não é erro de valor/usuário.”
+  - “Solução: liberar egress/allowlist para api.mercadopago.com no painel, ou usar um servidor proxy fora do Supabase.”
 
-src/components/Inbox/VPNTest/
-  VPNTestGenerator.tsx  # Adicionar fetchMetadata, Select dropdowns, estados
-```
+3.2) Não “travar” a UI
+- Se não conseguiu criar PIX, manter o formulário e permitir tentar novamente.
 
-Observações
-- "Teste" que você quer usar: se na verdade "Teste" é um nome de categoria visível no painel, provavelmente vai aparecer na lista retornada pela API, e você vai selecionar visualmente.
-- **Problema de Cloudflare 403**: no teste do curl do Edge Function, recebemos 403 com Cloudflare challenge page. Isso pode indicar que o Servex tem proteção contra bots ou IPs suspeitos. Vamos ajustar o User-Agent/Headers (já está feito) e considerar:
-  - Se persistir o 403, pode ser que o Servex bloqueie chamadas de IPs da Supabase Edge.
-  - Possível solução: chamar a API do seu servidor/backend (se tiver) ou configurar IP whitelist no Servex (se disponível).
-  - Mas como você viu que funciona manualmente, vamos assumir que é questão de headers/configuração que vamos aprimorar.
+Etapa 4 — Se for realmente egress/policy: solução operacional (fora do código)
+4.1) Verificar configurações de rede/egress no Supabase (Projeto)
+- Se existir allowlist/Outbound restrictions:
+  - permitir domínio `api.mercadopago.com` (e possivelmente `mercadopago.com`).
+- Se houver alguma política global impedindo “financial/checkout” providers, isso pode exigir ajuste no projeto.
 
-Conclusão
-- Vamos implementar um **descobrimento automático via API** para evitar que você tenha que saber IDs manuais.
-- Se não achar, ainda tem fallback manual (inputs de texto).
-- Isso deve resolver o erro 400 "Campos obrigatórios faltando" de forma amigável e automática.
+4.2) Plano B (caso Supabase Edge não consiga mesmo acessar o Mercado Pago)
+- Implementar um “proxy” fora do Supabase (ex.: servidor próprio/Vercel/Cloudflare Worker) que:
+  - recebe request do `wallet-pix`
+  - chama Mercado Pago
+  - devolve resposta
+- O Supabase Edge chamaria o proxy (se este não estiver bloqueado) e o proxy chama o Mercado Pago.
+- Isso é a alternativa mais robusta quando há bloqueio por IP/WAF ou limitações de egress.
+
+Arquivos que serão envolvidos (quando eu puder implementar)
+- `supabase/functions/wallet-pix/index.ts`
+  - timeout + headers + parse resiliente + mensagens melhores
+- `src/pages/Wallet.tsx` (ou onde o modal de recarga trata erros)
+  - exibir erro “policy/egress” de forma explícita
+- (Opcional) `supabase/functions/mercado-pago-webhook/index.ts`
+  - aplicar o mesmo padrão de timeout + parse resiliente, porque o webhook também depende de chamar Mercado Pago
+
+Critérios de aceite (como você valida)
+1) Em /carteira -> “Gerar PIX”:
+- Em cenário saudável: gera QR + pix_code normalmente.
+- Em cenário bloqueado: mostra erro claro de “bloqueio de rede/egress”, não “erro genérico 502”.
+2) “Verificar”:
+- Se aprovado: credita saldo e aparece no histórico.
+- Se MP indisponível: erro amigável e possibilidade de tentar novamente.
+3) Engajamento:
+- O cartão de créditos atualiza (refetch) depois do crédito confirmado.
+
+Observação sobre sua pergunta (“ver se a credencial está configurada”)
+- Está configurada no projeto como secret (`MERCADO_PAGO_ACCESS_TOKEN`).
+- O próximo passo é confirmar se o valor é válido e se a infraestrutura permite acesso ao domínio do Mercado Pago; o erro que você reportou aponta mais para bloqueio de saída do que para ausência de secret.
