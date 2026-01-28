@@ -22,9 +22,17 @@ serve(async (req) => {
     // Servex docs: Authorization must be sent as Bearer Token.
     // Accept secret values with or without the "Bearer " prefix.
     const apiKey = apiKeyRaw.trim();
+    console.log("🔐 API Key format check:", {
+      startsWithBearer: apiKey.toLowerCase().startsWith("bearer "),
+      startsWithSx: apiKey.startsWith("sx_"),
+      length: apiKey.length
+    });
+
     const authorizationHeader = apiKey.toLowerCase().startsWith("bearer ")
       ? apiKey
       : `Bearer ${apiKey}`;
+
+    console.log("🔑 Authorization header prepared (first 20 chars):", authorizationHeader.substring(0, 20) + "...");
 
     console.log("Creating VPN test client at servex.ws...");
 
@@ -52,6 +60,8 @@ serve(async (req) => {
       owner_id,
     };
 
+    console.log("📤 Sending POST to Servex with payload:", { ...payload, password: "***", v2ray_uuid: "***" });
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
 
@@ -62,26 +72,25 @@ serve(async (req) => {
         "Accept": "application/json",
         "Content-Type": "application/json",
         "Authorization": authorizationHeader,
-        // Compatibility headers (some gateways still look for these)
-        "X-API-Key": apiKey,
-        "apikey": apiKey,
         "User-Agent": "LovableSupabaseEdgeFunction/1.0",
       },
       body: JSON.stringify(payload),
     }).finally(() => clearTimeout(timeout));
 
     if (!response.ok) {
-      console.error("API responded with status:", response.status);
       const errorText = await response.text();
-      console.error("Error response:", errorText);
-      // Return a short snippet to help diagnose Cloudflare/WAF blocks
+      console.error("❌ Servex API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText.substring(0, 300)
+      });
       throw new Error(
-        `API error: ${response.status} - ${errorText.slice(0, 180)}`
+        `API error: ${response.status} - ${errorText.slice(0, 200)}`
       );
     }
 
     const data = await response.json();
-    console.log("Servex response received successfully");
+    console.log("✅ Servex response received successfully:", { hasData: !!data });
 
     // Ensure the UI always sees the generated credentials even if the API response shape changes
     const normalized = {
