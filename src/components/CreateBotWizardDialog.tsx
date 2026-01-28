@@ -43,7 +43,7 @@ const TEMPLATE_PRESETS: Record<BotTemplateId, { title: string; summary: string; 
   },
 };
 
-type StepId = "template" | "identity" | "channels" | "features" | "limits" | "routing" | "review";
+type StepId = "template" | "identity" | "channels" | "features" | "limits" | "numeric_menu" | "routing" | "review";
 
 const STEPS: Array<{ id: StepId; title: string; description: string }> = [
   { id: "template", title: "Template", description: "Comece com um modelo pronto" },
@@ -51,9 +51,32 @@ const STEPS: Array<{ id: StepId; title: string; description: string }> = [
   { id: "channels", title: "Canais", description: "Onde ele atua" },
   { id: "features", title: "Recursos", description: "Memória, ferramentas e qualidade" },
   { id: "limits", title: "Limites", description: "Anti-spam e comportamento" },
+  { id: "numeric_menu", title: "Menu numérico", description: "URA simples (resposta 1/2/3)" },
   { id: "routing", title: "Roteamento", description: "Vincular às instâncias" },
   { id: "review", title: "Revisão", description: "Conferir e criar" },
 ];
+
+type NumericMenuOption = {
+  key: string; // "1".."9"
+  title: string;
+  reply: string;
+};
+
+function safeJsonParse(value: string | null): any {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function buildDefaultMenuPrompt(options: NumericMenuOption[]) {
+  const lines = options
+    .filter((o) => o.key.trim() && o.title.trim())
+    .map((o) => `${o.key.trim()} - ${o.title.trim()}`);
+  return [`Olá! Escolha uma opção:`, ...lines].join("\n");
+}
 
 export function CreateBotWizardDialog({
   open,
@@ -88,6 +111,17 @@ export function CreateBotWizardDialog({
   const [bufferEnabled, setBufferEnabled] = useState(true);
   const [bufferWaitSeconds, setBufferWaitSeconds] = useState(8);
   const [bufferMaxMessages, setBufferMaxMessages] = useState(8);
+
+  // Numeric menu (manual trigger)
+  const [numericMenuEnabled, setNumericMenuEnabled] = useState(false);
+  const [numericMenuPrompt, setNumericMenuPrompt] = useState<string>(
+    "Olá! Escolha uma opção:\n1 - Suporte\n2 - Vendas\n3 - Financeiro",
+  );
+  const [numericMenuOptions, setNumericMenuOptions] = useState<NumericMenuOption[]>([
+    { key: "1", title: "Suporte", reply: "Beleza! Vamos para suporte. Me diga qual app você usa e o erro." },
+    { key: "2", title: "Vendas", reply: "Perfeito! Para vendas, qual plano você quer? 1 mês / 3 meses / 12 meses" },
+    { key: "3", title: "Financeiro", reply: "Certo! Para financeiro, você quer 1) 2ª via 2) status do pagamento 3) renovar" },
+  ]);
 
   // Routing
   const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
@@ -130,9 +164,25 @@ export function CreateBotWizardDialog({
     setBufferEnabled(true);
     setBufferWaitSeconds(8);
     setBufferMaxMessages(8);
+    setNumericMenuEnabled(false);
+    setNumericMenuOptions([
+      { key: "1", title: "Suporte", reply: "Beleza! Vamos para suporte. Me diga qual app você usa e o erro." },
+      { key: "2", title: "Vendas", reply: "Perfeito! Para vendas, qual plano você quer? 1 mês / 3 meses / 12 meses" },
+      { key: "3", title: "Financeiro", reply: "Certo! Para financeiro, você quer 1) 2ª via 2) status do pagamento 3) renovar" },
+    ]);
+    setNumericMenuPrompt("Olá! Escolha uma opção:\n1 - Suporte\n2 - Vendas\n3 - Financeiro");
     setSelectedInstanceIds([]);
     setOverwriteRouting(false);
   }, [open]);
+
+  useEffect(() => {
+    // Keep prompt readable when enabled and prompt is empty
+    if (!numericMenuEnabled) return;
+    if (!numericMenuPrompt.trim()) {
+      setNumericMenuPrompt(buildDefaultMenuPrompt(numericMenuOptions));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numericMenuEnabled]);
 
   useEffect(() => {
     // Keep a sensible default name/description when switching template.
@@ -171,6 +221,30 @@ export function CreateBotWizardDialog({
       "- Seja claro e evite inventar. Se não souber, peça contexto.",
     ].join("\n");
 
+    const consultationContext = (() => {
+      if (!numericMenuEnabled) return undefined;
+
+      const options: Record<string, { title?: string; reply: string }> = {};
+      for (const opt of numericMenuOptions) {
+        const key = opt.key.trim();
+        if (!key) continue;
+        options[key] = {
+          title: opt.title?.trim() || undefined,
+          reply: (opt.reply || "").trim(),
+        };
+      }
+
+      const payload = {
+        numeric_menu: {
+          enabled: true,
+          prompt: numericMenuPrompt.trim() || buildDefaultMenuPrompt(numericMenuOptions),
+          options,
+        },
+      };
+
+      return JSON.stringify(payload);
+    })();
+
     return {
       name: name.trim(),
       description: description.trim(),
@@ -182,6 +256,7 @@ export function CreateBotWizardDialog({
       use_native_ai: true,
       ai_model: DEFAULT_MODEL,
       system_prompt: systemPrompt,
+      consultation_context: consultationContext,
 
       // Sending
       response_delay_min: responseDelayMin,
@@ -210,6 +285,23 @@ export function CreateBotWizardDialog({
 
       agent_type: "principal",
     };
+  };
+
+  const updateMenuOption = (index: number, patch: Partial<NumericMenuOption>) => {
+    setNumericMenuOptions((prev) => prev.map((o, i) => (i === index ? { ...o, ...patch } : o)));
+  };
+
+  const addMenuOption = () => {
+    setNumericMenuOptions((prev) => {
+      if (prev.length >= 9) return prev;
+      const used = new Set(prev.map((o) => o.key.trim()).filter(Boolean));
+      const nextKey = Array.from({ length: 9 }, (_, i) => String(i + 1)).find((k) => !used.has(k)) || "";
+      return [...prev, { key: nextKey, title: "", reply: "" }];
+    });
+  };
+
+  const removeMenuOption = (index: number) => {
+    setNumericMenuOptions((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleToggleInstance = (id: string, checked: boolean) => {
@@ -462,6 +554,97 @@ export function CreateBotWizardDialog({
             </div>
           )}
 
+          {step.id === "numeric_menu" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 p-3">
+                <div>
+                  <p className="font-medium">Ativar menu numérico (manual)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Você inicia pelo Inbox e o cliente responde com 1/2/3.
+                  </p>
+                </div>
+                <Switch checked={numericMenuEnabled} onCheckedChange={setNumericMenuEnabled} />
+              </div>
+
+              {numericMenuEnabled && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Mensagem do menu</Label>
+                    <Textarea
+                      value={numericMenuPrompt}
+                      onChange={(e) => setNumericMenuPrompt(e.target.value)}
+                      placeholder="Ex.: Olá! Escolha uma opção:\n1 - Suporte\n2 - Vendas\n3 - Financeiro"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Dica: use quebras de linha para ficar legível.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Opções (1–9)</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={addMenuOption} disabled={numericMenuOptions.length >= 9}>
+                        Adicionar opção
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {numericMenuOptions.map((opt, idx) => (
+                        <div key={`${opt.key}-${idx}`} className="rounded-lg border border-border/60 bg-background/40 p-3">
+                          <div className="grid gap-3 md:grid-cols-12">
+                            <div className="md:col-span-2 space-y-2">
+                              <Label className="text-xs">Número</Label>
+                              <Input
+                                inputMode="numeric"
+                                value={opt.key}
+                                onChange={(e) => updateMenuOption(idx, { key: e.target.value.replace(/\D/g, "").slice(0, 1) })}
+                                placeholder="1"
+                              />
+                            </div>
+                            <div className="md:col-span-4 space-y-2">
+                              <Label className="text-xs">Título</Label>
+                              <Input
+                                value={opt.title}
+                                onChange={(e) => updateMenuOption(idx, { title: e.target.value })}
+                                placeholder="Ex: Suporte"
+                              />
+                            </div>
+                            <div className="md:col-span-6 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs">Resposta automática</Label>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeMenuOption(idx)}
+                                  className="text-muted-foreground"
+                                >
+                                  Remover
+                                </Button>
+                              </div>
+                              <Textarea
+                                value={opt.reply}
+                                onChange={(e) => updateMenuOption(idx, { reply: e.target.value })}
+                                placeholder="Texto que o bot envia quando o cliente escolher esta opção"
+                                className="min-h-[72px]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Configuração fica salva no agente (campo <code>consultation_context</code>) como JSON.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {step.id === "routing" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 p-3">
@@ -560,6 +743,10 @@ export function CreateBotWizardDialog({
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Vincular instâncias</span>
                     <span className="font-medium">{enableInbox ? selectedInstanceIds.length : 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Menu numérico</span>
+                    <span className="font-medium">{numericMenuEnabled ? "Ativo" : "Desativado"}</span>
                   </div>
                 </div>
               </div>

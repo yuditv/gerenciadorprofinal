@@ -291,7 +291,9 @@ export function useInboxConversations() {
     try {
       const { error } = await supabase
         .from('conversations')
-        .update(updates)
+        // Supabase generated types represent jsonb as Json; our app uses Record<string, unknown>
+        // for convenience in the UI.
+        .update(updates as any)
         .eq('id', conversationId);
 
       if (error) throw error;
