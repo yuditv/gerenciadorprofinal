@@ -2,13 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
@@ -19,30 +19,35 @@ serve(async (req) => {
       throw new Error("API key not configured");
     }
 
-    console.log("Fetching VPN test from servex.ws...");
+    console.log("Fetching VPN client/test from servex.ws...");
     
-    const response = await fetch(
-      "https://servex.ws/test/3c5cfe65-2403-45f6-86d8-d3b820e6a8c9",
-      {
-        method: "GET",
-        headers: {
-          "Accept": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "X-API-Key": apiKey,
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      }
-    );
+    // New Servex API endpoint provided by user
+    const url = "https://servex.ws/api/clients";
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        // Servex sometimes expects the raw token (not Bearer). We send multiple headers for compatibility.
+        "Authorization": apiKey,
+        "X-API-Key": apiKey,
+        "apikey": apiKey,
+        "User-Agent": "LovableSupabaseEdgeFunction/1.0",
+      },
+    });
 
     if (!response.ok) {
       console.error("API responded with status:", response.status);
       const errorText = await response.text();
       console.error("Error response:", errorText);
-      throw new Error(`API error: ${response.status}`);
+      // Return a short snippet to help diagnose Cloudflare/WAF blocks
+      throw new Error(
+        `API error: ${response.status} - ${errorText.slice(0, 180)}`
+      );
     }
 
     const data = await response.json();
-    console.log("VPN test generated successfully");
+    console.log("Servex response received successfully");
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
