@@ -12,6 +12,10 @@ serve(async (req) => {
   }
 
   try {
+    const requestBody = req.method !== "GET"
+      ? await req.json().catch(() => ({}))
+      : {};
+
     const apiKeyRaw = Deno.env.get("SERVEX_API_KEY");
     
     if (!apiKeyRaw) {
@@ -38,17 +42,24 @@ serve(async (req) => {
 
     const url = "https://servex.ws/api/clients";
 
-    // Fixed parameters (as requested)
-    const category_id = 1;
-    const duration = 60; // minutes (per Servex docs)
-    const connection_limit = 1;
-    const owner_id = 1;
+    // Params can be provided by the client (modal). Defaults are safe.
+    const category_id = Number((requestBody as any)?.category_id ?? 1);
+    const duration = Number((requestBody as any)?.duration ?? 60); // minutes (per Servex docs)
+    const connection_limit = Number((requestBody as any)?.connection_limit ?? 1);
+    const owner_id = (requestBody as any)?.owner_id !== undefined && (requestBody as any)?.owner_id !== null && (requestBody as any)?.owner_id !== ""
+      ? Number((requestBody as any)?.owner_id)
+      : undefined;
 
     // Generate random username + identifiers
     // NOTE: Servex constraint: username and password must be <= 20 chars.
     const randomNumber = Math.floor(Math.random() * 1_000_000) + 1;
-    const v2rayUuid = crypto.randomUUID();
-    const usernameRaw = `teste${randomNumber}`;
+    const v2rayEnabled = Boolean((requestBody as any)?.v2ray_enabled ?? true);
+    const v2rayUuid = v2rayEnabled
+      ? String((requestBody as any)?.v2ray_uuid ?? crypto.randomUUID())
+      : "";
+
+    const usernameFromBody = typeof (requestBody as any)?.username === "string" ? (requestBody as any).username : "";
+    const usernameRaw = usernameFromBody || `teste${randomNumber}`;
     const username = usernameRaw.trim().slice(0, 20);
 
     // Short password (<= 20) to satisfy Servex validation
@@ -58,7 +69,8 @@ serve(async (req) => {
       const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // no ambiguous chars
       return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
     };
-    const password = makePassword(12).trim().slice(0, 20);
+    const passwordFromBody = typeof (requestBody as any)?.password === "string" ? (requestBody as any).password : "";
+    const password = (passwordFromBody || makePassword(12)).trim().slice(0, 20);
 
     console.log("🧾 Lengths:", {
       usernameLen: username.length,
@@ -73,8 +85,8 @@ serve(async (req) => {
       connection_limit,
       duration,
       type: "test",
-      v2ray_uuid: v2rayUuid,
-      owner_id,
+      ...(v2rayEnabled ? { v2ray_uuid: v2rayUuid } : {}),
+      ...(owner_id ? { owner_id } : {}),
     };
 
     console.log("📤 Sending POST to Servex with payload:", { ...payload, password: "***", v2ray_uuid: "***" });
