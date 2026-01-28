@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { useDragScroll } from "@/hooks/useDragScroll";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -113,6 +114,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
   const { permissions, isAdmin } = useUserPermissions();
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
+  const { ref: menuScrollRef, isDragging: isMenuDragging, handlers: menuDragHandlers } = useDragScroll<HTMLDivElement>();
 
   const handleClick = (item: MenuItem) => {
     if (item.id === 'admin') {
@@ -167,7 +169,15 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
           </div>
 
           {/* Menu Items */}
-          <nav className="flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide">
+          <nav
+            ref={menuScrollRef}
+            {...menuDragHandlers}
+            className={cn(
+              "flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide",
+              "select-none",
+              isMenuDragging ? "cursor-grabbing" : "cursor-grab",
+            )}
+          >
             {visibleMenuItems.map((item) => {
               const isActive = activeSection === item.id;
               const Icon = item.icon;
