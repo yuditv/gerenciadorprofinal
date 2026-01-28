@@ -766,7 +766,25 @@ export function ChatPanel({
                               <button onClick={() => openMediaGallery(msg.id)} className="absolute inset-0 flex items-center justify-center bg-black/30 rounded opacity-0 group-hover/video:opacity-100 transition-opacity">
                                 <Play className="h-12 w-12 text-white" />
                               </button>
-                            </div> : msg.media_type?.startsWith('audio/') ? <AudioPlayer src={msg.media_url} isOutgoing={isOutgoing} /> : <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="text-sm underline flex items-center gap-1">
+                            </div> : msg.media_type?.startsWith('audio/') ? <div className="space-y-2">
+                              <AudioPlayer src={msg.media_url} isOutgoing={isOutgoing} />
+
+                              {Boolean((msg.metadata as any)?.transcription?.text) && <div className={cn("rounded-lg border border-border/50 bg-muted/40 px-3 py-2", isOutgoing && msg.sender_type !== 'ai' && "bg-background/20")}
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[10px] font-medium text-muted-foreground">Transcrição</span>
+                                    {Boolean((msg.metadata as any)?.transcription?.language) && <Badge variant="secondary" className="text-[10px]">
+                                        {(msg.metadata as any)?.transcription?.language}
+                                      </Badge>}
+                                    {Boolean((msg.metadata as any)?.transcription?.provider) && <Badge variant="secondary" className="text-[10px]">
+                                        {(msg.metadata as any)?.transcription?.provider}
+                                      </Badge>}
+                                  </div>
+                                  <p className="text-xs whitespace-pre-wrap break-words text-foreground/90">
+                                    {(msg.metadata as any)?.transcription?.text}
+                                  </p>
+                                </div>}
+                            </div> : <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="text-sm underline flex items-center gap-1">
                               📎 Anexo
                             </a>}
                         </div>}

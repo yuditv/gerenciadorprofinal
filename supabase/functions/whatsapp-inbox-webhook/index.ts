@@ -625,7 +625,7 @@ async function downloadMediaFromUAZAPI(
   instanceKey: string,
   messageId: string,
   mediaType: string
-): Promise<{ fileUrl: string | null; mimetype: string | null }> {
+): Promise<{ fileUrl: string | null; mimetype: string | null; transcription?: string | null }> {
   try {
     console.log(`[Media Download] Downloading media for message: ${messageId}, type: ${mediaType}`);
     
@@ -657,6 +657,7 @@ async function downloadMediaFromUAZAPI(
     // UAZAPI returns: { fileURL, mimetype, base64Data?, transcription? }
     const fileUrl = data.fileURL || data.url || data.link || data.fileUrl || null;
     const mimetype = data.mimetype || data.mimeType || null;
+    const transcription = (typeof data.transcription === 'string' ? data.transcription : null);
     
     if (fileUrl) {
       console.log(`[Media Download] Success: ${fileUrl.substring(0, 80)}...`);
@@ -664,10 +665,51 @@ async function downloadMediaFromUAZAPI(
       console.log(`[Media Download] No URL in response`);
     }
     
-    return { fileUrl, mimetype };
+    return { fileUrl, mimetype, transcription };
   } catch (error) {
     console.error('[Media Download] Error:', error);
-    return { fileUrl: null, mimetype: null };
+    return { fileUrl: null, mimetype: null, transcription: null };
+  }
+}
+
+async function transcribeAudioViaEdge(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  mediaUrl: string,
+  mimeType?: string
+): Promise<{ text: string; provider: string; language: string } | null> {
+  try {
+    const resp = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify({
+        mediaUrl,
+        mimeType,
+        language: 'pt-BR',
+        source: 'whatsapp'
+      })
+    });
+
+    if (!resp.ok) {
+      const t = await resp.text();
+      console.error('[Transcription] transcribe-audio failed:', resp.status, t);
+      return null;
+    }
+
+    const data = await resp.json();
+    const text = (data?.text ?? '').toString();
+    if (!text.trim()) return null;
+    return {
+      text,
+      provider: (data?.provider ?? 'openai').toString(),
+      language: (data?.language ?? 'pt').toString(),
+    };
+  } catch (e) {
+    console.error('[Transcription] Error calling transcribe-audio:', e);
+    return null;
   }
 }
 
@@ -1319,18 +1361,35 @@ serve(async (req: Request) => {
 
     // === DOWNLOAD MEDIA IF NEEDED ===
     // If message has media but no URL, download from UAZAPI
-    if (hasMedia && !mediaUrl && messageId && instance.instance_key) {
+    let uazapiTranscription: string | undefined;
+
+    // For audio, try to use /message/download even if we already have mediaUrl, because it may provide transcription.
+    const shouldDownloadForAudioTranscript =
+      hasMedia && (mediaType === 'audio' || mediaType === 'ptt') && !!messageId && !!instance.instance_key;
+
+    if ((hasMedia && !mediaUrl && messageId && instance.instance_key) || shouldDownloadForAudioTranscript) {
       console.log(`[Inbox Webhook] Message has media but no URL, downloading via /message/download...`);
+
+      // TS safety: ensure messageId exists here
+      const safeMessageId = messageId;
+      if (!safeMessageId) {
+        console.log('[Inbox Webhook] Skipping media download: messageId is missing');
+      } else {
       
-      const { fileUrl, mimetype: downloadedMimetype } = await downloadMediaFromUAZAPI(
+      const { fileUrl, mimetype: downloadedMimetype, transcription } = await downloadMediaFromUAZAPI(
         uazapiUrl,
         instance.instance_key,
-        messageId,
+        safeMessageId,
         mediaType || 'unknown'
       );
+
+      if (transcription && transcription.trim()) {
+        uazapiTranscription = transcription.trim();
+      }
       
       if (fileUrl) {
-        mediaUrl = fileUrl;
+        // Only override mediaUrl when we didn't have one.
+        if (!mediaUrl) mediaUrl = fileUrl;
         console.log(`[Inbox Webhook] Media downloaded successfully: ${mediaUrl.substring(0, 80)}...`);
         
         // Determine media type from mimetype if not set
@@ -1347,6 +1406,7 @@ serve(async (req: Request) => {
         }
       } else {
         console.log(`[Inbox Webhook] Failed to download media, saving message without media URL`);
+      }
       }
     }
 
@@ -1540,6 +1600,38 @@ serve(async (req: Request) => {
       original_media_type: mediaType,
       file_name: caption || undefined
     };
+
+    // ===== AUDIO TRANSCRIPTION (INCOMING) =====
+    const isIncoming = !fromMe;
+    const isAudio = (mediaType === 'audio' || mediaType === 'ptt') || (finalMediaType?.startsWith('audio/') ?? false);
+    let transcriptText: string | undefined;
+
+    if (isIncoming && isAudio) {
+      // Priority 1: transcription from UAZAPI /message/download
+      if (uazapiTranscription && uazapiTranscription.trim()) {
+        transcriptText = uazapiTranscription.trim();
+        messageMetadata.transcription = {
+          text: transcriptText,
+          provider: 'uazapi',
+          language: 'pt',
+          created_at: new Date().toISOString(),
+        };
+      } else if (mediaUrl) {
+        // Priority 2: fallback to OpenAI Whisper
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        const t = await transcribeAudioViaEdge(supabaseUrl, supabaseServiceKey, mediaUrl, finalMediaType);
+        if (t?.text) {
+          transcriptText = t.text;
+          messageMetadata.transcription = {
+            text: transcriptText,
+            provider: t.provider,
+            language: t.language,
+            created_at: new Date().toISOString(),
+          };
+        }
+      }
+    }
     
     // For outgoing messages (from device), add source indicator and status
     if (fromMe) {
@@ -1960,8 +2052,11 @@ serve(async (req: Request) => {
             if (existingBuffer) {
               // Add message to existing buffer and reschedule
               const currentMessages = existingBuffer.messages as Array<{ content: string; timestamp: string }>;
+                const effectiveTextForAI = transcriptText?.trim()
+                  ? `(ÁUDIO) ${transcriptText.trim()}`
+                  : (message || caption || '');
               const updatedMessages = [...currentMessages, {
-                content: message || caption || '',
+                  content: effectiveTextForAI,
                 timestamp: new Date().toISOString()
               }];
               
@@ -1981,6 +2076,9 @@ serve(async (req: Request) => {
               console.log(`[Inbox Webhook] Added to buffer (${updatedMessages.length}/${maxMessages} msgs), ${shouldForceProcess ? 'forcing process' : `will respond in ${bufferWaitSeconds}s`}`);
             } else {
               // Create new buffer
+                const effectiveTextForAI = transcriptText?.trim()
+                  ? `(ÁUDIO) ${transcriptText.trim()}`
+                  : (message || caption || '');
               await supabase
                 .from('ai_message_buffer')
                 .insert({
@@ -1989,7 +2087,7 @@ serve(async (req: Request) => {
                   instance_id: instance.id,
                   user_id: instance.user_id,
                   agent_id: agent.id,
-                  messages: [{ content: message || caption || '', timestamp: new Date().toISOString() }],
+                    messages: [{ content: effectiveTextForAI, timestamp: new Date().toISOString() }],
                   scheduled_response_at: scheduledAt
                 });
               
@@ -2041,7 +2139,7 @@ serve(async (req: Request) => {
                     },
                     body: JSON.stringify({
                       agentId: agent.id,
-                      message: message,
+                      message: transcriptText?.trim() ? `(ÁUDIO) ${transcriptText.trim()}` : message,
                       sessionId: sessionId,
                       source: 'whatsapp-inbox',
                       phone: normalizedPhone,
