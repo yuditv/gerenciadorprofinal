@@ -513,6 +513,30 @@ function formatPhoneNumber(phone: string): string {
   return cleaned;
 }
 
+// ===== Numeric Menu (Manual) =====
+
+function safeJsonParse(value: string | null): any {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getNumericMenuFromAgent(consultationContext: string | null): {
+  enabled: boolean;
+  prompt: string;
+  options: Record<string, { reply?: string; title?: string }>;
+} | null {
+  const json = safeJsonParse(consultationContext);
+  const cfg = json?.numeric_menu;
+  if (!cfg?.enabled) return null;
+  const prompt = (cfg.prompt ?? '').toString();
+  const options = cfg.options && typeof cfg.options === 'object' ? cfg.options : {};
+  return { enabled: true, prompt, options };
+}
+
 // Fetch contact avatar from UAZAPI
 async function fetchContactAvatar(
   uazapiUrl: string,
@@ -1976,6 +2000,121 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
+    }
+
+    // ===== Numeric menu interception (manual, stateful) =====
+    // If conversation is waiting for a numeric choice, it takes priority over AI.
+    const convMeta = (conversation as any)?.metadata as Record<string, unknown> | null;
+    const botMenu = (convMeta as any)?.bot_menu as any;
+    if (!fromMe && botMenu?.mode === 'numeric' && botMenu?.status === 'waiting_choice') {
+      const rawText = (transcriptText?.trim() ? transcriptText.trim() : (message || caption || '')).trim();
+      const match = rawText.match(/^\s*(\d+)\s*$/);
+      const selected = match?.[1];
+
+      const agentId = (botMenu?.agent_id as string | undefined) || conversation.active_agent_id || null;
+      if (!agentId) {
+        console.log('[Numeric Menu] No agent_id found in state, skipping.');
+      } else {
+        const { data: agent } = await supabase
+          .from('ai_agents')
+          .select('*')
+          .eq('id', agentId)
+          .maybeSingle();
+
+        const menuCfg = agent ? getNumericMenuFromAgent(agent.consultation_context) : null;
+        const optionsObj = menuCfg?.options || {};
+        const optionKeys = Object.keys(optionsObj).filter(Boolean);
+
+        if (menuCfg?.enabled) {
+          let replyToSend = '';
+          let willComplete = false;
+
+          if (selected && optionsObj?.[selected]?.reply) {
+            replyToSend = (optionsObj[selected].reply ?? '').toString();
+            willComplete = true;
+          } else {
+            const keysText = optionKeys.length ? optionKeys.join(', ') : '1, 2, 3';
+            replyToSend = `Opção inválida. Responda com ${keysText}.`;
+          }
+
+          // Save menu reply to DB
+          await supabase
+            .from('chat_inbox_messages')
+            .insert({
+              conversation_id: conversation.id,
+              sender_type: 'ai',
+              content: replyToSend,
+              metadata: {
+                agent_id: agent?.id,
+                agent_name: agent?.name,
+                bot_menu: {
+                  mode: 'numeric',
+                  status: willComplete ? 'done' : 'waiting_choice',
+                  selected_option: willComplete ? selected : null,
+                },
+              },
+            });
+
+          // Update conversation metadata/state
+          const nextMeta: Record<string, unknown> = {
+            ...(convMeta || {}),
+            bot_menu: {
+              ...(botMenu || {}),
+              status: willComplete ? 'done' : 'waiting_choice',
+              selected_option: willComplete ? selected : undefined,
+              completed_at: willComplete ? new Date().toISOString() : undefined,
+              last_invalid_at: !willComplete ? new Date().toISOString() : undefined,
+            },
+          };
+
+          const previewText = replyToSend.substring(0, 100);
+          await supabase
+            .from('conversations')
+            .update({
+              metadata: nextMeta,
+              last_message_at: new Date().toISOString(),
+              last_message_preview: previewText,
+            } as any)
+            .eq('id', conversation.id);
+
+          // Send via UAZAPI using agent send config (if present)
+          const formattedPhone = formatPhoneNumber(normalizedPhone);
+          const sendConfig: MessageSendConfig = {
+            response_delay_min: agent?.response_delay_min ?? DEFAULT_SEND_CONFIG.response_delay_min,
+            response_delay_max: agent?.response_delay_max ?? DEFAULT_SEND_CONFIG.response_delay_max,
+            max_lines_per_message: agent?.max_lines_per_message ?? DEFAULT_SEND_CONFIG.max_lines_per_message,
+            split_mode: agent?.split_mode ?? DEFAULT_SEND_CONFIG.split_mode,
+            split_delay_min: agent?.split_delay_min ?? DEFAULT_SEND_CONFIG.split_delay_min,
+            split_delay_max: agent?.split_delay_max ?? DEFAULT_SEND_CONFIG.split_delay_max,
+            max_chars_per_message: agent?.max_chars_per_message ?? DEFAULT_SEND_CONFIG.max_chars_per_message,
+            typing_simulation: agent?.typing_simulation ?? DEFAULT_SEND_CONFIG.typing_simulation,
+          };
+          await sendAIResponseWithConfig(
+            uazapiUrl,
+            instance.instance_key || uazapiToken,
+            formattedPhone,
+            replyToSend,
+            sendConfig,
+          );
+
+          console.log(`[Numeric Menu] Replied (${willComplete ? 'completed' : 'invalid'})`);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              conversationId: conversation.id,
+              messageId: savedMessage?.id,
+              numeric_menu: {
+                status: willComplete ? 'done' : 'waiting_choice',
+                selected_option: willComplete ? selected : null,
+              },
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          );
+        }
+      }
     }
 
     // Check if AI should respond - only for INCOMING messages (not fromMe)

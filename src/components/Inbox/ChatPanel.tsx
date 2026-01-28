@@ -128,6 +128,7 @@ export function ChatPanel({
   const [showTestGenerator, setShowTestGenerator] = useState(false);
   const [showVPNTestGenerator, setShowVPNTestGenerator] = useState(false);
   const [showPIXDialog, setShowPIXDialog] = useState(false);
+  const [isStartingNumericMenu, setIsStartingNumericMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -164,6 +165,20 @@ export function ChatPanel({
 
   // Check if contact is blocked from conversation metadata
   const isContactBlocked = (conversation?.metadata as Record<string, unknown> | null)?.is_blocked === true;
+
+  const parseNumericMenuConfig = (consultationContext: string | null) => {
+    if (!consultationContext) return null;
+    try {
+      const json = JSON.parse(consultationContext);
+      const cfg = json?.numeric_menu;
+      if (!cfg?.enabled) return null;
+      const prompt = (cfg.prompt ?? '').toString();
+      const options = cfg.options && typeof cfg.options === 'object' ? cfg.options : {};
+      return { prompt, options } as { prompt: string; options: Record<string, { reply?: string; title?: string }> };
+    } catch {
+      return null;
+    }
+  };
 
   // Get autocomplete suggestions based on current message
   const getAutocompleteSuggestions = () => {
@@ -626,6 +641,82 @@ export function ChatPanel({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (!conversation?.active_agent_id) {
+                    toast({
+                      title: 'Sem agente ativo',
+                      description: 'Defina um agente ativo para esta conversa antes de iniciar o menu.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+
+                  setIsStartingNumericMenu(true);
+                  try {
+                    const { data: agent, error } = await supabase
+                      .from('ai_agents')
+                      .select('id,name,consultation_context,is_active,is_whatsapp_enabled')
+                      .eq('id', conversation.active_agent_id)
+                      .maybeSingle();
+
+                    if (error || !agent) throw error || new Error('Agente não encontrado');
+                    const menuCfg = parseNumericMenuConfig(agent.consultation_context);
+                    if (!menuCfg?.prompt?.trim()) {
+                      toast({
+                        title: 'Menu não configurado',
+                        description: 'Este agente não tem menu numérico ativo/configurado.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+
+                    // 1) Send menu message
+                    const ok = await onSendMessage(menuCfg.prompt);
+                    if (!ok) return;
+
+                    // 2) Persist state on conversation
+                    const currentMeta = (conversation.metadata as Record<string, unknown> | null) ?? {};
+                    const optionKeys = Object.keys(menuCfg.options || {}).filter(Boolean);
+                    const newMeta: Record<string, unknown> = {
+                      ...currentMeta,
+                      bot_menu: {
+                        mode: 'numeric',
+                        status: 'waiting_choice',
+                        agent_id: agent.id,
+                        started_at: new Date().toISOString(),
+                        options: optionKeys,
+                      },
+                    };
+
+                    const { error: upErr } = await supabase
+                      .from('conversations')
+                      .update({ metadata: newMeta } as any)
+                      .eq('id', conversation.id);
+                    if (upErr) throw upErr;
+
+                    toast({
+                      title: 'Menu iniciado',
+                      description: 'A conversa ficou aguardando a opção (1/2/3…).',
+                    });
+                  } catch (e) {
+                    console.error('Error starting numeric menu:', e);
+                    toast({
+                      title: 'Erro ao iniciar menu',
+                      description: e instanceof Error ? e.message : 'Não foi possível iniciar o menu.',
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setIsStartingNumericMenu(false);
+                  }
+                }}
+                disabled={isStartingNumericMenu}
+              >
+                <MessageSquareText className="h-4 w-4 mr-2" />
+                {isStartingNumericMenu ? 'Iniciando menu...' : 'Iniciar menu do bot'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+
               <DropdownMenuItem onClick={async () => {
                 if (conversation) {
                   const avatarUrl = await fetchAvatar(conversation.id, conversation.phone);
