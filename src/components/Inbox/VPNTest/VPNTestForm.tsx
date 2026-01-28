@@ -37,16 +37,6 @@ export function VPNTestForm({
 }) {
   return (
     <div className="space-y-4">
-      <Field icon={Hash} label="Categoria de servidor">
-        <Input
-          inputMode="numeric"
-          value={String(values.categoryId)}
-          onChange={(e) =>
-            onChange({ ...values, categoryId: Math.max(1, Number(e.target.value || 1)) })
-          }
-        />
-      </Field>
-
       <Field icon={User} label="Usuário">
         <Input
           value={values.username}
