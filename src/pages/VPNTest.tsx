@@ -15,7 +15,7 @@ export default function VPNTest() {
           </Button>
           <div className="flex items-center gap-2">
             <Wifi className="h-5 w-5 text-primary" />
-            <h1 className="text-lg font-semibold">Teste VPN (Offline)</h1>
+            <h1 className="text-lg font-semibold">Teste VPN (Online)</h1>
           </div>
         </div>
       </header>

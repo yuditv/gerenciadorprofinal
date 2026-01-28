@@ -26,18 +26,16 @@ serve(async (req) => {
     // Servex docs: Authorization must be sent as Bearer Token.
     // Accept secret values with or without the "Bearer " prefix.
     const apiKey = apiKeyRaw.trim();
-    console.log("🔐 API Key format check:", {
+    console.log("🔐 SERVEX_API_KEY loaded:", {
+      hasValue: true,
       startsWithBearer: apiKey.toLowerCase().startsWith("bearer "),
       startsWithSx: apiKey.startsWith("sx_"),
-      length: apiKey.length
+      length: apiKey.length,
     });
 
     const authorizationHeader = apiKey.toLowerCase().startsWith("bearer ")
       ? apiKey
       : `Bearer ${apiKey}`;
-
-    console.log("🔑 Authorization header prepared (first 20 chars):", authorizationHeader.substring(0, 20) + "...");
-
     console.log("Creating VPN test client at servex.ws...");
 
     const url = "https://servex.ws/api/clients";
