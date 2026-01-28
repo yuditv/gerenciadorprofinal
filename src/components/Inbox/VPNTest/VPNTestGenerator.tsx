@@ -9,6 +9,8 @@ import { generateOfflineValues, normalizeNumberish } from "@/components/Inbox/VP
 import { buildVPNTestTemplate } from "@/components/Inbox/VPNTest/template";
 import { VPNTestTemplate } from "@/components/Inbox/VPNTest/VPNTestTemplate";
 import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 function sanitizeValues(values: VPNTestFormValues): VPNTestFormValues {
   return {
@@ -39,6 +41,10 @@ export function VPNTestGenerator({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [ownerId, setOwnerId] = useState<string>("");
+
+  const needsRequiredFields = /campos obrigat[óo]rios faltando/i.test(apiError || "");
 
   // Still generate initial credentials locally (required to send to API),
   // but we don't expose a "regenerate local" button to the user.
@@ -55,6 +61,8 @@ export function VPNTestGenerator({
         password: values.password,
         v2ray_enabled: values.v2rayEnabled,
         v2ray_uuid: values.v2rayUuid,
+        ...(categoryId.trim() ? { category_id: Number(categoryId) } : {}),
+        ...(ownerId.trim() ? { owner_id: Number(ownerId) } : {}),
       };
 
       const { data, error } = await supabase.functions.invoke("vpn-test-generator", {
@@ -132,6 +140,39 @@ export function VPNTestGenerator({
       {apiError ? (
         <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
           {apiError}
+        </div>
+      ) : null}
+
+      {needsRequiredFields ? (
+        <div className="rounded-lg border bg-card p-4 space-y-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Campos obrigatórios do seu painel</p>
+            <p className="text-xs text-muted-foreground">
+              Sua conta Servex está exigindo campos adicionais. Preencha e tente novamente.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Category ID</Label>
+              <Input
+                inputMode="numeric"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="Ex.: 1"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Owner ID</Label>
+              <Input
+                inputMode="numeric"
+                value={ownerId}
+                onChange={(e) => setOwnerId(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="Ex.: 1"
+              />
+            </div>
+          </div>
         </div>
       ) : null}
 
