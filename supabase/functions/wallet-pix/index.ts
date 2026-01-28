@@ -31,6 +31,42 @@ function json(data: unknown, status = 200) {
   });
 }
 
+type MpErrorShape = {
+  message?: string;
+  blocked_by?: string;
+  status?: number;
+  code?: string;
+};
+
+async function fetchMercadoPago(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const raw = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      // non-JSON response (HTML, plain text, etc.)
+      parsed = null;
+    }
+    return { res, raw, parsed };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isPolicyAgentBlock(payload: any): payload is MpErrorShape {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      (payload as any).blocked_by === "PolicyAgent" &&
+      (payload as any).code === "PA_UNAUTHORIZED_RESULT_FROM_POLICIES",
+  );
+}
+
 async function requireUser(supabase: ReturnType<typeof createClient>, req: Request) {
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
@@ -126,23 +162,46 @@ serve(async (req) => {
         date_of_expiration: expirationDate.toISOString(),
       };
 
-      const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
-          "X-Idempotency-Key": `${user.id}-wallet-${Date.now()}`,
+      const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
+        "https://api.mercadopago.com/v1/payments",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
+            Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+            "X-Idempotency-Key": `${user.id}-wallet-${Date.now()}`,
+          },
+          body: JSON.stringify(mpPayload),
         },
-        body: JSON.stringify(mpPayload),
-      });
+      );
 
-      const mpData = await mpResponse.json();
       if (!mpResponse.ok) {
-        console.error("[wallet-pix] MP error", mpData);
-        return json({ error: mpData.message || "Erro ao criar pagamento no Mercado Pago" }, 502);
+        if (isPolicyAgentBlock(mpData)) {
+          console.error("[wallet-pix] MP blocked by PolicyAgent", mpData);
+          return json(
+            {
+              error:
+                "Bloqueio de rede (PolicyAgent): o Supabase não conseguiu acessar a API do Mercado Pago.",
+              details:
+                "Isso não é credencial faltando. É bloqueio de egress/política de rede. Tente liberar outbound para api.mercadopago.com no Supabase ou usar um proxy externo.",
+            },
+            503,
+          );
+        }
+        console.error("[wallet-pix] MP error", mpData ?? raw?.slice?.(0, 500));
+        return json(
+          {
+            error:
+              (mpData && (mpData as any).message) ||
+              "Erro ao criar pagamento no Mercado Pago",
+          },
+          502,
+        );
       }
 
-      const pixData = mpData.point_of_interaction?.transaction_data;
+      const pixData = mpData?.point_of_interaction?.transaction_data;
       const pixCode = pixData?.qr_code || null;
       const pixQrCode = pixData?.qr_code_base64 ? `data:image/png;base64,${pixData.qr_code_base64}` : null;
 
@@ -186,13 +245,29 @@ serve(async (req) => {
       return json({ success: true, topup, wallet_credits: Number(wallet?.credits ?? 0) });
     }
 
-    const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${topup.external_id}`, {
-      headers: { Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}` },
-    });
-    const mpData = await mpResponse.json();
+    const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
+      `https://api.mercadopago.com/v1/payments/${topup.external_id}`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
+          Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+        },
+      },
+    );
 
     if (!mpResponse.ok) {
-      console.error("[wallet-pix] MP status error", mpData);
+      if (isPolicyAgentBlock(mpData)) {
+        console.error("[wallet-pix] MP blocked by PolicyAgent (check)", mpData);
+        return json(
+          {
+            error:
+              "Bloqueio de rede (PolicyAgent): o Supabase não conseguiu acessar a API do Mercado Pago.",
+          },
+          503,
+        );
+      }
+      console.error("[wallet-pix] MP status error", mpData ?? raw?.slice?.(0, 500));
       return json({ error: "Falha ao consultar pagamento no Mercado Pago" }, 502);
     }
 
