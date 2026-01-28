@@ -43,10 +43,10 @@ export default function Atendimento() {
   const [defaultAgentId, setDefaultAgentId] = useState<string | null>(null);
 
   const { instances } = useWhatsAppInstances();
-  const { isActive, isOnTrial, getRemainingDays } = useSubscription();
-  const { isAdmin } = useUserPermissions();
-  // Admins bypass subscription check
-  const subscriptionExpired = !isActive() && !isAdmin;
+  const { isActive, isOnTrial, getRemainingDays, isLoading: isSubscriptionLoading } = useSubscription();
+  const { isAdmin, isLoading: isPermissionsLoading } = useUserPermissions();
+  // Admins bypass subscription check; evita “flash” aguardando permissão/assinatura resolverem.
+  const subscriptionExpired = !isPermissionsLoading && !isSubscriptionLoading && !isAdmin && !isActive();
   const { agents, myStatus, updateStatus } = useAgentStatus();
   
   const {
