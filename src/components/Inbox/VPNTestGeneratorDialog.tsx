@@ -22,10 +22,10 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Wifi className="h-5 w-5 text-primary" />
-            Teste VPN (Offline)
+            Teste VPN (Online)
           </DialogTitle>
           <DialogDescription>
-            Gere usuário/senha/UUID localmente e copie o template para criar no painel.
+            Clique em “Gerar no painel” para criar o teste diretamente no Servex e copie os dados.
           </DialogDescription>
         </DialogHeader>
 
