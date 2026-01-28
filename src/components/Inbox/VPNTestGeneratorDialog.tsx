@@ -42,7 +42,18 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
     setError(null);
     
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('vpn-test-generator');
+      const { data, error: fnError } = await supabase.functions.invoke('vpn-test-generator', {
+        body: {
+          category_id: formValues.categoryId,
+          duration: formValues.minutes,
+          connection_limit: formValues.connectionLimit,
+          owner_id: formValues.ownerId,
+          username: formValues.username,
+          password: formValues.password,
+          v2ray_enabled: formValues.v2rayEnabled,
+          v2ray_uuid: formValues.v2rayUuid,
+        },
+      });
       
       if (fnError) {
         throw new Error(fnError.message);
@@ -82,6 +93,8 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
         setResult({ mode: "offline", values: offline });
         setRawResponse({ offline: true, values: offline });
         setError("Servex bloqueou a requisição (Cloudflare). Geramos os dados offline para você copiar e criar no painel manualmente.");
+      } else if (/Categoria não encontrada|404/i.test(message)) {
+        setError("Categoria inválida/não permitida. Ajuste o Category ID e tente novamente.");
       } else {
         setError("Erro ao gerar teste. Verifique sua conexão e tente novamente.");
       }
