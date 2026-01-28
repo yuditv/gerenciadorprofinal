@@ -58,7 +58,7 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
       }
       
       if (data?.error) {
-        throw new Error(data.error);
+        throw new Error(String(data.error));
       }
       
       console.log("🔍 VPN API Response:", JSON.stringify(data, null, 2));
@@ -83,13 +83,17 @@ export function VPNTestGeneratorDialog({ open, onOpenChange }: VPNTestGeneratorD
       console.error("Erro ao gerar teste VPN:", err);
 
       const message = err instanceof Error ? err.message : String(err);
-      const shouldFallbackOffline = /403|just a moment|cloudflare/i.test(message);
+      const shouldFallbackOffline = /403|just a moment|cloudflare|campos obrigat[óo]rios faltando/i.test(message);
 
       if (shouldFallbackOffline) {
         const offline = generateOfflineValues(formValues);
         setResult({ mode: "offline", values: offline });
         setRawResponse({ offline: true, values: offline });
-        setError("Servex bloqueou a requisição (Cloudflare). Geramos os dados offline para você copiar e criar no painel manualmente.");
+        setError(
+          /campos obrigat[óo]rios faltando/i.test(message)
+            ? "A Servex exige campos obrigatórios (ex.: categoria/plano) que o painel não expõe por ID. Geramos os dados offline para você copiar e criar no painel manualmente."
+            : "Servex bloqueou a requisição (Cloudflare). Geramos os dados offline para você copiar e criar no painel manualmente."
+        );
       } else if (/Categoria não encontrada|404/i.test(message)) {
         setError("A Servex recusou a criação do teste (categoria/plano não permitido na sua conta). Como o painel não mostra o ID, use o modo Offline para copiar os dados e crie manualmente no painel.");
       } else {
