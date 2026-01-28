@@ -117,10 +117,22 @@ serve(async (req) => {
       console.error("❌ Servex API error:", {
         status: response.status,
         statusText: response.statusText,
-        body: errorText.substring(0, 300)
+        body: errorText.substring(0, 300),
       });
-      throw new Error(
-        `API error: ${response.status} - ${errorText.slice(0, 200)}`
+
+      // Do not throw to avoid returning 500 to the frontend.
+      // Instead, return a normalized error payload that the UI can interpret.
+      return new Response(
+        JSON.stringify({
+          error: `API error: ${response.status} - ${errorText.slice(0, 200)}`,
+          servex_status: response.status,
+          servex_status_text: response.statusText,
+          servex_body: errorText,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
