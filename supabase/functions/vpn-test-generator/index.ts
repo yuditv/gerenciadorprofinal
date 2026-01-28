@@ -44,19 +44,29 @@ serve(async (req) => {
     const connection_limit = 1;
     const owner_id = 1;
 
-    // Generate random username + UUIDs (equivalent to your n8n snippet)
+    // Generate random username + identifiers
+    // NOTE: Servex constraint: username and password must be <= 20 chars.
     const randomNumber = Math.floor(Math.random() * 1_000_000) + 1;
-    const uuid = crypto.randomUUID();
-    const username = `teste${randomNumber}`;
+    const v2rayUuid = crypto.randomUUID();
+    const username = `teste${randomNumber}`; // max 11 chars
+
+    // Short password (<= 20) to satisfy Servex validation
+    const makePassword = (len = 12) => {
+      const bytes = new Uint8Array(len);
+      crypto.getRandomValues(bytes);
+      const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // no ambiguous chars
+      return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+    };
+    const password = makePassword(12);
 
     const payload = {
       username,
-      password: uuid,
+      password,
       category_id,
       connection_limit,
       duration,
       type: "test",
-      v2ray_uuid: uuid,
+      v2ray_uuid: v2rayUuid,
       owner_id,
     };
 
@@ -95,8 +105,8 @@ serve(async (req) => {
     // Ensure the UI always sees the generated credentials even if the API response shape changes
     const normalized = {
       username,
-      password: uuid,
-      v2ray_uuid: uuid,
+      password,
+      v2ray_uuid: v2rayUuid,
       duration: String(duration),
       type: "test",
       category_id: String(category_id),
