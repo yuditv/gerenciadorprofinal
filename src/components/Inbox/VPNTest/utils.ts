@@ -21,7 +21,6 @@ export function generateOfflineValues(input?: Partial<VPNTestFormValues>): VPNTe
     minutes: input?.minutes ?? 60,
     v2rayEnabled: input?.v2rayEnabled ?? true,
     v2rayUuid: input?.v2rayUuid || v2rayUuid,
-    ownerId: input?.ownerId,
   };
 }
 
