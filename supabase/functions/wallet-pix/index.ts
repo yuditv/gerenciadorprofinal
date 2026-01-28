@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -46,11 +46,11 @@ async function requireUser(supabase: ReturnType<typeof createClient>, req: Reque
 }
 
 async function creditWalletIfNeeded(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   topup: { id: string; user_id: string; credits: number; status: string; amount_brl: number },
 ) {
   if (topup.status === "paid") {
-    const { data: wallet } = await supabase
+    const { data: wallet } = await (supabase as any)
       .from("user_wallets")
       .select("credits")
       .eq("user_id", topup.user_id)
@@ -60,7 +60,7 @@ async function creditWalletIfNeeded(
 
   // 1) mark paid
   const paidAt = new Date().toISOString();
-  const { data: updatedTopup, error: updateErr } = await supabase
+  const { data: updatedTopup, error: updateErr } = await (supabase as any)
     .from("wallet_topups")
     .update({ status: "paid", paid_at: paidAt })
     .eq("id", topup.id)
@@ -69,7 +69,7 @@ async function creditWalletIfNeeded(
   if (updateErr) throw updateErr;
 
   // 2) upsert wallet balance
-  const { data: existingWallet } = await supabase
+  const { data: existingWallet } = await (supabase as any)
     .from("user_wallets")
     .select("credits")
     .eq("user_id", topup.user_id)
@@ -78,13 +78,13 @@ async function creditWalletIfNeeded(
   const current = Number(existingWallet?.credits ?? 0);
   const nextCredits = Number((current + Number(topup.credits)).toFixed(2));
 
-  const { error: walletErr } = await supabase
+  const { error: walletErr } = await (supabase as any)
     .from("user_wallets")
     .upsert({ user_id: topup.user_id, credits: nextCredits }, { onConflict: "user_id" });
   if (walletErr) throw walletErr;
 
   // 3) ledger entry
-  const { error: ledgerErr } = await supabase.from("wallet_transactions").insert({
+  const { error: ledgerErr } = await (supabase as any).from("wallet_transactions").insert({
     user_id: topup.user_id,
     type: "topup",
     credits: Number(topup.credits),
@@ -98,11 +98,13 @@ async function creditWalletIfNeeded(
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const user = await requireUser(supabase, req);
+    // NOTE: this edge function is typechecked without generated Database types;
+    // force `any` to avoid `never` inference on `.from(...)`.
+    const supabase: any = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const user = await requireUser(supabase as any, req);
 
     const body = (await req.json()) as RequestBody;
     if (!body?.action) return json({ error: "Ação inválida" }, 400);
@@ -144,7 +146,7 @@ serve(async (req) => {
       const pixCode = pixData?.qr_code || null;
       const pixQrCode = pixData?.qr_code_base64 ? `data:image/png;base64,${pixData.qr_code_base64}` : null;
 
-      const { data: topup, error: topupErr } = await supabase
+      const { data: topup, error: topupErr } = await (supabase as any)
         .from("wallet_topups")
         .insert({
           user_id: user.id,
@@ -167,7 +169,7 @@ serve(async (req) => {
     const topupId = body.topup_id;
     if (!topupId) return json({ error: "topup_id é obrigatório" }, 400);
 
-    const { data: topup, error: topupErr } = await supabase
+    const { data: topup, error: topupErr } = await (supabase as any)
       .from("wallet_topups")
       .select("*")
       .eq("id", topupId)
@@ -176,7 +178,7 @@ serve(async (req) => {
     if (topupErr || !topup) return json({ error: "Recarga não encontrada" }, 404);
 
     if (topup.status === "paid") {
-      const { data: wallet } = await supabase
+      const { data: wallet } = await (supabase as any)
         .from("user_wallets")
         .select("credits")
         .eq("user_id", user.id)
@@ -213,7 +215,7 @@ serve(async (req) => {
     else if (topup.expires_at && new Date(topup.expires_at) < new Date()) nextStatus = "expired";
 
     if (nextStatus && nextStatus !== topup.status) {
-      const { data: updatedTopup } = await supabase
+      const { data: updatedTopup } = await (supabase as any)
         .from("wallet_topups")
         .update({ status: nextStatus })
         .eq("id", topup.id)
