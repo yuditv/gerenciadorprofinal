@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.smm-orders]
 verify_jwt = false
+
+[functions.transcribe-audio]
+verify_jwt = false
