@@ -333,8 +333,8 @@ serve(async (req: Request): Promise<Response> => {
       }
 
       try {
-        // Clean phone number - remove non-digits and ensure proper format
-        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        // Format phone number - uazapiGO expects international format (e.g. 5511999999999)
+        const cleanPhone = formatPhoneNumber(phoneNumber);
         console.log("Requesting pairing code for phone:", cleanPhone);
         
         // Method 1: POST /session/pairphone (ZuckZapGo/WuzAPI compatible)
@@ -399,19 +399,17 @@ serve(async (req: Request): Promise<Response> => {
           }
         }
 
-        // Method 3: POST /instance/connect with paircode mode
-        console.log("Trying POST /instance/connect with paircode mode...");
+        // Method 3 (uazapiGO v2): POST /instance/connect with { phone } -> returns instance.paircode
+        // Docs: https://docs.uazapi.com/endpoint/post/instance--connect
+        console.log("Trying POST /instance/connect (uazapiGO v2) with { phone }...");
         const connectResponse = await fetch(`${uazapiUrl}/instance/connect`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "token": instance.instance_key,
           },
-          body: JSON.stringify({ 
-            paircode: true,
+          body: JSON.stringify({
             phone: cleanPhone,
-            number: cleanPhone,
-            mode: "paircode"
           }),
         });
         
@@ -421,7 +419,11 @@ serve(async (req: Request): Promise<Response> => {
           const connectData = await connectResponse.json();
           console.log("Connect with paircode response:", JSON.stringify(connectData));
           
-          const code = connectData.paircode || connectData.instance?.paircode || connectData.code || connectData.data?.paircode;
+          const code =
+            connectData.paircode ||
+            connectData.instance?.paircode ||
+            connectData.code ||
+            connectData.data?.paircode;
           if (code) {
             await supabase
               .from("whatsapp_instances")
