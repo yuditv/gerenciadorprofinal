@@ -18,16 +18,21 @@ export function useSubscription() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPlans = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('subscription_plans')
-      .select('*')
-      .eq('is_active', true)
-      .order('duration_months', { ascending: true });
-
-    if (!error && data) {
-      setPlans(data as SubscriptionPlan[]);
+    // Avoid exposing pricing through direct table reads in the app.
+    // The edge function enforces authentication for this data.
+    if (!user) {
+      setPlans([]);
+      return;
     }
-  }, []);
+
+    const { data, error } = await supabase.functions.invoke('get-subscription-plans', {
+      method: 'GET',
+    });
+
+    if (!error && data?.plans) {
+      setPlans(data.plans as SubscriptionPlan[]);
+    }
+  }, [user]);
 
   const fetchSubscription = useCallback(async () => {
     if (!user) return;
