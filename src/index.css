@@ -53,10 +53,26 @@
     --glass-blur: 20px;
 
     /* Elegant shadows */
-    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.04);
-    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.06);
-    --shadow-lg: 0 8px 24px hsl(0 0% 0% / 0.08);
-    --shadow-xl: 0 16px 48px hsl(0 0% 0% / 0.1);
+    /*
+      Subtle extra depth:
+      - soft elevation
+      - faint inner highlight (border-like) to separate surfaces
+    */
+    --shadow-sm:
+      0 1px 2px hsl(0 0% 0% / 0.05),
+      0 1px 0 hsl(0 0% 100% / 0.55) inset;
+    --shadow-md:
+      0 8px 24px -16px hsl(0 0% 0% / 0.20),
+      0 2px 8px hsl(0 0% 0% / 0.06),
+      0 1px 0 hsl(0 0% 100% / 0.55) inset;
+    --shadow-lg:
+      0 18px 46px -22px hsl(0 0% 0% / 0.22),
+      0 6px 16px hsl(0 0% 0% / 0.07),
+      0 1px 0 hsl(0 0% 100% / 0.55) inset;
+    --shadow-xl:
+      0 26px 70px -32px hsl(0 0% 0% / 0.24),
+      0 10px 26px hsl(0 0% 0% / 0.08),
+      0 1px 0 hsl(0 0% 100% / 0.55) inset;
     --shadow-glow: 0 0 40px hsl(0 85% 55% / 0.15);
 
     /* Sidebar */
@@ -129,10 +145,21 @@
     --glass-blur: 24px;
 
     /* Dark shadows - reduced intensity */
-    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.15);
-    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.2);
-    --shadow-lg: 0 8px 24px hsl(0 0% 0% / 0.25);
-    --shadow-xl: 0 16px 48px hsl(0 0% 0% / 0.3);
+    --shadow-sm:
+      0 1px 2px hsl(0 0% 0% / 0.18),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
+    --shadow-md:
+      0 10px 26px -18px hsl(0 0% 0% / 0.45),
+      0 3px 10px hsl(0 0% 0% / 0.22),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
+    --shadow-lg:
+      0 20px 52px -28px hsl(0 0% 0% / 0.50),
+      0 7px 18px hsl(0 0% 0% / 0.26),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
+    --shadow-xl:
+      0 30px 84px -40px hsl(0 0% 0% / 0.55),
+      0 12px 30px hsl(0 0% 0% / 0.30),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
     --shadow-glow: 0 0 50px hsl(0 72% 58% / 0.12);
 
     /* Sidebar - softer */
@@ -199,10 +226,21 @@
     --ring: 0 78% 56%;
 
     /* More “panel-like” glow, but still clean */
-    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.18);
-    --shadow-md: 0 6px 18px hsl(0 0% 0% / 0.28);
-    --shadow-lg: 0 12px 30px hsl(0 0% 0% / 0.34);
-    --shadow-xl: 0 18px 56px hsl(0 0% 0% / 0.40);
+    --shadow-sm:
+      0 1px 2px hsl(0 0% 0% / 0.20),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
+    --shadow-md:
+      0 12px 30px -20px hsl(0 0% 0% / 0.55),
+      0 4px 12px hsl(0 0% 0% / 0.28),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
+    --shadow-lg:
+      0 22px 56px -30px hsl(0 0% 0% / 0.60),
+      0 8px 20px hsl(0 0% 0% / 0.32),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
+    --shadow-xl:
+      0 32px 90px -44px hsl(0 0% 0% / 0.62),
+      0 14px 34px hsl(0 0% 0% / 0.36),
+      0 1px 0 hsl(var(--foreground) / 0.06) inset;
     --shadow-glow: 0 0 52px hsl(0 78% 56% / 0.12);
 
     /* Glass */
