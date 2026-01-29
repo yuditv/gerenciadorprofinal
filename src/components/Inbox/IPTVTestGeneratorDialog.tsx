@@ -14,6 +14,7 @@ interface IPTVTestGeneratorDialogProps {
   onOpenChange: (open: boolean) => void;
   apiUrl: string;
   title: string;
+  providerVariant?: "sportplay" | "gextv";
 }
 
 interface TestCredentials {
@@ -69,6 +70,7 @@ export function IPTVTestGeneratorDialog({
   onOpenChange,
   apiUrl,
   title,
+  providerVariant = "sportplay",
 }: IPTVTestGeneratorDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [credentials, setCredentials] = useState<TestCredentials | null>(null);
@@ -136,7 +138,28 @@ export function IPTVTestGeneratorDialog({
 
   const copyAll = async () => {
     if (!credentials) return;
-    const formattedText = `📺 *TESTE IPTV*
+    const formattedText =
+      providerVariant === "gextv"
+        ? `📺 *TESTE IPTV (GEXTV)*
+
+👤 Usuário: ${credentials.username}
+🔐 Senha: ${credentials.password}
+📅 Expira em: ${credentials.expiresAt}
+
+📱 *APLICATIVO ASSIST+, PLAYSIM OU VIZZION PLAY, LAZER PLAY*
+✅ Codigo: ${credentials.assistPlusCode}
+✅ Usuário: ${credentials.username}
+✅ Senha: ${credentials.password}
+
+🎬 *CORE PLAY*
+✅ Codigo: ${credentials.corePlayerCode}
+✅ Usuário: ${credentials.username}
+✅ Senha: ${credentials.password}
+
+📥 *M3U*
+🔗 Link: ${credentials.linkM3U}
+📅 Expira em: ${credentials.expiresAt}`
+        : `📺 *TESTE IPTV*
 
 👤 Usuário: ${credentials.username}
 🔐 Senha: ${credentials.password}
@@ -317,69 +340,85 @@ export function IPTVTestGeneratorDialog({
                   />
                 </CredentialSection>
 
-                <CredentialSection
-                  sectionTitle="Assist Plus"
-                  icon={Smartphone}
-                  onCopySection={() =>
-                    copySectionToClipboard(
-                      "Assist Plus",
-                      `📱 *ASSIST PLUS*\n🔢 Código: ${credentials.assistPlusCode}\n👤 Usuário: ${credentials.username}\n🔐 Senha: ${credentials.password}\n📅 Expira em: ${credentials.expiresAt}`
-                    )
-                  }
-                >
-                  <CredentialRow
-                    icon={Smartphone}
-                    label="Código"
-                    value={credentials.assistPlusCode}
-                  />
-                  <CredentialRow
-                    icon={User}
-                    label="Usuário"
-                    value={credentials.username}
-                  />
-                  <CredentialRow
-                    icon={Lock}
-                    label="Senha"
-                    value={credentials.password}
-                  />
-                  <CredentialRow
-                    icon={Calendar}
-                    label="Expira em"
-                    value={credentials.expiresAt}
-                  />
-                </CredentialSection>
+                {providerVariant === "gextv" ? (
+                  <>
+                    <CredentialSection
+                      sectionTitle="APLICATIVO ASSIST+, PLAYSIM OU VIZZION PLAY, LAZER PLAY"
+                      icon={Smartphone}
+                      onCopySection={() =>
+                        copySectionToClipboard(
+                          "Aplicativo",
+                          `📱 *APLICATIVO ASSIST+, PLAYSIM OU VIZZION PLAY, LAZER PLAY*\n✅ Codigo: ${credentials.assistPlusCode}\n✅ Usuário: ${credentials.username}\n✅ Senha: ${credentials.password}`
+                        )
+                      }
+                    >
+                      <CredentialRow
+                        icon={Smartphone}
+                        label="Codigo"
+                        value={credentials.assistPlusCode}
+                      />
+                      <CredentialRow icon={User} label="Usuário" value={credentials.username} />
+                      <CredentialRow icon={Lock} label="Senha" value={credentials.password} />
+                    </CredentialSection>
 
-                <CredentialSection
-                  sectionTitle="PlaySim"
-                  icon={Smartphone}
-                  onCopySection={() =>
-                    copySectionToClipboard(
-                      "PlaySim",
-                      `🚀 *PLAYSIM*\n🔢 Código: ${credentials.playSimCode}\n👤 Usuário: ${credentials.username}\n🔐 Senha: ${credentials.password}\n📅 Expira em: ${credentials.expiresAt}`
-                    )
-                  }
-                >
-                  <CredentialRow
-                    icon={Smartphone}
-                    label="Código"
-                    value={credentials.playSimCode}
-                  />
-                  <CredentialRow
-                    icon={User}
-                    label="Usuário"
-                    value={credentials.username}
-                  />
-                  <CredentialRow
-                    icon={Lock}
-                    label="Senha"
-                    value={credentials.password}
-                  />
-                  <CredentialRow
-                    icon={Calendar}
-                    label="Expira em"
-                    value={credentials.expiresAt}
-                  />
-                </CredentialSection>
+                    <CredentialSection
+                      sectionTitle="CORE PLAY"
+                      icon={Tv}
+                      onCopySection={() =>
+                        copySectionToClipboard(
+                          "Core Play",
+                          `🎬 *CORE PLAY*\n✅ Codigo: ${credentials.corePlayerCode}\n✅ Usuário: ${credentials.username}\n✅ Senha: ${credentials.password}`
+                        )
+                      }
+                    >
+                      <CredentialRow icon={Tv} label="Codigo" value={credentials.corePlayerCode} />
+                      <CredentialRow icon={User} label="Usuário" value={credentials.username} />
+                      <CredentialRow icon={Lock} label="Senha" value={credentials.password} />
+                    </CredentialSection>
+                  </>
+                ) : (
+                  <>
+                    <CredentialSection
+                      sectionTitle="Assist Plus"
+                      icon={Smartphone}
+                      onCopySection={() =>
+                        copySectionToClipboard(
+                          "Assist Plus",
+                          `📱 *ASSIST PLUS*\n🔢 Código: ${credentials.assistPlusCode}\n👤 Usuário: ${credentials.username}\n🔐 Senha: ${credentials.password}\n📅 Expira em: ${credentials.expiresAt}`
+                        )
+                      }
+                    >
+                      <CredentialRow
+                        icon={Smartphone}
+                        label="Código"
+                        value={credentials.assistPlusCode}
+                      />
+                      <CredentialRow icon={User} label="Usuário" value={credentials.username} />
+                      <CredentialRow icon={Lock} label="Senha" value={credentials.password} />
+                      <CredentialRow icon={Calendar} label="Expira em" value={credentials.expiresAt} />
+                    </CredentialSection>
+
+                    <CredentialSection
+                      sectionTitle="PlaySim"
+                      icon={Smartphone}
+                      onCopySection={() =>
+                        copySectionToClipboard(
+                          "PlaySim",
+                          `🚀 *PLAYSIM*\n🔢 Código: ${credentials.playSimCode}\n👤 Usuário: ${credentials.username}\n🔐 Senha: ${credentials.password}\n📅 Expira em: ${credentials.expiresAt}`
+                        )
+                      }
+                    >
+                      <CredentialRow
+                        icon={Smartphone}
+                        label="Código"
+                        value={credentials.playSimCode}
+                      />
+                      <CredentialRow icon={User} label="Usuário" value={credentials.username} />
+                      <CredentialRow icon={Lock} label="Senha" value={credentials.password} />
+                      <CredentialRow icon={Calendar} label="Expira em" value={credentials.expiresAt} />
+                    </CredentialSection>
+                  </>
+                )}
 
                 <CredentialSection
                   sectionTitle="M3U"

@@ -12,6 +12,7 @@ export function GextvTestGeneratorDialog({ open, onOpenChange }: GextvTestGenera
       onOpenChange={onOpenChange}
       title="Gerar Teste IPTV (GEXTV)"
       apiUrl="https://bommesmo.site/api/chatbot/8241KEgDmx/nVrW8oDKaN"
+      providerVariant="gextv"
     />
   );
 }
