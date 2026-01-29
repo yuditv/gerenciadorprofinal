@@ -252,6 +252,58 @@
     /* QR surface (kept white for PIX scanning) */
     --qr-surface: 0 0% 100%;
   }
+
+  /* ============================================
+     Atendimento (Inbox) scoped theme
+     Black + neon green + white (requested)
+     Apply by adding className="theme-atendimento" to the Atendimento wrapper.
+     ============================================ */
+  .theme-atendimento {
+    /* Core */
+    --background: 210 20% 6%;
+    --foreground: 0 0% 96%;
+
+    /* Surfaces */
+    --card: 210 18% 9%;
+    --card-foreground: 0 0% 96%;
+    --popover: 210 18% 9%;
+    --popover-foreground: 0 0% 96%;
+
+    /* Neon green primary */
+    --primary: 145 85% 42%;
+    --primary-foreground: 210 20% 6%;
+
+    /* Support colors */
+    --secondary: 210 16% 12%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 210 14% 14%;
+    --muted-foreground: 220 10% 62%;
+    --accent: 155 88% 38%;
+    --accent-foreground: 210 20% 6%;
+
+    --destructive: 0 70% 54%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 14% 18%;
+    --input: 210 14% 12%;
+    --ring: 145 85% 42%;
+
+    /* Inbox-specific */
+    --inbox-bg: 210 20% 6%;
+    --inbox-sidebar-bg: 210 18% 8%;
+    --inbox-chat-bg: 210 20% 6%;
+    --inbox-message-sent: 210 16% 12%;
+    --inbox-message-received: 210 14% 10%;
+    --inbox-message-private: 145 35% 10%;
+    --inbox-header-bg: 210 18% 7%;
+    --inbox-input-bg: 210 14% 10%;
+    --inbox-hover: 210 14% 12%;
+    --inbox-active: 210 14% 14%;
+    --inbox-unread: 145 85% 42%;
+
+    /* Subtle green glow (used by components like glass-card hover) */
+    --shadow-glow: 0 0 52px hsl(var(--primary) / 0.10);
+  }
 }
 
 @layer base {
