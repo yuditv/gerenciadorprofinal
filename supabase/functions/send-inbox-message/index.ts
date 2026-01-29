@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parsePhoneNumberFromString } from "https://esm.sh/libphonenumber-js@1.11.7";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,40 +45,20 @@ function getMediaType(mimeType: string): string {
  * - International numbers (already have country code): preserved as-is
  * - USA numbers (1 + 10 digits): preserved with country code 1
  */
-function formatPhoneNumber(phone: string): string {
-  // Remove all non-numeric characters
-  let cleaned = phone.replace(/\D/g, '');
-  
-  // If number already has 12+ digits, assume it has country code
-  if (cleaned.length >= 12) {
-    return cleaned;
+function formatPhoneNumber(phone: string, defaultCountry: string = 'BR'): string {
+  const raw = (phone ?? '').toString().trim();
+  if (!raw) throw new Error('Phone is required');
+
+  const parsed =
+    parsePhoneNumberFromString(raw) ??
+    parsePhoneNumberFromString(raw, defaultCountry as any);
+
+  if (!parsed || !parsed.isValid()) {
+    throw new Error('Invalid phone number');
   }
-  
-  // Check for USA/Canada numbers: 1 + 10 digits = 11 digits
-  // USA area codes don't start with 0 or 1
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    const areaCode = cleaned.substring(1, 4);
-    if (!areaCode.startsWith('0') && !areaCode.startsWith('1')) {
-      // Likely USA number - keep as-is
-      return cleaned;
-    }
-  }
-  
-  // Check for other international prefixes
-  const internationalPrefixes = ['44', '351', '54', '56', '57', '58', '34', '33', '49', '39'];
-  for (const prefix of internationalPrefixes) {
-    if (cleaned.startsWith(prefix) && cleaned.length >= 10 + prefix.length - 1) {
-      // Likely international number - keep as-is
-      return cleaned;
-    }
-  }
-  
-  // Default: assume Brazilian number, add 55 if not present
-  if (!cleaned.startsWith('55')) {
-    cleaned = '55' + cleaned;
-  }
-  
-  return cleaned;
+
+  // UAZAPI expects digits only (E.164 without the leading '+')
+  return parsed.number.replace('+', '');
 }
 
 serve(async (req: Request) => {
@@ -232,7 +213,7 @@ serve(async (req: Request) => {
         let lastError = '';
 
         // Format phone number with international support
-        const formattedPhone = formatPhoneNumber(phone);
+        const formattedPhone = formatPhoneNumber(phone, (conversation.country_code as string | null) ?? 'BR');
 
         // Determine if sending media or text
         if (mediaUrl && mediaType) {
