@@ -295,6 +295,27 @@
 
 @layer components {
   /* ============================================
+     INBOX SURFACE - add color layers (avoid pure black)
+     Usage: add className="inbox-surface" on the page wrapper.
+     ============================================ */
+  .inbox-surface {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .inbox-surface::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background-image:
+      radial-gradient(ellipse 110% 80% at 12% 0%, hsl(var(--primary) / 0.18), transparent 55%),
+      radial-gradient(ellipse 80% 70% at 88% 100%, hsl(var(--accent) / 0.14), transparent 55%),
+      radial-gradient(ellipse 80% 60% at 50% 45%, hsl(230 30% 10% / 0.22), transparent 70%);
+  }
+
+  /* ============================================
      GLASSMORPHISM CARD - Premium Glass Effect
      ============================================ */
   .glass-card {
