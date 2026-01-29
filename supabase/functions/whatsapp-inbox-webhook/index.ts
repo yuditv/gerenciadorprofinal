@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parsePhoneNumberFromString } from "https://esm.sh/libphonenumber-js@1.11.7";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -413,104 +414,36 @@ async function sendOwnerNotification(
  * Returns ISO 2-letter country code (e.g., 'US', 'BR', 'UK')
  */
 function detectCountryCode(phone: string): string | null {
-  const cleaned = phone.replace(/\D/g, '');
-  
-  // Country code mappings (prefix -> ISO code)
-  const countryPrefixes: [string, string][] = [
-    ['55', 'BR'],   // Brazil
-    ['1', 'US'],    // USA/Canada (we'll use US as default)
-    ['44', 'GB'],   // United Kingdom
-    ['351', 'PT'],  // Portugal
-    ['34', 'ES'],   // Spain
-    ['33', 'FR'],   // France
-    ['49', 'DE'],   // Germany
-    ['39', 'IT'],   // Italy
-    ['54', 'AR'],   // Argentina
-    ['56', 'CL'],   // Chile
-    ['57', 'CO'],   // Colombia
-    ['58', 'VE'],   // Venezuela
-    ['52', 'MX'],   // Mexico
-    ['51', 'PE'],   // Peru
-    ['591', 'BO'], // Bolivia
-    ['595', 'PY'], // Paraguay
-    ['598', 'UY'], // Uruguay
-    ['593', 'EC'], // Ecuador
-    ['353', 'IE'], // Ireland
-    ['31', 'NL'],  // Netherlands
-    ['32', 'BE'],  // Belgium
-    ['41', 'CH'],  // Switzerland
-    ['43', 'AT'],  // Austria
-    ['48', 'PL'],  // Poland
-    ['81', 'JP'],  // Japan
-    ['86', 'CN'],  // China
-    ['91', 'IN'],  // India (only if 12+ digits)
-    ['61', 'AU'],  // Australia
-    ['64', 'NZ'],  // New Zealand
-    ['27', 'ZA'],  // South Africa
-    ['971', 'AE'], // UAE
-    ['972', 'IL'], // Israel
-    ['966', 'SA'], // Saudi Arabia
-  ];
+  const raw = (phone ?? '').toString().trim();
+  if (!raw) return null;
 
-  // For numbers with 12+ digits, check longer prefixes first
-  if (cleaned.length >= 12) {
-    for (const [prefix, code] of countryPrefixes) {
-      if (cleaned.startsWith(prefix)) {
-        return code;
-      }
-    }
-  }
-  
-  // For 11-digit numbers starting with 1 (USA/Canada)
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    const areaCode = cleaned.substring(1, 4);
-    if (!areaCode.startsWith('0') && !areaCode.startsWith('1')) {
-      return 'US';
-    }
-  }
-  
-  // For numbers starting with common international prefixes
-  for (const [prefix, code] of countryPrefixes) {
-    if (prefix !== '1' && cleaned.startsWith(prefix) && cleaned.length >= 10) {
-      return code;
-    }
-  }
-  
-  // Default to Brazil for 10-11 digit numbers without recognized prefix
-  if (cleaned.length >= 10 && cleaned.length <= 11) {
-    return 'BR';
-  }
-  
-  return null;
+  // Try to infer region from the number itself. We default to BR for legacy
+  // numbers stored without a leading +countrycode.
+  const parsed =
+    parsePhoneNumberFromString(raw) ??
+    parsePhoneNumberFromString(raw, 'BR');
+
+  if (!parsed || !parsed.isValid()) return null;
+  return parsed.country ?? null;
 }
 
 /**
  * Format phone number for WhatsApp API - supports international numbers
  */
-function formatPhoneNumber(phone: string): string {
-  let cleaned = phone.replace(/\D/g, '');
-  
-  if (cleaned.length >= 12) return cleaned;
-  
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    const areaCode = cleaned.substring(1, 4);
-    if (!areaCode.startsWith('0') && !areaCode.startsWith('1')) {
-      return cleaned;
-    }
+function formatPhoneNumber(phone: string, defaultCountry: string = 'BR'): string {
+  const raw = (phone ?? '').toString().trim();
+  if (!raw) throw new Error('Phone is required');
+
+  const parsed =
+    parsePhoneNumberFromString(raw) ??
+    parsePhoneNumberFromString(raw, defaultCountry as any);
+
+  if (!parsed || !parsed.isValid()) {
+    throw new Error('Invalid phone number');
   }
-  
-  const internationalPrefixes = ['44', '351', '54', '56', '57', '58', '34', '33', '49', '39'];
-  for (const prefix of internationalPrefixes) {
-    if (cleaned.startsWith(prefix) && cleaned.length >= 10 + prefix.length - 1) {
-      return cleaned;
-    }
-  }
-  
-  if (!cleaned.startsWith('55')) {
-    cleaned = '55' + cleaned;
-  }
-  
-  return cleaned;
+
+  // UAZAPI expects digits only (E.164 without the leading '+')
+  return parsed.number.replace('+', '');
 }
 
 // ===== Numeric Menu (Manual) =====
@@ -1819,7 +1752,7 @@ serve(async (req: Request) => {
           
           if (clientConv && clientInstance && clientInstance.instance_key) {
             // Forward message to client (simple bridge - no modifications)
-            const clientPhone = formatPhoneNumber(activeSession.client_phone);
+            const clientPhone = formatPhoneNumber(activeSession.client_phone, detectCountryCode(activeSession.client_phone) ?? 'BR');
             const messageContent = message || caption || '';
             
             console.log(`[Bot Proxy] Forwarding bot message to client ${clientPhone}: "${messageContent.substring(0, 100)}..."`);
@@ -1940,7 +1873,7 @@ serve(async (req: Request) => {
                 .single();
               
               if (proxyInstance && proxyInstance.instance_key) {
-                const botPhone = formatPhoneNumber(proxyConfig.bot_phone);
+                const botPhone = formatPhoneNumber(proxyConfig.bot_phone, detectCountryCode(proxyConfig.bot_phone) ?? 'BR');
                 
                 console.log(`[Bot Proxy] Forwarding client message to bot ${botPhone}: "${messageContent.substring(0, 50)}..."`);
                 
@@ -2078,7 +2011,7 @@ serve(async (req: Request) => {
             .eq('id', conversation.id);
 
           // Send via UAZAPI using agent send config (if present)
-          const formattedPhone = formatPhoneNumber(normalizedPhone);
+          const formattedPhone = formatPhoneNumber(normalizedPhone, detectCountryCode(normalizedPhone) ?? 'BR');
           const sendConfig: MessageSendConfig = {
             response_delay_min: agent?.response_delay_min ?? DEFAULT_SEND_CONFIG.response_delay_min,
             response_delay_max: agent?.response_delay_max ?? DEFAULT_SEND_CONFIG.response_delay_max,
@@ -2297,7 +2230,7 @@ serve(async (req: Request) => {
                     console.log('[Inbox Webhook] AI generated PIX, sending QR code and message...');
                     
                     const pixData = aiData.pixGenerated;
-                    const formattedPhonePix = formatPhoneNumber(normalizedPhone);
+                    const formattedPhonePix = formatPhoneNumber(normalizedPhone, detectCountryCode(normalizedPhone) ?? 'BR');
                     
                     try {
                       // Send QR Code image first
@@ -2438,7 +2371,7 @@ ${pixData.pix_code}
                 }
 
                 // Format phone number with international support
-                const formattedPhone = formatPhoneNumber(normalizedPhone);
+                const formattedPhone = formatPhoneNumber(normalizedPhone, detectCountryCode(normalizedPhone) ?? 'BR');
 
                 // Build send configuration from agent settings
                 const sendConfig: MessageSendConfig = {
