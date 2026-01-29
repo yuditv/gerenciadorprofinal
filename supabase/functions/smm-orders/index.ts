@@ -66,6 +66,21 @@ async function requireUserId(req: Request): Promise<string> {
   return data.claims.sub;
 }
 
+async function isAdminUser(admin: any, userId: string): Promise<boolean> {
+  try {
+    // Edge Functions não usam o types.ts gerado; rpc fica sem tipagem.
+    const { data, error } = await (admin as any).rpc("is_admin", { _user_id: userId });
+    if (error) {
+      console.warn("[smm-orders] failed to check is_admin, defaulting to false", error);
+      return false;
+    }
+    return !!data;
+  } catch (e) {
+    console.warn("[smm-orders] failed to check is_admin, defaulting to false", e);
+    return false;
+  }
+}
+
 function getServiceRoleClient() {
   const supabaseUrl = getEnv("SUPABASE_URL");
   const serviceRole = getEnv("SUPABASE_SERVICE_ROLE_KEY");
@@ -190,6 +205,8 @@ serve(async (req) => {
     const admin = getServiceRoleClient();
 
     if (action === "create") {
+      const bypassBilling = await isAdminUser(admin, userId);
+
       const serviceId = Number(payload.service_id ?? payload.serviceId ?? payload.service);
       const link = String(payload.link ?? "").trim();
       const quantityRaw = payload.quantity;
@@ -232,6 +249,7 @@ serve(async (req) => {
         interval: interval === undefined ? undefined : Number(interval),
         service_type: service.type,
         service_category: service.category,
+        billing_bypassed: bypassBilling,
       };
 
       const insertPayload: Record<string, unknown> = {
@@ -247,27 +265,29 @@ serve(async (req) => {
         markup_percent: Number(markupPercent.toFixed(2)),
         price_brl: Number(finalPrice.toFixed(2)),
         profit_brl: Number(profit.toFixed(2)),
-        credits_spent: Number(finalPrice.toFixed(2)),
+        credits_spent: bypassBilling ? 0 : Number(finalPrice.toFixed(2)),
         meta,
       };
 
       const { error: insertErr } = await admin.from("smm_orders").insert(insertPayload);
       if (insertErr) throw insertErr;
 
-      // Debita créditos (atomic)
-      const { error: debitErr } = await admin.rpc("wallet_debit", {
-        p_user_id: userId,
-        p_amount: finalPrice,
-        p_reference_type: "smm_order",
-        p_reference_id: orderId,
-      });
-      if (debitErr) {
-        await admin
-          .from("smm_orders")
-          .update({ status: "failed", error_message: debitErr.message })
-          .eq("id", orderId)
-          .eq("user_id", userId);
-        return json({ error: debitErr.message }, 400);
+      // Debita créditos (atomic) — Admin: saldo livre
+      if (!bypassBilling) {
+        const { error: debitErr } = await admin.rpc("wallet_debit", {
+          p_user_id: userId,
+          p_amount: finalPrice,
+          p_reference_type: "smm_order",
+          p_reference_id: orderId,
+        });
+        if (debitErr) {
+          await admin
+            .from("smm_orders")
+            .update({ status: "failed", error_message: debitErr.message })
+            .eq("id", orderId)
+            .eq("user_id", userId);
+          return json({ error: debitErr.message }, 400);
+        }
       }
 
       const apiPayload: Record<string, unknown> = { service: serviceId, link };
@@ -279,18 +299,23 @@ serve(async (req) => {
       const apiRes = await callSmmApi("add", apiPayload);
 
       if (apiRes && typeof apiRes === "object" && "error" in apiRes) {
-        // Estorna
-        await admin.rpc("wallet_credit", {
-          p_user_id: userId,
-          p_amount: finalPrice,
-          p_reference_type: "smm_order",
-          p_reference_id: orderId,
-          p_tx_type: "refund",
-        });
+        // Se cobrou, estorna; se admin, apenas falha (não há débito)
+        if (!bypassBilling) {
+          await admin.rpc("wallet_credit", {
+            p_user_id: userId,
+            p_amount: finalPrice,
+            p_reference_type: "smm_order",
+            p_reference_id: orderId,
+            p_tx_type: "refund",
+          });
+        }
 
         await admin
           .from("smm_orders")
-          .update({ status: "refunded", error_message: String((apiRes as any).error ?? "Erro"), })
+          .update({
+            status: bypassBilling ? "failed" : "refunded",
+            error_message: String((apiRes as any).error ?? "Erro"),
+          })
           .eq("id", orderId)
           .eq("user_id", userId);
 

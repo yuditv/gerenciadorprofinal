@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { SmmService } from "@/hooks/useSmmPanel";
 import { usePricingSettings } from "@/hooks/usePricingSettings";
 import { useSmmOrders } from "@/hooks/useSmmOrders";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useWallet } from "@/hooks/useWallet";
 
 function computeProviderCost(rate: string | undefined, quantity: number) {
@@ -83,6 +84,7 @@ export function EngajamentoCreateOrderCard(props: {
   const { pricingQuery } = usePricingSettings();
   const { walletQuery } = useWallet();
   const { createOrder } = useSmmOrders();
+  const { isAdmin, isLoading: isPermissionsLoading } = useUserPermissions();
 
   const [category, setCategory] = useState<string>(ALL_CATEGORIES_VALUE);
   const [search, setSearch] = useState<string>("");
@@ -176,11 +178,14 @@ export function EngajamentoCreateOrderCard(props: {
   }, [providerCost, pricingQuery.data?.markup_percent]);
 
   const hasBalance = useMemo(() => {
+    // Admin: saldo livre (não bloqueia criação)
+    if (isPermissionsLoading) return true; // evita “flash” antes de resolver permissões
+    if (isAdmin) return true;
     const credits = Number(walletQuery.data?.credits ?? 0);
     const need = Number(priceBreakdown?.finalPrice ?? 0);
     if (!need) return true;
     return credits >= need;
-  }, [walletQuery.data?.credits, priceBreakdown?.finalPrice]);
+  }, [isAdmin, isPermissionsLoading, walletQuery.data?.credits, priceBreakdown?.finalPrice]);
 
   const canSubmit = useMemo(() => {
     if (!serviceId) return false;
@@ -383,7 +388,7 @@ export function EngajamentoCreateOrderCard(props: {
                 {" "}• Preço final: <span className="tabular-nums">{priceBreakdown.finalPrice.toFixed(2)}</span>
                 {" "}• Lucro: <span className="tabular-nums">{priceBreakdown.profit.toFixed(2)}</span>
               </div>
-              {!hasBalance && (
+              {!hasBalance && !isAdmin && !isPermissionsLoading && (
                 <div className="text-destructive text-xs">
                   Saldo insuficiente para este pedido.
                 </div>
