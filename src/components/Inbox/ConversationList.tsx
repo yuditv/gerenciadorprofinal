@@ -139,7 +139,7 @@ export function ConversationList({
   };
 
   return (
-    <div className="w-80 border-r border-border/50 flex flex-col h-full bg-card/30 overflow-hidden">
+    <div className="w-80 border-r border-border/50 flex flex-col h-full bg-inbox-sidebar overflow-hidden">
       {/* Search Header */}
       <div className="p-3 border-b border-border/50 space-y-2">
         <div className="relative">
@@ -148,7 +148,7 @@ export function ConversationList({
             placeholder="Buscar conversas..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 bg-background/50"
+            className="pl-9 bg-inbox-input"
           />
         </div>
         <div className="flex items-center justify-between">
@@ -206,9 +206,9 @@ export function ConversationList({
                   onClick={() => onSelect(conversation)}
                   className={cn(
                     "w-full p-3 flex items-start gap-3 transition-all text-left border-b border-border/20",
-                    "hover:bg-accent/50",
-                    selectedId === conversation.id && "bg-primary/10 border-l-2 border-l-primary",
-                    isUnread && selectedId !== conversation.id && "bg-primary/5 border-l-2 border-l-primary/70"
+                    "hover:bg-inbox-hover",
+                    selectedId === conversation.id && "bg-inbox-active border-l-2 border-l-primary",
+                    isUnread && selectedId !== conversation.id && "bg-inbox-hover border-l-2 border-l-primary/70"
                   )}
                 >
                   {/* Avatar - Clean without status indicator */}

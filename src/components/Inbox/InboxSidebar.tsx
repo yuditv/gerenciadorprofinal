@@ -112,7 +112,7 @@ export function InboxSidebar({
   const selectedLabel = labels.find(l => l.id === filter.labelId);
 
   return (
-    <div className="w-full border-b border-border/50 bg-card/50 shrink-0">
+    <div className="w-full border-b border-border/50 bg-inbox-header shrink-0">
       <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto">
         {/* Logo/Title */}
         <div className="flex items-center gap-2 shrink-0 pr-3 border-r border-border/50">
