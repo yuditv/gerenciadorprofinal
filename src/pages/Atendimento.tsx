@@ -392,7 +392,7 @@ export default function Atendimento() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-screen flex flex-col bg-inbox overflow-hidden">
       {/* Subscription Expired Banner */}
       {subscriptionExpired && (
         <motion.div
@@ -420,7 +420,7 @@ export default function Atendimento() {
       )}
 
       {/* Top Header */}
-      <header className="h-14 border-b flex items-center justify-between px-4 shrink-0">
+      <header className="h-14 border-b border-border/50 bg-inbox-header flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
             <ArrowLeft className="h-5 w-5" />
@@ -479,7 +479,7 @@ export default function Atendimento() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
+              className="absolute inset-0 bg-inbox/80 backdrop-blur-sm z-50 flex items-center justify-center"
           >
             <div className="text-center p-8 max-w-md">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
