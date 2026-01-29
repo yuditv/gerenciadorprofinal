@@ -115,14 +115,13 @@ export default function AdminPanel() {
     setIsLoadingSubscriptions(true);
     
     // Fetch plans
-    const { data: plansData } = await supabase
-      .from('subscription_plans')
-      .select('*')
-      .eq('is_active', true)
-      .order('duration_months', { ascending: true });
+    const { data: plansResp, error: plansError } = await supabase.functions.invoke(
+      'get-subscription-plans',
+      { method: 'GET' }
+    );
 
-    if (plansData) {
-      setPlans(plansData as SubscriptionPlan[]);
+    if (!plansError && plansResp?.plans) {
+      setPlans(plansResp.plans as SubscriptionPlan[]);
     }
 
     // Fetch subscriptions with user info
