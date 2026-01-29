@@ -194,30 +194,51 @@ export function ConversationList({
             <p>Nenhuma conversa encontrada</p>
           </div>
         ) : (
-          <div>
+          <div className="py-2">
             {sortedConversations.map((conversation) => {
               const isUnread = conversation.unread_count > 0;
               const mediaPreview = getMediaPreview(conversation.last_message_preview);
               const MediaIcon = mediaPreview.icon;
+              const isSelected = selectedId === conversation.id;
               
               return (
                 <button
                   key={conversation.id}
                   onClick={() => onSelect(conversation)}
                   className={cn(
-                    "w-full p-3 flex items-start gap-3 transition-all text-left border-b border-border/20",
-                    "hover:bg-inbox-hover",
-                    selectedId === conversation.id && "bg-inbox-active border-l-2 border-l-primary",
-                    isUnread && selectedId !== conversation.id && "bg-inbox-hover border-l-2 border-l-primary/70"
+                    // Card-like row (more depth, less "flat list")
+                    "group w-[calc(100%-16px)] mx-2 p-3 flex items-start gap-3 text-left",
+                    "rounded-xl border border-border/30",
+                    "bg-card/30 backdrop-blur-sm",
+                    "shadow-[var(--shadow-sm)]",
+                    "transition-all duration-200",
+                    "hover:bg-card/50 hover:border-border/45 hover:shadow-[var(--shadow-md)] hover:-translate-y-[1px]",
+                    // Selected state
+                    isSelected && "bg-card/70 border-primary/25 ring-1 ring-primary/20 shadow-[var(--shadow-md)]",
+                    // Unread emphasis (when not selected)
+                    isUnread && !isSelected && "border-primary/20"
                   )}
                 >
                   {/* Avatar - Clean without status indicator */}
-                  <Avatar className="h-12 w-12 shrink-0">
+                  <div className="relative shrink-0">
+                    <Avatar className="h-12 w-12">
                     <AvatarImage src={conversation.contact_avatar || undefined} />
                     <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
                       {getInitials(conversation.contact_name, conversation.phone)}
                     </AvatarFallback>
                   </Avatar>
+                    {/* Unread dot */}
+                    {isUnread && !isSelected && (
+                      <span
+                        className={cn(
+                          "absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full",
+                          "bg-primary",
+                          "ring-2 ring-background"
+                        )}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0 space-y-1">
@@ -328,7 +349,7 @@ export function ConversationList({
                       {isUnread && (
                         <Badge 
                           variant="destructive" 
-                          className="ml-auto h-5 min-w-5 text-xs px-1.5 font-bold"
+                          className="ml-auto h-5 min-w-5 text-xs px-1.5 font-bold shadow-[var(--shadow-sm)]"
                         >
                           {conversation.unread_count}
                         </Badge>
