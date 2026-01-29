@@ -488,14 +488,15 @@ serve(async (req: Request): Promise<Response> => {
           }
         }
 
-        // If all fail, return helpful error
+        // If all fail, return a *successful HTTP response* with a domain error.
+        // supabase-js treats non-2xx as a Functions error and may surface it as a runtime error.
         return new Response(
-          JSON.stringify({ 
-            success: false, 
+          JSON.stringify({
+            success: false,
             error: "Código de pareamento não disponível. A API pode não suportar este método de conexão.",
-            hint: "Use o QR Code para conectar. O código de pareamento requer suporte específico da API."
+            hint: "Use o QR Code para conectar. O código de pareamento requer suporte específico da API.",
           }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       } catch (e) {
         console.error("UAZAPI paircode error:", e);

@@ -128,6 +128,10 @@ export function useWhatsAppInstances() {
         body: { action: 'paircode', instanceId, phoneNumber },
       });
       if (error) throw error;
+      // The edge function may return { success:false } with a hint when the API doesn't support paircode.
+      if (data?.success === false) {
+        throw new Error(data?.error || 'Código de pareamento não disponível');
+      }
       if (data?.error) throw new Error(data.error);
       toast.success('Código de pareamento gerado!');
       await fetchInstances();
