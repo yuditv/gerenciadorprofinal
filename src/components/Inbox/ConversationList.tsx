@@ -207,16 +207,21 @@ export function ConversationList({
                   onClick={() => onSelect(conversation)}
                   className={cn(
                     // Card-like row (more depth, less "flat list")
-                    "group w-[calc(100%-16px)] mx-2 p-3 flex items-start gap-3 text-left",
+                    "group relative w-[calc(100%-16px)] mx-2 p-3 flex items-start gap-3 text-left",
                     "rounded-xl border border-border/30",
-                    "bg-card/30 backdrop-blur-sm",
+                    "bg-card/25 backdrop-blur-md",
                     "shadow-[var(--shadow-sm)]",
                     "transition-all duration-200",
-                    "hover:bg-card/50 hover:border-border/45 hover:shadow-[var(--shadow-md)] hover:-translate-y-[1px]",
+                    "hover:bg-card/40 hover:border-border/45 hover:shadow-[var(--shadow-md)] hover:-translate-y-[1px]",
                     // Selected state
-                    isSelected && "bg-card/70 border-primary/25 ring-1 ring-primary/20 shadow-[var(--shadow-md)]",
+                    isSelected && [
+                      "bg-card/60 border-primary/25 ring-1 ring-primary/30",
+                      "shadow-[var(--shadow-md)]",
+                      // Premium neon/glass emphasis
+                      "[box-shadow:var(--shadow-md),var(--shadow-glow)]",
+                    ].join(" "),
                     // Unread emphasis (when not selected)
-                    isUnread && !isSelected && "border-primary/20"
+                    isUnread && !isSelected && "border-primary/25 bg-card/30"
                   )}
                 >
                   {/* Avatar - Clean without status indicator */}
@@ -349,13 +354,31 @@ export function ConversationList({
                       {isUnread && (
                         <Badge 
                           variant="destructive" 
-                          className="ml-auto h-5 min-w-5 text-xs px-1.5 font-bold shadow-[var(--shadow-sm)]"
+                          className={cn(
+                            "ml-auto h-5 min-w-5 text-xs px-1.5 font-bold",
+                            "shadow-[var(--shadow-sm)]",
+                            // When selected, keep badge readable over highlight
+                            isSelected && "ring-1 ring-background/20"
+                          )}
                         >
                           {conversation.unread_count}
                         </Badge>
                       )}
                     </div>
                   </div>
+
+                  {/* Left accent bar (selected / unread) */}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute left-0 top-3 bottom-3 w-1 rounded-r-full",
+                      isSelected
+                        ? "bg-primary/70"
+                        : isUnread
+                          ? "bg-primary/40"
+                          : "bg-transparent"
+                    )}
+                  />
                 </button>
               );
             })}

@@ -520,7 +520,7 @@ export function ChatPanel({
     return 'delivered';
   };
   if (!conversation) {
-    return <div className="flex-1 flex items-center justify-center bg-muted/20">
+    return <div className="flex-1 flex items-center justify-center bg-inbox">
         <div className="text-center text-muted-foreground">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h3 className="font-medium">Selecione uma conversa</h3>
@@ -534,7 +534,11 @@ export function ChatPanel({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden inbox-chat-area">
         {/* Header */}
-        <div className="p-3 inbox-header flex items-center justify-between">
+        <div className={cn(
+        "p-3 inbox-header flex items-center justify-between",
+        "border-b border-border/50",
+        "bg-card/20 backdrop-blur-md"
+      )}>
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={contactAvatarUrl || conversation.contact_avatar || undefined} />
@@ -543,7 +547,7 @@ export function ChatPanel({
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-semibold">
+            <h3 className="font-semibold tracking-tight">
               {conversation.contact_name || formatPhone(conversation.phone)}
             </h3>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -797,7 +801,7 @@ export function ChatPanel({
       </div>
 
       {/* Labels bar */}
-      {assignedLabels.length > 0 && <div className="px-3 py-2 border-b flex items-center gap-2 flex-wrap">
+      {assignedLabels.length > 0 && <div className="px-3 py-2 border-b border-border/50 bg-card/10 backdrop-blur-md flex items-center gap-2 flex-wrap">
           <Tag className="h-3 w-3 text-muted-foreground" />
           {assignedLabels.map(label => label && <Badge key={label.id} variant="secondary" className="text-xs cursor-pointer hover:opacity-80" style={{
           backgroundColor: `${label.color}20`,
@@ -827,7 +831,7 @@ export function ChatPanel({
             const messageStatus = getMessageStatus(msg);
             return <div key={msg.id}>
                   {showDate && <div className="text-center my-4">
-                      <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                      <span className="text-xs text-muted-foreground bg-card/20 border border-border/40 backdrop-blur-sm px-3 py-1 rounded-full">
                         {format(new Date(msg.created_at), "d 'de' MMMM", {
                     locale: ptBR
                   })}
@@ -840,9 +844,29 @@ export function ChatPanel({
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                       </button>}
                     
-                    <div className={cn("max-w-[70%] rounded-2xl px-4 py-2.5 transition-colors", isOutgoing ? msg.sender_type === 'ai' ? "bg-primary/15 text-foreground dark:bg-primary/10" : "bg-inbox-message-sent text-foreground rounded-br-sm" : "bg-inbox-message-received border border-border/50 rounded-bl-sm", msg.is_private && "inbox-message-private border border-dashed !border-amber-500/40", msg.metadata?.deleted && "opacity-60 italic")}>
+                    <div className={cn(
+                      "max-w-[70%] rounded-2xl px-4 py-2.5",
+                      "border border-border/35",
+                      "backdrop-blur-md shadow-[var(--shadow-sm)]",
+                      "transition-all duration-200",
+                      isOutgoing
+                        ? msg.sender_type === 'ai'
+                          ? "bg-primary/10 text-foreground"
+                          : "bg-inbox-message-sent text-foreground rounded-br-sm"
+                        : "bg-inbox-message-received rounded-bl-sm",
+                      msg.is_private && "inbox-message-private border border-dashed !border-amber-500/40",
+                      msg.metadata?.deleted && "opacity-60 italic"
+                    )}>
                       {/* Sender info */}
-                      <div className={cn("flex items-center gap-1 text-xs mb-1", isOutgoing ? "justify-end" : "justify-start", isOutgoing ? msg.sender_type === 'ai' ? "text-primary" : "text-primary-foreground/70" : "text-muted-foreground")}>
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs mb-1",
+                        isOutgoing ? "justify-end" : "justify-start",
+                        isOutgoing
+                          ? msg.sender_type === 'ai'
+                            ? "text-primary"
+                            : "text-muted-foreground"
+                          : "text-muted-foreground"
+                      )}>
                         <sender.icon className="h-3 w-3" />
                         <span>{sender.name}</span>
                         {msg.is_private && <Lock className="h-3 w-3 text-amber-500" />}
@@ -886,7 +910,11 @@ export function ChatPanel({
                         </p>}
 
                       {/* Time and Status */}
-                      <div className={cn("flex items-center gap-1 text-xs mt-1", isOutgoing ? "justify-end" : "justify-start", isOutgoing ? msg.sender_type === 'ai' ? "text-muted-foreground" : "text-primary-foreground/70" : "text-muted-foreground")}>
+                      <div className={cn(
+                        "flex items-center gap-1 text-xs mt-1",
+                        isOutgoing ? "justify-end" : "justify-start",
+                        "text-muted-foreground"
+                      )}>
                         <span>
                           {format(new Date(msg.created_at), 'HH:mm')}
                         </span>
@@ -908,7 +936,11 @@ export function ChatPanel({
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 inbox-input-area flex-shrink-0">
+      <div className={cn(
+        "p-3 inbox-input-area flex-shrink-0",
+        "border-t border-border/50",
+        "bg-card/15 backdrop-blur-md"
+      )}>
         {/* Attachments Preview */}
         {attachments.length > 0 && <div className="mb-2 flex flex-wrap gap-2">
             {attachments.map((att, index) => <AttachmentPreview key={`${att.url}-${index}`} url={att.url} type={att.type} fileName={att.fileName} onRemove={() => handleRemoveAttachment(index)} />)}
@@ -968,7 +1000,7 @@ export function ChatPanel({
             }} onKeyDown={handleKeyDown} className={cn("min-h-[44px] max-h-32 resize-none inbox-input-field", "bg-inbox-input dark:bg-inbox-input", isPrivate && "!border-amber-500/50 dark:!border-amber-500/40")} rows={1} />
           </div>
           
-          <Button onClick={handleSend} disabled={!message.trim() && attachments.length === 0 || isSending} className="h-11">
+          <Button onClick={handleSend} disabled={!message.trim() && attachments.length === 0 || isSending} className="h-11 shadow-[var(--shadow-sm)]">
             <Send className="h-4 w-4" />
           </Button>
         </div>
@@ -981,7 +1013,10 @@ export function ChatPanel({
       </div>
 
       {/* Client Info Panel - Right side (always visible) */}
-      <div className="border-l shrink-0 overflow-hidden bg-muted/20 w-80 py-0">
+      <div className={cn(
+        "border-l border-border/50 shrink-0 overflow-hidden w-80 py-0",
+        "bg-card/10 backdrop-blur-md"
+      )}>
         <ScrollArea className="w-80 h-full">
           <div className="p-3">
             <ClientInfoPanel client={client} isLoading={isLoadingClient} phone={conversation.phone} contactName={conversation.contact_name || undefined} contactAvatar={contactAvatarUrl || conversation.contact_avatar} agentId={conversation.active_agent_id} onRegisterClient={onRegisterClient} />

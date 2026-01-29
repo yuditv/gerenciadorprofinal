@@ -37,7 +37,8 @@ export function MessageStatus({ status, isOutgoing, className, onRetry }: Messag
         return {
           icon: CheckCheck,
           label: 'Lida',
-          color: 'text-blue-400'
+          // Keep theming consistent (no hard-coded blue)
+          color: 'text-primary'
         };
       case 'failed':
         return {
