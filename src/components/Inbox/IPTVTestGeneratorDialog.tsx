@@ -32,9 +32,16 @@ interface TestCredentials {
 const extractCredentials = (data: any): TestCredentials => {
   const reply = data.reply || "";
 
-  // Extract Link M3U from reply
-  const m3uMatch = reply.match(/📥\s*(http[^\s\n]+)/);
-  const linkM3U = m3uMatch ? m3uMatch[1] : "";
+  // Extract Link M3U from reply (providers may format differently)
+  // Strategy: collect all URLs from the reply and prefer ones that look like M3U.
+  const urls = (reply.match(/https?:\/\/[^\s\n\)\]]+/g) || []).map((u) =>
+    u.replace(/[),.]+$/g, "")
+  );
+  const linkM3U =
+    urls.find((u) => /m3u/i.test(u)) ||
+    urls.find((u) => /(get\.php|player_api\.php)/i.test(u)) ||
+    urls[0] ||
+    "";
 
   // Extract ASSIST PLUS code
   const assistMatch = reply.match(/ASSIST PLUS\n🔢 Código:\s*(\d+)/);
