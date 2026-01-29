@@ -77,6 +77,9 @@ export function IPTVTestGeneratorDialog({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const GEXTV_APP_CODE = "00929";
+  const GEXTV_CORE_PLAY_CODE = "2051";
+
   const generateTest = async () => {
     setIsLoading(true);
     setError(null);
@@ -147,12 +150,12 @@ export function IPTVTestGeneratorDialog({
 📅 Expira em: ${credentials.expiresAt}
 
 📱 *APLICATIVO ASSIST+, PLAYSIM OU VIZZION PLAY, LAZER PLAY*
-✅ Codigo: ${credentials.assistPlusCode}
+✅ Codigo: ${GEXTV_APP_CODE}
 ✅ Usuário: ${credentials.username}
 ✅ Senha: ${credentials.password}
 
 🎬 *CORE PLAY*
-✅ Codigo: ${credentials.corePlayerCode}
+✅ Codigo: ${GEXTV_CORE_PLAY_CODE}
 ✅ Usuário: ${credentials.username}
 ✅ Senha: ${credentials.password}
 
@@ -348,14 +351,14 @@ export function IPTVTestGeneratorDialog({
                       onCopySection={() =>
                         copySectionToClipboard(
                           "Aplicativo",
-                          `📱 *APLICATIVO ASSIST+, PLAYSIM OU VIZZION PLAY, LAZER PLAY*\n✅ Codigo: ${credentials.assistPlusCode}\n✅ Usuário: ${credentials.username}\n✅ Senha: ${credentials.password}`
+                          `📱 *APLICATIVO ASSIST+, PLAYSIM OU VIZZION PLAY, LAZER PLAY*\n✅ Codigo: ${GEXTV_APP_CODE}\n✅ Usuário: ${credentials.username}\n✅ Senha: ${credentials.password}`
                         )
                       }
                     >
                       <CredentialRow
                         icon={Smartphone}
                         label="Codigo"
-                        value={credentials.assistPlusCode}
+                        value={GEXTV_APP_CODE}
                       />
                       <CredentialRow icon={User} label="Usuário" value={credentials.username} />
                       <CredentialRow icon={Lock} label="Senha" value={credentials.password} />
@@ -367,11 +370,11 @@ export function IPTVTestGeneratorDialog({
                       onCopySection={() =>
                         copySectionToClipboard(
                           "Core Play",
-                          `🎬 *CORE PLAY*\n✅ Codigo: ${credentials.corePlayerCode}\n✅ Usuário: ${credentials.username}\n✅ Senha: ${credentials.password}`
+                          `🎬 *CORE PLAY*\n✅ Codigo: ${GEXTV_CORE_PLAY_CODE}\n✅ Usuário: ${credentials.username}\n✅ Senha: ${credentials.password}`
                         )
                       }
                     >
-                      <CredentialRow icon={Tv} label="Codigo" value={credentials.corePlayerCode} />
+                      <CredentialRow icon={Tv} label="Codigo" value={GEXTV_CORE_PLAY_CODE} />
                       <CredentialRow icon={User} label="Usuário" value={credentials.username} />
                       <CredentialRow icon={Lock} label="Senha" value={credentials.password} />
                     </CredentialSection>
