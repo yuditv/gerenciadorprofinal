@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Settings, Users, Tag, Zap, Play, ScrollText, Clock, Ban, MessageSquareText, PhoneOff, Bot } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -102,7 +102,28 @@ const menuItems: MenuItem[] = [
 
 export default function InboxSettings() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SettingsSection>("labels");
+
+  useEffect(() => {
+    const section = searchParams.get('section') as SettingsSection | null;
+    if (!section) return;
+
+    const allowed: SettingsSection[] = [
+      'labels',
+      'teams',
+      'macros',
+      'automation',
+      'business-hours',
+      'blocked-contacts',
+      'audit-logs',
+      'canned-responses',
+      'call-settings',
+      'bot-proxy',
+    ];
+
+    if (allowed.includes(section)) setActiveSection(section);
+  }, [searchParams]);
 
   const renderContent = () => {
     switch (activeSection) {
