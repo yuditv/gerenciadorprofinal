@@ -5,6 +5,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function normalizePhone(phone: string): string {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+async function upsertContactFromChat(supabase: any, userId: string, phone: string, name: string | null) {
+  const cleanPhone = normalizePhone(phone);
+  const cleanName = name?.trim() ? name.trim() : null;
+  if (!cleanPhone || !cleanName) return;
+
+  const { data: existing } = await supabase
+    .from("contacts")
+    .select("id, name")
+    .eq("user_id", userId)
+    .eq("phone", cleanPhone)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) {
+    if (existing.name !== cleanName) {
+      await supabase
+        .from("contacts")
+        .update({ name: cleanName, updated_at: new Date().toISOString() })
+        .eq("id", existing.id)
+        .eq("user_id", userId);
+    }
+  } else {
+    await supabase.from("contacts").insert({
+      user_id: userId,
+      phone: cleanPhone,
+      name: cleanName,
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -119,12 +154,14 @@ Deno.serve(async (req) => {
       const phone = chat.chatid?.replace('@s.whatsapp.net', '') || chat.phone;
       if (!phone) continue;
 
+      const candidateName = chat.lead_name || chat.wa_name || null;
+
       // Check if conversation exists
       const { data: existingConv } = await supabase
         .from('conversations')
         .select('id, last_message_at, contact_name')
         .eq('instance_id', instanceId)
-        .eq('phone', phone)
+        .eq('phone', normalizePhone(phone))
         .single();
 
       // If onlyNew filter is set, skip if no new messages
@@ -148,8 +185,8 @@ Deno.serve(async (req) => {
           .insert({
             user_id: userId,
             instance_id: instanceId,
-            phone,
-            contact_name: chat.lead_name || chat.wa_name || null,
+            phone: normalizePhone(phone),
+            contact_name: candidateName,
             contact_avatar: chat.wa_profilePic || null,
             status: 'open',
             last_message_at: chat.wa_lastMsgTimestamp 
@@ -165,12 +202,15 @@ Deno.serve(async (req) => {
         await supabase
           .from('conversations')
           .update({
-            contact_name: chat.lead_name || chat.wa_name || existingConv.contact_name,
+            contact_name: candidateName || existingConv.contact_name,
             contact_avatar: chat.wa_profilePic || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', existingConv.id);
       }
+
+      // Keep CRM contacts in sync with external chats
+      await upsertContactFromChat(supabase, userId, phone, candidateName);
 
       syncedChats++;
     }

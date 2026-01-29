@@ -83,6 +83,56 @@ function replaceVariables(template: string, contact: any): string {
   return message;
 }
 
+function normalizePhone(phone: string): string {
+  return String(phone || "").replace(/\D/g, "");
+}
+
+async function upsertContactAndSyncInbox(
+  supabase: any,
+  userId: string,
+  phone: string,
+  name: string | null
+) {
+  if (!phone) return;
+  const cleanPhone = normalizePhone(phone);
+  const cleanName = name?.trim() ? name.trim() : null;
+
+  // 1) Upsert into CRM contacts (without relying on unique constraints)
+  const { data: existingContact } = await supabase
+    .from("contacts")
+    .select("id, name")
+    .eq("user_id", userId)
+    .eq("phone", cleanPhone)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingContact?.id) {
+    if (cleanName && cleanName !== existingContact.name) {
+      await supabase
+        .from("contacts")
+        .update({ name: cleanName, updated_at: new Date().toISOString() })
+        .eq("id", existingContact.id)
+        .eq("user_id", userId);
+    }
+  } else if (cleanName) {
+    await supabase.from("contacts").insert({
+      user_id: userId,
+      phone: cleanPhone,
+      name: cleanName,
+    });
+  }
+
+  // 2) Keep Inbox conversation display name aligned
+  if (cleanName) {
+    await supabase
+      .from("conversations")
+      .update({ contact_name: cleanName, updated_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .eq("phone", cleanPhone);
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -181,19 +231,65 @@ const handler = async (req: Request): Promise<Response> => {
           );
         }
 
-        // Add contacts
-        const contacts = body.contacts.map((c: any) => ({
-          campaign_id: campaignId,
-          phone: c.phone,
-          name: c.name || null,
-          variables: c.variables || {},
-        }));
+        // Add contacts (update existing by phone; keep external contacts)
+        const incoming = Array.isArray(body.contacts) ? body.contacts : [];
+        const dedupedByPhone = new Map<string, any>();
+        for (const c of incoming) {
+          const phone = normalizePhone(c?.phone);
+          if (!phone) continue;
+          dedupedByPhone.set(phone, {
+            phone,
+            name: c?.name ? String(c.name).trim() : null,
+            variables: c?.variables && typeof c.variables === "object" ? c.variables : {},
+          });
+        }
+        const deduped = Array.from(dedupedByPhone.values());
 
-        const { error: insertError } = await supabase
+        const phones = deduped.map((c) => c.phone);
+        const { data: existing, error: existingErr } = await supabase
           .from("campaign_contacts")
-          .insert(contacts);
+          .select("id, phone")
+          .eq("campaign_id", campaignId)
+          .in("phone", phones);
+        if (existingErr) throw existingErr;
 
-        if (insertError) throw insertError;
+        const existingByPhone = new Map<string, { id: string; phone: string }>(
+          (existing || []).map((r: any) => [r.phone, { id: r.id, phone: r.phone }])
+        );
+
+        const toUpdate = deduped.filter((c) => existingByPhone.has(c.phone));
+        const toInsert = deduped
+          .filter((c) => !existingByPhone.has(c.phone))
+          .map((c) => ({
+            campaign_id: campaignId,
+            phone: c.phone,
+            name: c.name,
+            variables: c.variables,
+          }));
+
+        // Update existing rows
+        for (const c of toUpdate) {
+          const row = existingByPhone.get(c.phone);
+          if (!row) continue;
+          const { error: upErr } = await supabase
+            .from("campaign_contacts")
+            .update({ name: c.name, variables: c.variables })
+            .eq("id", row.id);
+          if (upErr) throw upErr;
+        }
+
+        // Insert new rows
+        if (toInsert.length > 0) {
+          const { error: insertError } = await supabase
+            .from("campaign_contacts")
+            .insert(toInsert);
+          if (insertError) throw insertError;
+        }
+
+        // Sync to Contacts + Inbox
+        for (const c of deduped) {
+          await upsertContactAndSyncInbox(supabase, user.id, c.phone, c.name);
+        }
 
         // Update total contacts count
         const { count } = await supabase
@@ -207,7 +303,7 @@ const handler = async (req: Request): Promise<Response> => {
           .eq("id", campaignId);
 
         return new Response(
-          JSON.stringify({ success: true, added: contacts.length }),
+          JSON.stringify({ success: true, added: toInsert.length, updated: toUpdate.length, total: deduped.length }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
