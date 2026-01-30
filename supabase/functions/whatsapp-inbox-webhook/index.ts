@@ -22,6 +22,12 @@ interface MessageSendConfig {
   typing_simulation: boolean;
 }
 
+// WhatsApp/UAZAPI may truncate very long messages when sent in a single payload.
+// To keep the experience human-like (short bursts), we auto-split long answers
+// ONLY when the agent has not explicitly configured splitting.
+const AUTO_SPLIT_THRESHOLD_CHARS = 420;
+const AUTO_SPLIT_MAX_CHARS_PER_MESSAGE = 380;
+
 const DEFAULT_SEND_CONFIG: MessageSendConfig = {
   response_delay_min: 2,
   response_delay_max: 5,
@@ -225,21 +231,44 @@ async function sendAIResponseWithConfig(
   fullResponse: string,
   config: MessageSendConfig
 ): Promise<void> {
+  // Auto-split safeguard:
+  // If the agent didn't configure splitting/limits, but the message is long,
+  // enable a safe default split to avoid truncation and feel more natural.
+  const hasExplicitSplitConfig =
+    config.split_mode !== 'none' ||
+    config.max_lines_per_message > 0 ||
+    config.max_chars_per_message > 0;
+
+  const effectiveConfig: MessageSendConfig = (!hasExplicitSplitConfig && fullResponse.length > AUTO_SPLIT_THRESHOLD_CHARS)
+    ? {
+        ...config,
+        split_mode: 'sentences',
+        max_chars_per_message: AUTO_SPLIT_MAX_CHARS_PER_MESSAGE,
+        // Keep it snappy/human-like
+        response_delay_min: Math.min(config.response_delay_min, 2),
+        response_delay_max: Math.min(config.response_delay_max, 4),
+        split_delay_min: Math.min(config.split_delay_min, 1),
+        split_delay_max: Math.max(Math.min(config.split_delay_max, 3), 1),
+        typing_simulation: true,
+      }
+    : config;
+
   console.log(`[Inbox Webhook] Sending AI response with config:`, {
-    split_mode: config.split_mode,
-    response_delay: `${config.response_delay_min}-${config.response_delay_max}s`,
-    typing: config.typing_simulation
+    split_mode: effectiveConfig.split_mode,
+    response_delay: `${effectiveConfig.response_delay_min}-${effectiveConfig.response_delay_max}s`,
+    typing: effectiveConfig.typing_simulation,
+    auto_split: !hasExplicitSplitConfig && fullResponse.length > AUTO_SPLIT_THRESHOLD_CHARS,
   });
   
   // 1. Apply initial response delay
-  if (config.response_delay_max > 0) {
-    const delaySeconds = randomBetween(config.response_delay_min, config.response_delay_max);
+  if (effectiveConfig.response_delay_max > 0) {
+    const delaySeconds = randomBetween(effectiveConfig.response_delay_min, effectiveConfig.response_delay_max);
     console.log(`[Inbox Webhook] Waiting ${delaySeconds}s before responding...`);
     await sleep(delaySeconds * 1000);
   }
   
   // 2. Split message according to configuration
-  const messageParts = splitMessage(fullResponse, config);
+  const messageParts = splitMessage(fullResponse, effectiveConfig);
   console.log(`[Inbox Webhook] Message split into ${messageParts.length} parts`);
   
   // 3. Send each part with optional delays
@@ -247,7 +276,7 @@ async function sendAIResponseWithConfig(
     const part = messageParts[i];
     
     // Simulate typing if enabled
-    if (config.typing_simulation) {
+    if (effectiveConfig.typing_simulation) {
       const typingTime = calculateTypingTime(part);
       await sendTypingIndicator(uazapiUrl, instanceKey, phone, typingTime);
     }
@@ -257,8 +286,8 @@ async function sendAIResponseWithConfig(
     console.log(`[Inbox Webhook] Sent part ${i + 1}/${messageParts.length}: ${sent ? 'OK' : 'FAILED'}`);
     
     // Delay between parts (except for last)
-    if (i < messageParts.length - 1 && config.split_delay_max > 0) {
-      const splitDelay = randomBetween(config.split_delay_min, config.split_delay_max);
+    if (i < messageParts.length - 1 && effectiveConfig.split_delay_max > 0) {
+      const splitDelay = randomBetween(effectiveConfig.split_delay_min, effectiveConfig.split_delay_max);
       console.log(`[Inbox Webhook] Waiting ${splitDelay}s before next part...`);
       await sleep(splitDelay * 1000);
     }
