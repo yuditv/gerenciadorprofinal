@@ -21,10 +21,12 @@ const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 
 // When true, the model receives ONLY the system_prompt + the current user message
 // (no extra rules, no canned responses, no client memory context, no history, no tools).
-// This is enforced for WhatsApp sources to match the expected “prompt-only” behavior.
+// NOTE: This should be used only in very specific scenarios. In our product,
+// agents are expected to keep context across the conversation.
 function isPromptOnlySource(source: string | null | undefined) {
-  // User-requested: enforce prompt-only for all sources.
-  return true;
+  // Enable full memory/history by default.
+  // If we ever need prompt-only again, restrict it explicitly to a narrow source.
+  return false;
 }
 
 const LOVABLE_ALLOWED_MODELS = new Set([
