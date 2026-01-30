@@ -22,6 +22,27 @@ export interface WhatsAppInstance {
   user_id: string;
 }
 
+export type WhatsAppInstanceStatusDetails = {
+  qrCode?: string | null;
+  paircode?: string | null;
+  owner?: string | null;
+  platform?: string | null;
+  lastDisconnect?: string | null;
+  lastDisconnectReason?: string | null;
+  connected?: boolean | null;
+  loggedIn?: boolean | null;
+};
+
+export type WhatsAppPrivacySettings = {
+  groupadd?: string;
+  last?: string;
+  status?: string;
+  profile?: string;
+  readreceipts?: string;
+  online?: string;
+  calladd?: string;
+};
+
 export function useWhatsAppInstances() {
   const { user } = useAuth();
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
@@ -114,11 +135,77 @@ export function useWhatsAppInstances() {
         body: { action: 'status', instanceId },
       });
       if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Falha ao buscar status');
       await fetchInstances();
       return data;
     } catch (error: any) {
       console.error('Status check error:', error);
       return null;
+    }
+  };
+
+  const updateInstanceName = async (instanceId: string, name: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'update_instance_name', instanceId, name },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao atualizar nome');
+      toast.success('Nome da instância atualizado!');
+      await fetchInstances();
+      return true;
+    } catch (error: any) {
+      console.error('Update instance name error:', error);
+      toast.error(error.message || 'Erro ao atualizar nome');
+      return false;
+    }
+  };
+
+  const getInstancePrivacy = async (instanceId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'get_privacy', instanceId },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao buscar privacidade');
+      return (data?.privacy ?? null) as WhatsAppPrivacySettings | null;
+    } catch (error: any) {
+      console.error('Get privacy error:', error);
+      toast.error(error.message || 'Erro ao buscar privacidade');
+      return null;
+    }
+  };
+
+  const setInstancePrivacy = async (instanceId: string, privacy: WhatsAppPrivacySettings) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'set_privacy', instanceId, privacy },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao salvar privacidade');
+      toast.success('Privacidade atualizada!');
+      return (data?.privacy ?? null) as WhatsAppPrivacySettings | null;
+    } catch (error: any) {
+      console.error('Set privacy error:', error);
+      toast.error(error.message || 'Erro ao salvar privacidade');
+      return null;
+    }
+  };
+
+  const disconnectInstance = async (instanceId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'disconnect', instanceId },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao desconectar');
+      toast.success('Instância desconectada.');
+      await fetchInstances();
+      return true;
+    } catch (error: any) {
+      console.error('Disconnect instance error:', error);
+      toast.error(error.message || 'Erro ao desconectar instância');
+      return false;
     }
   };
 
@@ -278,6 +365,10 @@ export function useWhatsAppInstances() {
     createInstance,
     getQRCode,
     checkStatus,
+    updateInstanceName,
+    getInstancePrivacy,
+    setInstancePrivacy,
+    disconnectInstance,
     deleteInstance,
     getPairingCode,
     checkNumbers,
