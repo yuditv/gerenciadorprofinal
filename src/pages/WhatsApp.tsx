@@ -86,7 +86,8 @@ export default function WhatsApp() {
     getPairingCode,
     configureWebhook,
     testWebhook,
-    refetch: refetchInstances 
+    refetch: refetchInstances,
+    refreshAllStatus,
   } = useWhatsAppInstances();
   const { 
     campaigns, 
@@ -108,6 +109,9 @@ export default function WhatsApp() {
   // Tab state
   const [activeTab, setActiveTab] = useState('dispatch');
   const [showPlans, setShowPlans] = useState(false);
+
+  // Prevent spamming status checks while user navigates around.
+  const [instancesStatusRefreshedOnce, setInstancesStatusRefreshedOnce] = useState(false);
 
   const { isAdmin, isLoading: isPermissionsLoading } = useUserPermissions();
 
@@ -145,6 +149,17 @@ export default function WhatsApp() {
       return () => clearInterval(interval);
     }
   }, [campaigns, refetchCampaigns]);
+
+  // Keep instance connection status in sync with UAZAPI when user opens the Instances tab.
+  useEffect(() => {
+    if (subscriptionExpired) return;
+    if (activeTab !== 'instances') return;
+    if (instancesStatusRefreshedOnce) return;
+    if (!instances || instances.length === 0) return;
+
+    setInstancesStatusRefreshedOnce(true);
+    refreshAllStatus();
+  }, [activeTab, instances, instancesStatusRefreshedOnce, refreshAllStatus, subscriptionExpired]);
 
   // Instance handlers
   const handleShowQRCode = async (instance: WhatsAppInstance) => {

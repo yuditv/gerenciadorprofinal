@@ -570,6 +570,19 @@ serve(async (req: Request): Promise<Response> => {
 
         const respData = await resp.json().catch(() => null);
         if (!resp.ok) {
+          // If the API indicates the WhatsApp is disconnected, keep our DB status in sync.
+          const msg = String(respData?.message ?? respData?.error ?? respData?.details?.message ?? '').toLowerCase();
+          if (msg.includes('whatsapp disconnected') || msg.includes('disconnected')) {
+            try {
+              await supabase
+                .from('whatsapp_instances')
+                .update({ status: 'disconnected' })
+                .eq('id', instanceId)
+                .eq('user_id', user.id);
+            } catch (e) {
+              console.error('Failed to sync disconnected status after get_privacy:', e);
+            }
+          }
           return fail("Falha ao buscar privacidade na UAZAPI", { details: respData });
         }
 
