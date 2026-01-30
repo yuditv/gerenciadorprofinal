@@ -260,6 +260,24 @@ export function ChatPanel({
     if (conversation?.phone) {
       content = content.replace(/\{\{telefone\}\}/gi, conversation.phone);
     }
+
+    // If this canned response has media, attach it so it is sent together.
+    // (media_type for canned responses is stored as: image|video|audio|document)
+    if (response.media_url && response.media_type) {
+      setAttachments(prev => {
+        // Avoid duplicating the same attachment if user selects the same shortcut again quickly
+        if (prev.some(a => a.url === response.media_url)) return prev;
+        return [
+          ...prev,
+          {
+            url: response.media_url,
+            type: response.media_type,
+            fileName: response.media_name || 'Arquivo',
+          },
+        ];
+      });
+    }
+
     setMessage(content);
     setAutocompleteIndex(-1);
     textareaRef.current?.focus();
