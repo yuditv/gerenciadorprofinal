@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, DollarSign, Palette, Save, Moon, Sun, Monitor, Loader2, Bell, CreditCard, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,22 +10,16 @@ import { usePlanSettings, PlanSetting } from '@/hooks/usePlanSettings';
 import { RenewalReminderSettings } from '@/components/RenewalReminderSettings';
 import { SubscriptionReminderSettings } from '@/components/SubscriptionReminderSettings';
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
+import { useTheme } from '@/components/ThemeProvider';
 import { toast } from 'sonner';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { settings, isLoading, saveSettings } = usePlanSettings();
+  const { theme, setTheme } = useTheme();
   
   const [editedSettings, setEditedSettings] = useState<PlanSetting[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
-
-  // Theme preference
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'dark';
-    }
-    return 'dark';
-  });
 
   const handlePlanSettingChange = (planKey: string, field: 'planName' | 'planPrice', value: string | number) => {
     const currentSettings = editedSettings.length > 0 ? editedSettings : settings;
@@ -47,16 +41,9 @@ export default function Settings() {
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    
-    if (newTheme === 'system') {
-      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.classList.toggle('dark', systemDark);
-    } else {
-      document.documentElement.classList.toggle('dark', newTheme === 'dark');
-    }
-    
-    toast.success(`Tema alterado para ${newTheme === 'light' ? 'Claro' : newTheme === 'dark' ? 'Escuro' : 'Sistema'}`);
+    toast.success(
+      `Tema alterado para ${newTheme === 'light' ? 'Claro' : newTheme === 'dark' ? 'Escuro' : 'Sistema'}`
+    );
   };
 
   const currentSettings = editedSettings.length > 0 ? editedSettings : settings;

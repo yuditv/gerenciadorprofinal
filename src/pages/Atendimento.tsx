@@ -12,7 +12,6 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useSoundEffects } from "@/hooks/useSoundEffects";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { InboxSidebar } from "@/components/Inbox/InboxSidebar";
 import { ConversationList } from "@/components/Inbox/ConversationList";
 import { ChatPanel } from "@/components/Inbox/ChatPanel";
@@ -432,8 +431,6 @@ export default function Atendimento() {
         </div>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
-
           {/* Status Selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
