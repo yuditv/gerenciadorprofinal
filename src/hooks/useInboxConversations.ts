@@ -356,19 +356,39 @@ export function useInboxConversations() {
   };
 
   const markAsRead = async (conversationId: string) => {
-    await updateConversation(conversationId, { unread_count: 0 });
-    
-    // Also mark messages as read
-    await supabase
-      .from('chat_inbox_messages')
-      .update({ is_read: true })
-      .eq('conversation_id', conversationId)
-      .eq('is_read', false);
+    // IMPORTANT: fetch unread WhatsApp message IDs BEFORE flipping is_read=true,
+    // otherwise the backend can't find which messages to mark read in WhatsApp.
+    let whatsappIds: string[] = [];
+    try {
+      const { data: unreadMsgs, error: unreadErr } = await supabase
+        .from('chat_inbox_messages')
+        .select('metadata')
+        .eq('conversation_id', conversationId)
+        .eq('sender_type', 'contact')
+        .eq('is_read', false)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-    // Mark as read on WhatsApp (best-effort)
+      if (unreadErr) throw unreadErr;
+
+      whatsappIds = (unreadMsgs || [])
+        .map((m: any) => m?.metadata?.whatsapp_id || m?.metadata?.whatsapp_message_id)
+        .filter(Boolean)
+        .map((v: any) => String(v));
+    } catch (e) {
+      console.warn('[Inbox] could not prefetch WhatsApp IDs for mark_read:', e);
+    }
+
+    // Best-effort: mark as read on WhatsApp first
     try {
       const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
-        body: { action: 'mark_read', conversationId }
+        body: {
+          action: 'mark_read',
+          conversationId,
+          // Passing explicit IDs prevents the backend from depending on is_read=false
+          // (which we will flip locally right after).
+          messageIds: whatsappIds,
+        },
       });
       if (error) throw error;
       if (data?.success === false) {
@@ -377,6 +397,15 @@ export function useInboxConversations() {
     } catch (e) {
       console.warn('[Inbox] mark_read invoke error:', e);
     }
+
+    // Now mark locally
+    await updateConversation(conversationId, { unread_count: 0 });
+
+    await supabase
+      .from('chat_inbox_messages')
+      .update({ is_read: true })
+      .eq('conversation_id', conversationId)
+      .eq('is_read', false);
   };
 
   const saveContactToWhatsApp = async (conversationId: string, customName?: string): Promise<boolean> => {

@@ -3,7 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  // supabase-js adds extra headers (e.g. x-supabase-client-platform) that must be allowed for CORS preflight.
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
 };
 
 /**
@@ -44,8 +46,11 @@ function formatPhoneNumber(phone: string): string {
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
+
+  // Handle CORS preflight
+  // (kept for backward compatibility)
 
   try {
     const { conversationId, presence, delay = 30000 } = await req.json();
@@ -67,7 +72,8 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const uazapiUrl = Deno.env.get('UAZAPI_URL')!;
+    // Fallback to the default UAZAPI base URL if env is missing.
+    const uazapiUrl = Deno.env.get('UAZAPI_URL') || 'https://zynk2.uazapi.com';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get conversation details
@@ -101,7 +107,8 @@ serve(async (req) => {
     }
 
     // Prepare UAZAPI request
-    const presenceUrl = `${uazapiUrl}/message/presence`;
+    // Keep endpoint consistent with the rest of the codebase (e.g. whatsapp-inbox-webhook).
+    const presenceUrl = `${uazapiUrl}/send/presence`;
 
     // Format phone number with international support
     const formattedPhone = formatPhoneNumber(conversation.phone);
