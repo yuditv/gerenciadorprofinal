@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Bump when deploying to verify the newest code is running
+const VERSION = "ai-agent-chat@2026-01-30.1";
+
 function getCorsHeaders(req: Request) {
   // Some environments send requests with credentials. In that case, "*" is not allowed.
   const origin = req.headers.get('origin') ?? '*';
@@ -452,7 +455,7 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`[ai-agent-chat] Processing chat request for agent: ${agentId}, user: ${userId}, source: ${source}, phone: ${phone || 'N/A'}`);
+    console.log(`[${VERSION}] Processing chat request for agent: ${agentId}, user: ${userId}, source: ${source}, phone: ${phone || 'N/A'}`);
 
     // Fetch agent details (using admin client to get all fields)
     const { data: agent, error: agentError } = await supabaseAdmin
@@ -625,7 +628,7 @@ serve(async (req: Request) => {
     if (agent.use_native_ai) {
       // ============ NATIVE AI INTEGRATION (LOVABLE AI GATEWAY) ============
       const { requestedModel, normalizedModel } = normalizeLovableModel(agent.ai_model);
-      console.log(`[ai-agent-chat] Using Lovable AI Gateway. requestedModel=${requestedModel ?? 'null'} normalizedModel=${normalizedModel}`);
+      console.log(`[${VERSION}] Using Lovable AI Gateway. requestedModel=${requestedModel ?? 'null'} normalizedModel=${normalizedModel}`);
 
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       if (!LOVABLE_API_KEY) {
@@ -634,13 +637,24 @@ serve(async (req: Request) => {
         assistantResponse = 'Desculpe, o serviço de IA não está configurado corretamente. Contate o administrador.';
       } else {
         try {
-          // Fetch conversation history for context
-          const { data: history } = await supabaseAdmin
+          // Fetch conversation history for context.
+          // IMPORTANT: When the agent config changes, old history can keep the model behaving like before.
+          // To make config updates take effect immediately, we only include messages created AFTER agent.updated_at.
+          const historyQuery = supabaseAdmin
             .from('ai_chat_messages')
-            .select('role, content')
+            .select('role, content, created_at')
             .eq('session_id', chatSessionId)
             .order('created_at', { ascending: true })
             .limit(20);
+
+          const agentUpdatedAt = agent.updated_at ? String(agent.updated_at) : null;
+          const { data: history } = agentUpdatedAt
+            ? await historyQuery.gt('created_at', agentUpdatedAt)
+            : await historyQuery;
+
+          if (agentUpdatedAt) {
+            console.log(`[${VERSION}] Context cutoff enabled: only messages after agent.updated_at=${agentUpdatedAt}`);
+          }
 
           // Build system prompt with client context and anti-hallucination rules
           const baseSystemPrompt = agent.system_prompt || 'Você é um assistente útil e prestativo. Responda sempre em português brasileiro.';
@@ -747,7 +761,7 @@ INSTRUÇÕES IMPORTANTES:
             console.log(`[ai-agent-chat] PIX tool added with ${availablePlans.length} plans`);
           }
 
-          console.log(`[ai-agent-chat] Sending ${messages.length} messages to Lovable AI Gateway`);
+           console.log(`[${VERSION}] Sending ${messages.length} messages to Lovable AI Gateway`);
 
           const gatewayResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
@@ -1074,6 +1088,7 @@ INSTRUÇÕES IMPORTANTES:
       JSON.stringify({
         success: true,
         sessionId: chatSessionId,
+        _version: VERSION,
         message: {
           id: savedMessage?.id,
           role: 'assistant',
