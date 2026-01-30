@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Client } from '@/types/client';
+import { useMemo, useState } from 'react';
+import { Client, getDaysUntilExpiration, planLabels } from '@/types/client';
 import { WhatsAppInstance } from '@/hooks/useWhatsAppInstances';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,66 @@ interface SendWhatsAppDialogProps {
 
 export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: SendWhatsAppDialogProps) {
   const [selectedInstance, setSelectedInstance] = useState<string>('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
   const connectedInstances = instances.filter(i => i.status === 'connected');
+
+  const templates = useMemo(() => {
+    if (!client) return [] as { id: string; label: string; value: string }[];
+
+    const days = getDaysUntilExpiration(client.expiresAt);
+    const expiresAtStr = client.expiresAt.toLocaleDateString('pt-BR');
+    const planLabel = planLabels[client.plan] ?? client.plan;
+    const priceStr = client.price != null
+      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(client.price)
+      : '';
+    const signatureLine = "\n\n*Responda aqui para renovar.*";
+
+    return [
+      {
+        id: 'expiring',
+        label: 'Aviso: vai expirar',
+        value:
+          `Olá ${client.name}! Tudo bem? 🙂\n` +
+          `Seu plano *${planLabel}* vence em *${expiresAtStr}* (${days} dia(s)).\n` +
+          `Posso gerar sua renovação agora para você não ficar sem acesso?` +
+          signatureLine,
+      },
+      {
+        id: 'expired',
+        label: 'Expirado: renovar agora',
+        value:
+          `Olá ${client.name}!\n` +
+          `Seu acesso *venceu em ${expiresAtStr}*.\n` +
+          `Se quiser, eu já faço sua renovação agora pra liberar novamente.` +
+          signatureLine,
+      },
+      {
+        id: 'renew_short',
+        label: 'Renovação (curta)',
+        value:
+          `Oi ${client.name}! Sua renovação está disponível. Quer renovar agora?` +
+          signatureLine,
+      },
+      {
+        id: 'renew_with_price',
+        label: 'Renovação (com valor)',
+        value:
+          `Olá ${client.name}!\n` +
+          `Renovação do plano *${planLabel}*${priceStr ? ` por *${priceStr}*` : ''}.\n` +
+          `Quer que eu envie o pagamento para renovar?` +
+          signatureLine,
+      },
+    ];
+  }, [client]);
+
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    const tpl = templates.find(t => t.id === templateId);
+    if (tpl) setMessage(tpl.value);
+  };
 
   const handleSend = async () => {
     if (!client || !selectedInstance || !message.trim()) {
@@ -70,6 +126,7 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
     if (!isSending) {
       setMessage('');
       setSelectedInstance('');
+      setSelectedTemplate('');
       onOpenChange(false);
     }
   };
@@ -137,6 +194,23 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
                 </SelectContent>
               </Select>
             )}
+          </div>
+
+          {/* Templates */}
+          <div className="space-y-2">
+            <Label>Templates</Label>
+            <Select value={selectedTemplate} onValueChange={applyTemplate}>
+              <SelectTrigger>
+                <SelectValue placeholder="Escolha um template (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Message */}
