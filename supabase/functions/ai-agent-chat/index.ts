@@ -805,6 +805,14 @@ INSTRUÇÕES IMPORTANTES:
                   console.error('[ai-agent-chat] Error parsing tool arguments:', fn, e);
                 }
               }
+
+              // Guardrail: some models may respond with tool_calls but empty content.
+              // Never return an empty assistant message, otherwise inbox/WhatsApp flows will appear to “stop responding”.
+              if (!assistantResponse || assistantResponse.trim().length === 0) {
+                aiError = aiError || 'Empty AI response';
+                assistantResponse = 'Certo! 😊 Como posso te ajudar agora?';
+                console.warn('[ai-agent-chat] Empty assistant content detected; using fallback message.');
+              }
             }
           }
         } catch (err) {
