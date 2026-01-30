@@ -1812,6 +1812,89 @@ export type Database = {
         }
         Relationships: []
       }
+      inbox_scheduled_message_logs: {
+        Row: {
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          scheduled_message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          scheduled_message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          scheduled_message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_scheduled_message_logs_scheduled_message_id_fkey"
+            columns: ["scheduled_message_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_scheduled_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inbox_scheduled_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          instance_id: string | null
+          last_error: string | null
+          phone: string
+          send_at: string
+          sent_at: string | null
+          status: string
+          template_key: string
+          template_vars: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          last_error?: string | null
+          phone: string
+          send_at: string
+          sent_at?: string | null
+          status?: string
+          template_key: string
+          template_vars?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          last_error?: string | null
+          phone?: string
+          send_at?: string
+          sent_at?: string | null
+          status?: string
+          template_key?: string
+          template_vars?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_team_members: {
         Row: {
           agent_id: string
