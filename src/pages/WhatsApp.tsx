@@ -48,6 +48,7 @@ import {
   Pencil,
   Shield,
   LogOut,
+  Radio,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { WhatsAppTemplateManager } from '@/components/WhatsAppTemplateManager';
@@ -81,6 +82,7 @@ export default function WhatsApp() {
     updateInstanceName,
     disconnectInstance,
     deleteInstance, 
+    setInstancePresence,
     getPairingCode,
     configureWebhook,
     testWebhook,
@@ -236,6 +238,12 @@ export default function WhatsApp() {
     await disconnectInstance(instance.id);
     await refetchInstances();
   };
+
+  const handleTogglePresence = async (instance: WhatsAppInstance) => {
+    const newPresence = instance.presence_status === 'available' ? 'unavailable' : 'available';
+    await setInstancePresence(instance.id, newPresence);
+  };
+
   const handleDeleteInstance = async (instanceId: string) => {
     if (confirm("Tem certeza que deseja excluir esta instância?")) {
       await deleteInstance(instanceId);
@@ -608,6 +616,18 @@ export default function WhatsApp() {
                             <Pencil className="w-4 h-4" />
                             Renomear
                           </Button>
+
+                        {/* Presence (Online/Offline) Toggle */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleTogglePresence(instance)}
+                          className="gap-1.5"
+                          title={instance.presence_status === 'available' ? 'Online (clique para Offline)' : 'Offline (clique para Online)'}
+                        >
+                          <Radio className={instance.presence_status === 'available' ? 'text-green-500' : 'text-red-500'} />
+                          {instance.presence_status === 'available' ? 'Online' : 'Offline'}
+                        </Button>
 
                           <Button
                             variant="outline"

@@ -654,6 +654,58 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    // SET PRESENCE - UAZAPI POST /instance/presence
+    if (action === "set_presence") {
+      const instanceId = (body.instanceId as string) || "";
+      const presence = (body.presence as string) || "";
+
+      if (!instanceId) return fail("instanceId is required");
+      if (!presence || !['available', 'unavailable'].includes(presence)) {
+        return fail('presence must be "available" or "unavailable"');
+      }
+
+      const { data: instance, error: fetchError } = await supabase
+        .from('whatsapp_instances')
+        .select('id, instance_key')
+        .eq('id', instanceId)
+        .single();
+
+      if (fetchError || !instance?.instance_key) {
+        return fail('Instance not found or not configured');
+      }
+
+      try {
+        const uazapiResponse = await fetch(`${uazapiUrl}/instance/presence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'token': instance.instance_key },
+          body: JSON.stringify({ presence }),
+        });
+
+        const respText = await uazapiResponse.text();
+
+        if (!uazapiResponse.ok) {
+          console.error('[set_presence] UAZAPI error:', respText);
+          return fail(`UAZAPI error: ${respText}`);
+        }
+
+        // Update presence_status in database
+        const { error: updateError } = await supabase
+          .from('whatsapp_instances')
+          .update({ presence_status: presence })
+          .eq('id', instanceId);
+
+        if (updateError) {
+          console.error('[set_presence] DB update error:', updateError);
+          return fail('Failed to update presence in database');
+        }
+
+        return ok({ success: true, presence, message: 'Presence updated successfully' });
+      } catch (e) {
+        console.error("UAZAPI set presence error:", e);
+        return fail(`Erro ao comunicar com UAZAPI: ${String(e)}`);
+      }
+    }
+
     // STATUS - check instance status
     if (action === "status" && entityId) {
       const { data: instance, error } = await supabase

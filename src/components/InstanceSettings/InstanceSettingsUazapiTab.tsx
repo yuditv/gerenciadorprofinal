@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { RefreshCw, LogOut, Save, Loader2, Info } from "lucide-react";
+import { RefreshCw, LogOut, Save, Loader2, Info, Radio } from "lucide-react";
 
 type Props = {
   instance: WhatsAppInstance;
@@ -23,10 +24,11 @@ type Props = {
 };
 
 export function InstanceSettingsUazapiTab({ instance, onSaved }: Props) {
-  const { checkStatus, updateInstanceName, disconnectInstance } = useWhatsAppInstances();
+  const { checkStatus, updateInstanceName, disconnectInstance, setInstancePresence } = useWhatsAppInstances();
   const [statusLoading, setStatusLoading] = useState(false);
   const [renameLoading, setRenameLoading] = useState(false);
   const [disconnectLoading, setDisconnectLoading] = useState(false);
+  const [presenceLoading, setPresenceLoading] = useState(false);
   const [name, setName] = useState(instance.instance_name || instance.name);
   const [details, setDetails] = useState<WhatsAppInstanceStatusDetails | null>(null);
 
@@ -58,6 +60,17 @@ export function InstanceSettingsUazapiTab({ instance, onSaved }: Props) {
       if (ok) onSaved?.();
     } finally {
       setRenameLoading(false);
+    }
+  };
+
+  const handleTogglePresence = async () => {
+    setPresenceLoading(true);
+    try {
+      const newPresence = instance.presence_status === 'available' ? 'unavailable' : 'available';
+      await setInstancePresence(instance.id, newPresence);
+      onSaved?.();
+    } finally {
+      setPresenceLoading(false);
     }
   };
 
@@ -104,6 +117,36 @@ export function InstanceSettingsUazapiTab({ instance, onSaved }: Props) {
           <RefreshCw className={`h-4 w-4 ${statusLoading ? "animate-spin" : ""}`} />
           Atualizar agora
         </Button>
+      </div>
+
+      <Separator />
+
+      {/* Presence Control */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Radio className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Status de Presença</p>
+        </div>
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/30">
+          <div className="flex-1">
+            <p className="font-medium">
+              {instance.presence_status === 'available' ? 'Online' : 'Offline'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {instance.presence_status === 'available' 
+                ? 'Instância aparece como disponível/online no WhatsApp' 
+                : 'Instância aparece como indisponível/offline no WhatsApp'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={instance.presence_status === 'available'}
+              onCheckedChange={handleTogglePresence}
+              disabled={presenceLoading}
+            />
+            {presenceLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          </div>
+        </div>
       </div>
 
       <Separator />
