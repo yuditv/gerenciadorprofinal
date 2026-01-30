@@ -51,19 +51,25 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          member_email: string | null
           member_id: string
+          member_name: string | null
           owner_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          member_email?: string | null
           member_id: string
+          member_name?: string | null
           owner_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          member_email?: string | null
           member_id?: string
+          member_name?: string | null
           owner_id?: string
         }
         Relationships: []

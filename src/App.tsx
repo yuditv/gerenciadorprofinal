@@ -20,6 +20,7 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const InboxSettings = lazy(() => import("./pages/InboxSettings"));
 const Atendimento = lazy(() => import("./pages/Atendimento"));
+  const AttendantAuth = lazy(() => import("./pages/AttendantAuth"));
 
 const Install = lazy(() => import("./pages/Install"));
 const ResellerDashboard = lazy(() => import("./pages/ResellerDashboard"));
@@ -119,6 +120,14 @@ const AppRoutes = () => (
           <Auth />
         </PublicRoute>
       } />
+      <Route
+        path="/attendant-auth"
+        element={
+          <PublicRoute>
+            <AttendantAuth />
+          </PublicRoute>
+        }
+      />
       <Route path="/email-confirmed" element={<EmailConfirmed />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={
