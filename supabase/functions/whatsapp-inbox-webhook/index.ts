@@ -1509,7 +1509,12 @@ serve(async (req: Request) => {
           contact_avatar: contactAvatar,
           country_code: countryCode,
           status: 'open',
-          ai_enabled: true,
+          // New conversations should not auto-start AI. The UI will ask the user
+          // whether to enable AI for this conversation.
+          ai_enabled: false,
+          metadata: {
+            ai_prompt_pending: true,
+          },
           unread_count: 1,
           last_message_at: new Date().toISOString(),
           last_message_preview: previewMessage.substring(0, 100)
