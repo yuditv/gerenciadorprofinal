@@ -5,8 +5,59 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+type MpErrorShape = {
+  message?: string;
+  blocked_by?: string;
+  status?: number;
+  code?: string;
+};
+
+async function fetchMercadoPago(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const raw = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      parsed = null;
+    }
+    return { res, raw, parsed };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isPolicyAgentBlock(payload: any): payload is MpErrorShape {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      (payload as any).blocked_by === "PolicyAgent" &&
+      (payload as any).code === "PA_UNAUTHORIZED_RESULT_FROM_POLICIES",
+  );
+}
+
+function asDataUriPng(base64OrDataUri: string | null | undefined) {
+  if (!base64OrDataUri) return null;
+  if (base64OrDataUri.startsWith("data:image")) return base64OrDataUri;
+  return `data:image/png;base64,${base64OrDataUri}`;
+}
+
+function planToDurationDays(plan: string | null | undefined): number {
+  const p = (plan || "").toLowerCase();
+  if (p.includes("seman")) return 7;
+  if (p.includes("quin")) return 15;
+  if (p.includes("trimes")) return 90;
+  if (p.includes("semes")) return 180;
+  if (p.includes("anual")) return 365;
+  // default mensal
+  return 30;
+}
 
 interface ReminderMessages {
   before: string;
@@ -181,16 +232,160 @@ serve(async (req: Request): Promise<Response> => {
              }
 
             // Replace variables in the message
-            const message = replaceVariables(messageTemplate, client);
+            const messageBase = replaceVariables(messageTemplate, client);
+
+            const price = Number((client as any).price ?? 0);
+            const hasPrice = Number.isFinite(price) && price > 0;
+
+            // If no price, keep current behavior (text only)
+            if (!hasPrice) {
+              console.log(
+                `[renewal-reminder-scheduler] Client ${client.id} expiring today but missing price; scheduling text-only reminder`,
+              );
+              const { error: insertError } = await supabase
+                .from("scheduled_messages")
+                .insert({
+                  user_id: userId,
+                  client_id: client.id,
+                  message_type: "renewal_reminder",
+                  message_content: messageBase,
+                  scheduled_at: new Date().toISOString(),
+                  status: "pending",
+                });
+
+              if (insertError) {
+                console.error(`Error creating scheduled message:`, insertError);
+                results.errors.push(`Client ${client.id}: ${insertError.message}`);
+              } else {
+                results.remindersCreated++;
+              }
+              continue;
+            }
+
+            const durationDays = planToDurationDays((client as any).plan);
+            const nowIso = new Date().toISOString();
+
+            // Reuse pending, valid PIX if possible
+            const { data: existingPix } = await supabase
+              .from("client_pix_payments")
+              .select("id, external_id, pix_code, pix_qr_code, expires_at, status")
+              .eq("user_id", userId)
+              .eq("client_id", client.id)
+              .eq("status", "pending")
+              .gt("expires_at", nowIso)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            let pixCode: string | null = existingPix?.pix_code ?? null;
+            let pixQrCode: string | null = existingPix?.pix_qr_code ?? null;
+            let pixExpiresAt: string | null = existingPix?.expires_at ?? null;
+
+            if (!existingPix) {
+              console.log(
+                `[renewal-reminder-scheduler] No reusable pending PIX for client ${client.id}; creating new PIX`,
+              );
+
+              // Fetch user's Mercado Pago credentials
+              const { data: credentials, error: credError } = await supabase
+                .from("user_payment_credentials")
+                .select("mercado_pago_access_token_enc")
+                .eq("user_id", userId)
+                .maybeSingle();
+
+              if (credError) {
+                console.error("Error fetching user_payment_credentials:", credError);
+                results.errors.push(`User ${userId}: credential fetch error`);
+                continue;
+              }
+
+              if (!credentials?.mercado_pago_access_token_enc) {
+                console.log(
+                  `[renewal-reminder-scheduler] User ${userId} missing Mercado Pago credentials; skipping PIX creation`,
+                );
+                continue;
+              }
+
+              const accessToken = credentials.mercado_pago_access_token_enc;
+              const expirationDate = new Date(Date.now() + 30 * 60 * 1000);
+              const mpPayload = {
+                transaction_amount: Number(price.toFixed(2)),
+                description: `Renovação - ${(client as any).plan || "Plano"}`,
+                payment_method_id: "pix",
+                payer: { email: (client as any).email || "cliente@gerenciadorpro.com" },
+                date_of_expiration: expirationDate.toISOString(),
+                notification_url: `${supabaseUrl}/functions/v1/mercado-pago-webhook`,
+              };
+
+              const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
+                "https://api.mercadopago.com/v1/payments",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
+                    Authorization: `Bearer ${accessToken}`,
+                    "X-Idempotency-Key": `${userId}-renewal-${client.id}-${Date.now()}`,
+                  },
+                  body: JSON.stringify(mpPayload),
+                },
+              );
+
+              if (!mpResponse.ok) {
+                if (isPolicyAgentBlock(mpData)) {
+                  console.error("[renewal-reminder-scheduler] MP blocked by PolicyAgent", mpData);
+                  results.errors.push(`Client ${client.id}: PolicyAgent`);
+                  continue;
+                }
+                console.error("[renewal-reminder-scheduler] MP error", mpData ?? raw?.slice?.(0, 500));
+                results.errors.push(`Client ${client.id}: MP error`);
+                continue;
+              }
+
+              const pixData = mpData?.point_of_interaction?.transaction_data;
+              pixCode = pixData?.qr_code || null;
+              pixQrCode = asDataUriPng(pixData?.qr_code_base64) || null;
+              pixExpiresAt = expirationDate.toISOString();
+
+              const { error: pixInsertErr } = await supabase
+                .from("client_pix_payments")
+                .insert({
+                  user_id: userId,
+                  client_id: client.id,
+                  client_phone: (client as any).whatsapp,
+                  plan_name: (client as any).plan || "Plano",
+                  amount: Number(price.toFixed(2)),
+                  duration_days: durationDays,
+                  expected_plan: (client as any).plan || null,
+                  expected_plan_label: (client as any).plan || null,
+                  external_id: mpData.id?.toString?.() ?? String(mpData.id),
+                  pix_code: pixCode,
+                  pix_qr_code: pixQrCode,
+                  status: "pending",
+                  expires_at: pixExpiresAt,
+                });
+
+              if (pixInsertErr) {
+                console.error("[renewal-reminder-scheduler] Error inserting client_pix_payments", pixInsertErr);
+                results.errors.push(`Client ${client.id}: DB insert pix error`);
+                continue;
+              }
+            } else {
+              console.log(`[renewal-reminder-scheduler] Reusing pending PIX ${existingPix.id} for client ${client.id}`);
+            }
+
+            const pixInfo = `\n\n💳 *PIX para renovação*\n\n📌 Copia e cola:\n${pixCode || "(indisponível)"}\n\n⏳ Válido até: ${pixExpiresAt ? new Date(pixExpiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ""}`;
+            const fullMessage = `${messageBase}${pixInfo}`;
 
             const { error: insertError } = await supabase
               .from("scheduled_messages")
               .insert({
                 user_id: userId,
                 client_id: client.id,
-                message_type: "renewal_reminder",
-                message_content: message,
-                scheduled_at: new Date().toISOString(), // Send immediately
+                message_type: "renewal_reminder_pix",
+                message_content: fullMessage,
+                scheduled_at: new Date().toISOString(),
                 status: "pending",
               });
 

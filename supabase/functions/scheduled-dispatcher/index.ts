@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req: Request): Promise<Response> => {
@@ -143,10 +143,16 @@ serve(async (req: Request): Promise<Response> => {
           content = content.replace(/\{expiration\}/gi, expiresDate.toLocaleDateString('pt-BR'));
         }
 
-        console.log(`Sending message to ${phone}: ${content.substring(0, 50)}...`);
+        const isPixRenewal = (message.message_type || '') === 'renewal_reminder_pix';
 
-        // Send via UAZAPI - format: /send/text with { number, text }
-        const sendResponse = await fetch(`${uazapiUrl}/send/text`, {
+        let textOk = false;
+        let mediaOk = false;
+        let mediaError: string | null = null;
+
+        console.log(`Sending message to ${phone} (type=${message.message_type}): ${content.substring(0, 80)}...`);
+
+        // 1) Always send text first
+        const sendTextResponse = await fetch(`${uazapiUrl}/send/text`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -158,10 +164,67 @@ serve(async (req: Request): Promise<Response> => {
           }),
         });
 
-        const sendData = await sendResponse.json();
-        console.log(`Send response for ${phone}:`, JSON.stringify(sendData));
+        const sendTextRaw = await sendTextResponse.text();
+        let sendTextData: any = null;
+        try {
+          sendTextData = sendTextRaw ? JSON.parse(sendTextRaw) : null;
+        } catch {
+          sendTextData = { raw: sendTextRaw };
+        }
+        console.log(`Send(text) response for ${phone}:`, JSON.stringify(sendTextData));
+        textOk = sendTextResponse.ok && !sendTextData?.error;
 
-        if (sendResponse.ok && !sendData.error) {
+        // 2) If PIX renewal, send QR image after text
+        if (isPixRenewal) {
+          const nowIso = new Date().toISOString();
+          const clientId = (message as any).client_id || client.id;
+
+          const { data: pixPayment } = await supabase
+            .from('client_pix_payments')
+            .select('pix_qr_code, expires_at')
+            .eq('user_id', message.user_id)
+            .eq('client_id', clientId)
+            .eq('status', 'pending')
+            .gt('expires_at', nowIso)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const qr = (pixPayment as any)?.pix_qr_code as string | null | undefined;
+          if (qr) {
+            const sendMediaResponse = await fetch(`${uazapiUrl}/send/media`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                token: instance.instance_key,
+              },
+              body: JSON.stringify({
+                number: phone,
+                type: 'image',
+                file: qr,
+              }),
+            });
+
+            const sendMediaRaw = await sendMediaResponse.text();
+            let sendMediaData: any = null;
+            try {
+              sendMediaData = sendMediaRaw ? JSON.parse(sendMediaRaw) : null;
+            } catch {
+              sendMediaData = { raw: sendMediaRaw };
+            }
+            console.log(`Send(media) response for ${phone}:`, JSON.stringify(sendMediaData));
+            mediaOk = sendMediaResponse.ok && !sendMediaData?.error;
+            if (!mediaOk) {
+              mediaError = sendMediaData?.error || sendMediaData?.message || sendMediaRaw || 'unknown media error';
+            }
+          } else {
+            mediaError = 'missing pix_qr_code';
+          }
+        }
+
+        const atLeastOneOk = textOk || mediaOk;
+
+        if (atLeastOneOk) {
           await supabase
             .from("scheduled_messages")
             .update({ status: "sent" })
@@ -175,11 +238,15 @@ serve(async (req: Request): Promise<Response> => {
               user_id: message.user_id,
               client_id: client.id,
               notification_type: message.message_type || "whatsapp",
-              subject: `Mensagem agendada enviada`,
+              subject: isPixRenewal
+                ? `Renovação PIX enviada${mediaError ? ` (QR: ${mediaError})` : ''}`
+                : `Mensagem agendada enviada`,
               status: "sent",
             });
         } else {
-          throw new Error(sendData.error || sendData.message || "Unknown error");
+          throw new Error(
+            `Failed to send: textOk=${String(textOk)} mediaOk=${String(mediaOk)} mediaError=${mediaError ?? ''}`,
+          );
         }
 
         // Small delay between sends

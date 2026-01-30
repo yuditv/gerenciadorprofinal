@@ -1,11 +1,52 @@
- // Generate PIX for client using USER'S Mercado Pago credentials
+// Generate PIX for client using USER'S Mercado Pago credentials
  import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  
  const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
-   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
+
+  type MpErrorShape = {
+    message?: string;
+    blocked_by?: string;
+    status?: number;
+    code?: string;
+  };
+
+  async function fetchMercadoPago(url: string, init: RequestInit) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal });
+      const raw = await res.text();
+      let parsed: any = null;
+      try {
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch {
+        parsed = null;
+      }
+      return { res, raw, parsed };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  function isPolicyAgentBlock(payload: any): payload is MpErrorShape {
+    return Boolean(
+      payload &&
+        typeof payload === "object" &&
+        (payload as any).blocked_by === "PolicyAgent" &&
+        (payload as any).code === "PA_UNAUTHORIZED_RESULT_FROM_POLICIES",
+    );
+  }
+
+  function asDataUriPng(base64OrDataUri: string | null | undefined) {
+    if (!base64OrDataUri) return null;
+    if (base64OrDataUri.startsWith("data:image")) return base64OrDataUri;
+    return `data:image/png;base64,${base64OrDataUri}`;
+  }
  
  serve(async (req: Request) => {
    if (req.method === "OPTIONS") {
@@ -37,7 +78,18 @@
        );
      }
  
-     const { client_phone, plan_name, amount, duration_days, description, conversation_id, instance_id } = await req.json();
+      const {
+        client_id,
+        client_phone,
+        plan_name,
+        expected_plan,
+        expected_plan_label,
+        amount,
+        duration_days,
+        description,
+        conversation_id,
+        instance_id,
+      } = await req.json();
  
      if (!client_phone || !plan_name || !amount) {
        return new Response(
@@ -88,19 +140,34 @@
  
      console.log("[generate-client-pix-v2] Creating Mercado Pago payment...");
  
-     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
-       method: "POST",
-       headers: {
-         "Authorization": `Bearer ${accessToken}`,
-         "Content-Type": "application/json",
-       },
-       body: JSON.stringify(paymentData),
-     });
- 
-     const mpData = await mpResponse.json();
- 
-     if (!mpResponse.ok) {
-       console.error("[generate-client-pix-v2] Mercado Pago error:", mpData);
+      const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
+        "https://api.mercadopago.com/v1/payments",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
+            "X-Idempotency-Key": `${user.id}-clientpix-${Date.now()}`,
+          },
+          body: JSON.stringify(paymentData),
+        },
+      );
+
+      if (!mpResponse.ok) {
+        if (isPolicyAgentBlock(mpData)) {
+          console.error("[generate-client-pix-v2] MP blocked by PolicyAgent", mpData);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error:
+                "Bloqueio de rede (PolicyAgent): o Supabase não conseguiu acessar a API do Mercado Pago.",
+            }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        console.error("[generate-client-pix-v2] Mercado Pago error:", mpData ?? raw?.slice?.(0, 500));
        return new Response(
          JSON.stringify({ 
            success: false, 
@@ -111,7 +178,7 @@
      }
  
      const pixCode = mpData.point_of_interaction?.transaction_data?.qr_code;
-     const pixQRCode = mpData.point_of_interaction?.transaction_data?.qr_code_base64;
+      const pixQRCode = asDataUriPng(mpData.point_of_interaction?.transaction_data?.qr_code_base64);
      const externalId = String(mpData.id);
  
      console.log(`[generate-client-pix-v2] Payment created: ${externalId}`);
@@ -121,6 +188,7 @@
        .from("client_pix_payments")
        .insert({
          user_id: user.id,
+          client_id: client_id || null,
          client_phone,
          plan_name,
          amount: Number(amount),
@@ -128,6 +196,8 @@
          description: description || null,
          conversation_id: conversation_id || null,
          instance_id: instance_id || null,
+          expected_plan: expected_plan || null,
+          expected_plan_label: expected_plan_label || null,
          external_id: externalId,
          pix_code: pixCode,
          pix_qr_code: pixQRCode,

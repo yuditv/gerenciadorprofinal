@@ -3,11 +3,45 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+type MpErrorShape = {
+  message?: string;
+  blocked_by?: string;
+  status?: number;
+  code?: string;
+};
+
+async function fetchMercadoPago(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const raw = await res.text();
+    let parsed: any = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      parsed = null;
+    }
+    return { res, raw, parsed };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isPolicyAgentBlock(payload: any): payload is MpErrorShape {
+  return Boolean(
+    payload &&
+      typeof payload === "object" &&
+      (payload as any).blocked_by === "PolicyAgent" &&
+      (payload as any).code === "PA_UNAUTHORIZED_RESULT_FROM_POLICIES",
+  );
+}
 
 // Map duration days to plan type
 function mapDurationToPlanType(days: number): string {
@@ -91,23 +125,127 @@ async function sendPaymentConfirmationWhatsApp(
   }
 }
 
-// Process client PIX payment - register client and add label
+// Process client PIX payment.
+// If payment has client_id: renewal flow (extend expires_at idempotently + owner notification).
+// Otherwise: legacy flow (register/update client + label).
 async function processClientPixPayment(
   supabase: any,
   payment: any,
-  mpData: any
+  mpData: any,
 ) {
   try {
     console.log("[mercado-pago-webhook] Processing client PIX payment:", payment.id);
-    
-    // Update payment status
+
+    const paidAtIso = new Date().toISOString();
+
+    // Always mark paid (idempotent)
     await supabase
       .from("client_pix_payments")
-      .update({ 
-        status: "paid",
-        paid_at: new Date().toISOString()
-      })
+      .update({ status: "paid", paid_at: paidAtIso })
       .eq("id", payment.id);
+
+    // Renewal flow
+    if (payment.client_id) {
+      // If already applied, skip
+      if (payment.renewal_applied_at) {
+        console.log(
+          `[mercado-pago-webhook] Renewal already applied for payment ${payment.id} at ${payment.renewal_applied_at}`,
+        );
+        return;
+      }
+
+      // Fetch client
+      const { data: client, error: clientErr } = await supabase
+        .from("clients")
+        .select("id, name, whatsapp, expires_at, plan")
+        .eq("id", payment.client_id)
+        .eq("user_id", payment.user_id)
+        .maybeSingle();
+
+      if (clientErr || !client) {
+        const msg = `Cliente não encontrado para client_id=${payment.client_id}`;
+        console.error("[mercado-pago-webhook]", msg, clientErr);
+        await supabase
+          .from("client_pix_payments")
+          .update({ renewal_error: msg })
+          .eq("id", payment.id);
+        return;
+      }
+
+      const durationDays = Number(payment.duration_days || 30);
+      const now = new Date();
+      const currentExpiry = client.expires_at ? new Date(client.expires_at) : null;
+      const base = currentExpiry && currentExpiry > now ? currentExpiry : now;
+      const newExpiresAt = new Date(base);
+      newExpiresAt.setDate(newExpiresAt.getDate() + durationDays);
+
+      // Update client expiry
+      const { error: updErr } = await supabase
+        .from("clients")
+        .update({ expires_at: newExpiresAt.toISOString() })
+        .eq("id", client.id);
+
+      if (updErr) {
+        const msg = `Falha ao atualizar expires_at: ${updErr.message}`;
+        console.error("[mercado-pago-webhook]", msg);
+        await supabase
+          .from("client_pix_payments")
+          .update({ renewal_error: msg })
+          .eq("id", payment.id);
+        return;
+      }
+
+      // renewal_history is optional; if missing, don't block
+      const { error: rhErr } = await supabase.from("renewal_history").insert({
+        user_id: payment.user_id,
+        client_id: client.id,
+        plan: client.plan,
+        previous_expires_at: client.expires_at,
+        new_expires_at: newExpiresAt.toISOString(),
+      });
+      if (rhErr) {
+        console.log("[mercado-pago-webhook] renewal_history insert skipped/failed:", rhErr.message);
+      }
+
+      await supabase
+        .from("client_pix_payments")
+        .update({ renewal_applied_at: paidAtIso, renewal_error: null })
+        .eq("id", payment.id);
+
+      // Notify owner (internal function; requires service role bearer)
+      try {
+        const supabaseInternal = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+          global: { headers: { Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } },
+        });
+
+        const formattedAmount = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+          Number(mpData?.transaction_amount ?? payment.amount ?? 0),
+        );
+        const formattedDate = newExpiresAt.toLocaleDateString('pt-BR');
+        const { error: notifyErr } = await supabaseInternal.functions.invoke("send-owner-notification", {
+          body: {
+            userId: payment.user_id,
+            eventType: "payment_proof",
+            contactName: client.name,
+            contactPhone: client.whatsapp,
+            conversationId: payment.conversation_id || undefined,
+            instanceId: payment.instance_id || undefined,
+            urgency: "medium",
+            summary: `PIX aprovado (${formattedAmount}) — Renovado até ${formattedDate}`,
+          },
+        });
+        if (notifyErr) {
+          console.error("[mercado-pago-webhook] send-owner-notification returned error:", notifyErr);
+        }
+      } catch (e) {
+        console.error("[mercado-pago-webhook] Error invoking send-owner-notification:", e);
+      }
+
+      console.log(
+        `[mercado-pago-webhook] Renewal applied for client ${client.id}: ${client.expires_at} -> ${newExpiresAt.toISOString()}`,
+      );
+      return;
+    }
 
     // Get AI memory for client details
     const { data: memory } = await supabase
@@ -382,50 +520,85 @@ serve(async (req) => {
       );
     }
 
-    // SECURITY: Validate payment exists in Mercado Pago API
-    // This confirms the webhook is authentic since only real payments will exist
-    const MERCADO_PAGO_ACCESS_TOKEN = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN")!;
-    
-    if (!MERCADO_PAGO_ACCESS_TOKEN) {
-      console.error("[mercado-pago-webhook] MERCADO_PAGO_ACCESS_TOKEN not configured");
+    // Determine which access token to use by checking our DB first.
+    const globalMpToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN") || "";
+
+    const { data: subscriptionPayment } = await supabase
+      .from("subscription_payments")
+      .select("*, subscription:user_subscriptions(*)")
+      .eq("external_id", externalPaymentId.toString())
+      .maybeSingle();
+
+    const { data: clientPayment } = await supabase
+      .from("client_pix_payments")
+      .select("*")
+      .eq("external_id", externalPaymentId.toString())
+      .maybeSingle();
+
+    const { data: walletTopup } = await supabase
+      .from("wallet_topups")
+      .select("*")
+      .eq("external_id", externalPaymentId.toString())
+      .maybeSingle();
+
+    let mpAccessToken = globalMpToken;
+    if (clientPayment) {
+      const { data: creds } = await supabase
+        .from("user_payment_credentials")
+        .select("mercado_pago_access_token_enc")
+        .eq("user_id", clientPayment.user_id)
+        .maybeSingle();
+
+      if (!creds?.mercado_pago_access_token_enc) {
+        console.error(
+          `[mercado-pago-webhook] Missing Mercado Pago credentials for user ${clientPayment.user_id} (client_pix_payments)`,
+        );
+        return new Response(
+          JSON.stringify({ received: true, error: "Missing user Mercado Pago credentials" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      mpAccessToken = creds.mercado_pago_access_token_enc;
+    }
+
+    if (!mpAccessToken) {
+      console.error("[mercado-pago-webhook] No Mercado Pago token available");
       return new Response(
-        JSON.stringify({ received: true, error: 'Mercado Pago not configured' }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ received: true, error: "Mercado Pago not configured" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    
-    const mpResponse = await fetch(
+
+    // Validate payment exists in Mercado Pago using the correct token
+    const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
       `https://api.mercadopago.com/v1/payments/${externalPaymentId}`,
       {
         headers: {
-          "Authorization": `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+          Accept: "application/json",
+          "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
+          Authorization: `Bearer ${mpAccessToken}`,
         },
-      }
+      },
     );
 
-    // If payment doesn't exist in Mercado Pago, reject the webhook
     if (!mpResponse.ok) {
-      const errorStatus = mpResponse.status;
-      console.error(`[mercado-pago-webhook] Payment validation failed: status ${errorStatus}`);
-      
-      if (errorStatus === 404) {
-        // Payment doesn't exist - possible forged webhook
-        console.error("[mercado-pago-webhook] SECURITY: Payment not found in Mercado Pago - possible forged webhook");
+      const status = mpResponse.status;
+      console.error(`[mercado-pago-webhook] Payment validation failed: status ${status}`);
+      if (isPolicyAgentBlock(mpData)) {
+        console.error("[mercado-pago-webhook] MP blocked by PolicyAgent", mpData);
         return new Response(
-          JSON.stringify({ received: true, error: 'Payment not found' }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ received: true, error: "PolicyAgent" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      
-      // Other errors - still return 200 so MP doesn't retry
+      console.error("[mercado-pago-webhook] MP error", mpData ?? raw?.slice?.(0, 500));
       return new Response(
-        JSON.stringify({ received: true, error: 'Payment validation failed' }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ received: true, error: "Payment validation failed" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const mpData = await mpResponse.json();
-    console.log("[mercado-pago-webhook] MP Status:", mpData.status);
+    console.log("[mercado-pago-webhook] MP Status:", mpData?.status);
 
     if (mpData.status !== "approved") {
       console.log("[mercado-pago-webhook] Payment not approved, ignoring");
@@ -434,13 +607,6 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // First, try to find in subscription_payments (user subscription)
-    const { data: subscriptionPayment } = await supabase
-      .from("subscription_payments")
-      .select("*, subscription:user_subscriptions(*)")
-      .eq("external_id", externalPaymentId.toString())
-      .maybeSingle();
 
     if (subscriptionPayment && subscriptionPayment.status !== "paid") {
       console.log("[mercado-pago-webhook] Processing subscription payment");
@@ -495,14 +661,7 @@ serve(async (req) => {
       );
     }
 
-    // Second, try to find in client_pix_payments (client payment)
-    const { data: clientPayment } = await supabase
-      .from("client_pix_payments")
-      .select("*")
-      .eq("external_id", externalPaymentId.toString())
-      .maybeSingle();
-
-    if (clientPayment && clientPayment.status !== "paid") {
+    if (clientPayment && (clientPayment.status !== "paid" || !clientPayment.renewal_applied_at)) {
       console.log("[mercado-pago-webhook] Processing client PIX payment");
       
       await processClientPixPayment(supabase, clientPayment, mpData);
@@ -512,13 +671,6 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Third, try wallet topups
-    const { data: walletTopup } = await supabase
-      .from("wallet_topups")
-      .select("*")
-      .eq("external_id", externalPaymentId.toString())
-      .maybeSingle();
 
     if (walletTopup && walletTopup.status !== "paid") {
       console.log("[mercado-pago-webhook] Processing wallet topup:", walletTopup.id);
