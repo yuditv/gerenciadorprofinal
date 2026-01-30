@@ -1498,6 +1498,21 @@ serve(async (req: Request) => {
       const countryCode = detectCountryCode(normalizedPhone);
       console.log(`[Inbox Webhook] Detected country code for ${normalizedPhone}: ${countryCode}`);
 
+      // Load AI preferences for the instance owner (Auto IA + Agente padrão)
+      let autoStartAI = false;
+      let defaultAgentId: string | null = null;
+      try {
+        const { data: prefs } = await supabase
+          .from('ai_agent_preferences')
+          .select('auto_start_ai, default_agent_id')
+          .eq('user_id', instance.user_id)
+          .maybeSingle();
+        autoStartAI = prefs?.auto_start_ai === true;
+        defaultAgentId = prefs?.default_agent_id ?? null;
+      } catch (e) {
+        console.log('[Inbox Webhook] Failed to load ai_agent_preferences (ignored):', e);
+      }
+
       // Create new conversation
       const { data: newConv, error: createError } = await supabase
         .from('conversations')
@@ -1509,11 +1524,10 @@ serve(async (req: Request) => {
           contact_avatar: contactAvatar,
           country_code: countryCode,
           status: 'open',
-          // New conversations should not auto-start AI. The UI will ask the user
-          // whether to enable AI for this conversation.
-          ai_enabled: false,
+          ai_enabled: autoStartAI,
+          active_agent_id: autoStartAI ? defaultAgentId : null,
           metadata: {
-            ai_prompt_pending: true,
+            ai_prompt_pending: !autoStartAI,
           },
           unread_count: 1,
           last_message_at: new Date().toISOString(),
