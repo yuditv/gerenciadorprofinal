@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, DollarSign, Palette, Save, Moon, Sun, Monitor, Loader2, Bell, CreditCard, BellRing } from 'lucide-react';
+import { ArrowLeft, DollarSign, Save, Bell, CreditCard, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,13 +10,10 @@ import { usePlanSettings, PlanSetting } from '@/hooks/usePlanSettings';
 import { RenewalReminderSettings } from '@/components/RenewalReminderSettings';
 import { SubscriptionReminderSettings } from '@/components/SubscriptionReminderSettings';
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
-import { useTheme } from '@/components/ThemeProvider';
-import { toast } from 'sonner';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { settings, isLoading, saveSettings } = usePlanSettings();
-  const { theme, setTheme } = useTheme();
   
   const [editedSettings, setEditedSettings] = useState<PlanSetting[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -37,13 +34,6 @@ export default function Settings() {
     await saveSettings(editedSettings);
     setHasChanges(false);
     setEditedSettings([]);
-  };
-
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme);
-    toast.success(
-      `Tema alterado para ${newTheme === 'light' ? 'Claro' : newTheme === 'dark' ? 'Escuro' : 'Sistema'}`
-    );
   };
 
   const currentSettings = editedSettings.length > 0 ? editedSettings : settings;
@@ -77,7 +67,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="plans" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Planos</span>
@@ -93,10 +83,6 @@ export default function Settings() {
             <TabsTrigger value="owner-notifications" className="flex items-center gap-2">
               <BellRing className="h-4 w-4" />
               <span className="hidden sm:inline">Alertas</span>
-            </TabsTrigger>
-            <TabsTrigger value="appearance" className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
-              <span className="hidden sm:inline">Aparência</span>
             </TabsTrigger>
           </TabsList>
 
@@ -177,58 +163,6 @@ export default function Settings() {
           {/* Owner Notifications Tab */}
           <TabsContent value="owner-notifications" className="space-y-6">
             <OwnerNotificationSettings />
-          </TabsContent>
-
-          {/* Appearance Tab */}
-          <TabsContent value="appearance" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="h-5 w-5 text-primary" />
-                  Aparência
-                </CardTitle>
-                <CardDescription>
-                  Personalize o visual do sistema.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Label>Tema</Label>
-                  <div className="flex flex-wrap gap-3">
-                    <Button
-                      variant={theme === 'light' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleThemeChange('light')}
-                      className="gap-2"
-                    >
-                      <Sun className="h-4 w-4" />
-                      Claro
-                    </Button>
-                    <Button
-                      variant={theme === 'dark' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleThemeChange('dark')}
-                      className="gap-2"
-                    >
-                      <Moon className="h-4 w-4" />
-                      Escuro
-                    </Button>
-                    <Button
-                      variant={theme === 'system' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleThemeChange('system')}
-                      className="gap-2"
-                    >
-                      <Monitor className="h-4 w-4" />
-                      Sistema
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Escolha entre tema claro, escuro ou automático baseado no sistema.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>
