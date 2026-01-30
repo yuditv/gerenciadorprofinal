@@ -28,6 +28,7 @@ export function AIAgentPreferencesPanel() {
 
   const defaultAgentId = preferences?.default_agent_id ?? null;
   const autoStartAI = preferences?.auto_start_ai ?? false;
+  const expiredClientAgentId = preferences?.expired_client_agent_id ?? null;
 
   const isBusy = isLoading || isLoadingAgents || upsertPreferences.isPending;
   const canEnableAutoStart = !!defaultAgentId;
@@ -107,6 +108,51 @@ export function AIAgentPreferencesPanel() {
                 </AlertDescription>
               </Alert>
             )}
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Agente para Clientes Expirados (CRM)</Label>
+            <Select
+              value={expiredClientAgentId ?? "__none__"}
+              onValueChange={(value) => {
+                const next = value === "__none__" ? null : value;
+                upsertPreferences.mutate({ expired_client_agent_id: next });
+              }}
+              disabled={isBusy}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um agente..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Nenhum</SelectItem>
+                {principalActiveAgents.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    <span className="flex items-center gap-2">
+                      <Bot className="h-4 w-4 text-muted-foreground" />
+                      {agent.name}
+                    </span>
+                  </SelectItem>
+                ))}
+                {!isLoadingAgents && principalActiveAgents.length === 0 && (
+                  <SelectItem value="__empty__" disabled>
+                    Nenhum agente ativo com WhatsApp
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Esse agente será usado quando você clicar em <span className="font-medium">Ativar IA</span> em um cliente expirado no Gerenciador.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Alert>
+              <AlertDescription>
+                Nota: como você escolheu <span className="font-medium">somente manual</span>, não existe ativação automática ao expirar.
+              </AlertDescription>
+            </Alert>
           </div>
         </div>
       </CardContent>

@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Pencil, Trash2, RefreshCw, History, ArrowLeftRight, Bell, Mail, Phone } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, RefreshCw, History, ArrowLeftRight, Bell, Mail, Phone, Bot } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,6 +23,7 @@ interface ClientTableProps {
   onChangePlan: (client: Client) => void;
   onViewNotifications: (client: Client) => void;
   onSendEmail: (client: Client) => void;
+  onActivateAI?: (client: Client) => void;
   getPlanName: (plan: string) => string;
   selectedClients?: Set<string>;
   onToggleSelection?: (clientId: string) => void;
@@ -37,6 +38,7 @@ export function ClientTable({
   onChangePlan,
   onViewNotifications,
   onSendEmail,
+  onActivateAI,
   getPlanName,
   selectedClients,
   onToggleSelection,
@@ -135,6 +137,15 @@ export function ClientTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-background border-border/50 z-50">
+                    {onActivateAI && getExpirationStatus(client.expiresAt) === 'expired' && (
+                      <>
+                        <DropdownMenuItem onClick={() => onActivateAI(client)}>
+                          <Bot className="h-4 w-4 mr-2 text-primary" />
+                          Ativar IA
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-border/50" />
+                      </>
+                    )}
                     <DropdownMenuItem onClick={() => onEdit(client)}>
                       <Pencil className="h-4 w-4 mr-2 text-primary" />
                       Editar

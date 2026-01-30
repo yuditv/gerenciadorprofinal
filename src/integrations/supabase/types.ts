@@ -109,6 +109,7 @@ export type Database = {
           auto_start_ai: boolean
           created_at: string
           default_agent_id: string | null
+          expired_client_agent_id: string | null
           updated_at: string
           user_id: string
         }
@@ -116,6 +117,7 @@ export type Database = {
           auto_start_ai?: boolean
           created_at?: string
           default_agent_id?: string | null
+          expired_client_agent_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -123,6 +125,7 @@ export type Database = {
           auto_start_ai?: boolean
           created_at?: string
           default_agent_id?: string | null
+          expired_client_agent_id?: string | null
           updated_at?: string
           user_id?: string
         }
