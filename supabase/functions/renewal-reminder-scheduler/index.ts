@@ -53,8 +53,9 @@ serve(async (req: Request): Promise<Response> => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get all users with WhatsApp reminders enabled
-    const { data: settings, error: settingsError } = await supabase
+    // Get all users with WhatsApp reminders enabled, then filter by auto_send_enabled
+    // (so we can log how many were skipped)
+    const { data: allSettings, error: settingsError } = await supabase
       .from("notification_settings")
       .select("*")
       .eq("whatsapp_reminders_enabled", true);
@@ -64,11 +65,27 @@ serve(async (req: Request): Promise<Response> => {
       throw settingsError;
     }
 
-    console.log(`Found ${settings?.length || 0} users with WhatsApp reminders enabled`);
+    const totalEnabled = allSettings?.length || 0;
+    const eligibleSettings = (allSettings || []).filter(
+      (s: any) => s.auto_send_enabled === true
+    );
 
-    if (!settings || settings.length === 0) {
+    console.log(
+      `Found ${totalEnabled} users with WhatsApp reminders enabled; ` +
+      `${eligibleSettings.length} eligible with auto_send_enabled=true; ` +
+      `${Math.max(0, totalEnabled - eligibleSettings.length)} skipped (auto_send_enabled=false)`
+    );
+
+    if (!eligibleSettings || eligibleSettings.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, processed: 0, message: "No users with reminders enabled" }),
+        JSON.stringify({
+          success: true,
+          processed: 0,
+          message:
+            totalEnabled === 0
+              ? "No users with reminders enabled"
+              : "No eligible users (auto_send_enabled=false)",
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -79,7 +96,7 @@ serve(async (req: Request): Promise<Response> => {
       errors: [] as string[],
     };
 
-    for (const setting of settings) {
+    for (const setting of eligibleSettings) {
       results.usersProcessed++;
       const userId = setting.user_id;
       // Default: 1 day before, on the day, 1 day after
