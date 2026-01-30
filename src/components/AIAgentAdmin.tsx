@@ -18,6 +18,7 @@ import { WhatsAppAgentRouting } from "./WhatsAppAgentRouting";
 import { AIAgentTransferRules } from "./AIAgentTransferRules";
 import { SubAgentsPanel } from "./SubAgentsPanel";
 import { AIMaintenanceDialog } from "./AIMaintenanceDialog";
+import { AIAgentPreferencesPanel } from "./AIAgentPreferencesPanel";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { PlanLimitAlert } from "./PlanLimitAlert";
 
@@ -78,6 +79,10 @@ export function AIAgentAdmin() {
           <TabsTrigger value="agents" className="gap-2">
             <Bot className="h-4 w-4" />
             Agentes
+          </TabsTrigger>
+          <TabsTrigger value="preferences" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Preferências
           </TabsTrigger>
           <TabsTrigger value="sub-agents" className="gap-2">
             <Users className="h-4 w-4" />
@@ -371,6 +376,10 @@ export function AIAgentAdmin() {
         title="Excluir Agente"
         description={`Tem certeza que deseja excluir o agente "${deletingAgent?.name}"? Esta ação não pode ser desfeita e todo o histórico de conversas será perdido.`}
       />
+      </TabsContent>
+
+      <TabsContent value="preferences" className="space-y-6">
+        <AIAgentPreferencesPanel />
       </TabsContent>
 
       <TabsContent value="sub-agents">

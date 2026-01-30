@@ -40,6 +40,22 @@ async function upsertContactFromChat(supabase: any, userId: string, phone: strin
   }
 }
 
+async function getAIPreferences(supabase: any, userId: string): Promise<{ auto_start_ai: boolean; default_agent_id: string | null }> {
+  try {
+    const { data } = await supabase
+      .from('ai_agent_preferences')
+      .select('auto_start_ai, default_agent_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return {
+      auto_start_ai: data?.auto_start_ai === true,
+      default_agent_id: data?.default_agent_id ?? null,
+    };
+  } catch (_e) {
+    return { auto_start_ai: false, default_agent_id: null };
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -72,6 +88,8 @@ Deno.serve(async (req) => {
     }
 
     const userId = claims.claims.sub as string;
+
+    const aiPrefs = await getAIPreferences(supabase, userId);
 
     const { instanceId, filters } = await req.json();
     
@@ -189,9 +207,14 @@ Deno.serve(async (req) => {
             contact_name: candidateName,
             contact_avatar: chat.wa_profilePic || null,
             status: 'open',
+            ai_enabled: aiPrefs.auto_start_ai,
+            active_agent_id: aiPrefs.auto_start_ai ? aiPrefs.default_agent_id : null,
             last_message_at: chat.wa_lastMsgTimestamp 
               ? new Date(chat.wa_lastMsgTimestamp * 1000).toISOString()
-              : new Date().toISOString()
+              : new Date().toISOString(),
+            metadata: {
+              ai_prompt_pending: !aiPrefs.auto_start_ai,
+            }
           });
 
         if (!insertError) {

@@ -117,6 +117,27 @@ export default function Atendimento() {
 
       if (enable) {
         updateData.assigned_to = null;
+
+        // If the conversation doesn't have an active agent yet, apply the user's default agent.
+        if (!conv.active_agent_id) {
+          try {
+            const { data: authData } = await supabase.auth.getUser();
+            const userId = authData.user?.id;
+            if (userId) {
+              const { data: prefs } = await supabase
+                .from('ai_agent_preferences')
+                .select('default_agent_id')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+              if (prefs?.default_agent_id) {
+                updateData.active_agent_id = prefs.default_agent_id;
+              }
+            }
+          } catch (e) {
+            console.warn('[Atendimento] Failed to load ai_agent_preferences (ignored):', e);
+          }
+        }
       }
 
       await supabase
