@@ -9,6 +9,29 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
 };
 
+async function invokeMemoryExtractor(payload: {
+  userId: string;
+  phone: string;
+  contactName?: string | null;
+  agentId?: string | null;
+  message: string;
+}) {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    fetch(`${supabaseUrl}/functions/v1/memory-extractor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.log('[Inbox Webhook] memory-extractor invoke error (ignored):', e);
+  }
+}
+
 // ===== Message Sending Utilities =====
 
 interface MessageSendConfig {
@@ -1693,6 +1716,18 @@ serve(async (req: Request) => {
       console.error('[Inbox Webhook] Error saving message:', msgError);
     } else {
       console.log(`[Inbox Webhook] Saved ${senderType} message: ${savedMessage.id}`);
+    }
+
+    // Fire-and-forget: update structured client memory from this message (incoming + device-sent)
+    if (savedMessage) {
+      const extractedText = transcriptText ? `${message || caption || ''}\n\n(ÁUDIO) ${transcriptText}` : (message || caption || '');
+      invokeMemoryExtractor({
+        userId: instance.user_id,
+        agentId: null,
+        phone: normalizedPhone,
+        contactName: conversation.contact_name,
+        message: extractedText,
+      });
     }
 
     // ===== OWNER NOTIFICATION SYSTEM =====

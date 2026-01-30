@@ -6,6 +6,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function invokeMemoryExtractor(payload: {
+  userId: string;
+  phone: string;
+  contactName?: string | null;
+  agentId?: string | null;
+  message: string;
+}) {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    fetch(`${supabaseUrl}/functions/v1/memory-extractor`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.log('[Buffer Processor] memory-extractor invoke error (ignored):', e);
+  }
+}
+
 // WhatsApp/UAZAPI may truncate very long messages; also, the desired UX is “humanized”
 // by sending in smaller bursts (sentence-by-sentence).
 const AUTO_SPLIT_THRESHOLD_CHARS = 420;
@@ -434,6 +457,15 @@ serve(async (req: Request) => {
                 buffered_messages: messages.length
               }
             });
+
+          // Fire-and-forget: update structured client memory from AI response
+          invokeMemoryExtractor({
+            userId: conversation.user_id,
+            agentId: agent.id,
+            phone: buffer.phone,
+            contactName: conversation.contact_name,
+            message: assistantResponse,
+          });
 
           // Update conversation with last message info for realtime UI updates
           const previewText = assistantResponse.substring(0, 100);

@@ -170,6 +170,30 @@ serve(async (req: Request) => {
       );
     }
 
+    // Fire-and-forget: update structured client memory from this message
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const msgText = [content, fileName ? `Arquivo: ${fileName}` : null].filter(Boolean).join('\n');
+      fetch(`${supabaseUrl}/functions/v1/memory-extractor`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`
+        },
+        body: JSON.stringify({
+          userId: conversation.user_id,
+          agentId: null,
+          phone: conversation.phone,
+          contactName: conversation.contact_name,
+          message: msgText,
+        })
+      });
+    } catch (e) {
+      // best-effort
+      console.log('[Send Inbox] memory-extractor invoke error (ignored):', e);
+    }
+
     // Update conversation - pause AI when human responds
     const updateData: Record<string, unknown> = {
       last_message_at: new Date().toISOString(),
