@@ -1,170 +1,138 @@
 
-Objetivo (seguir agora)
-Implementar o fluxo completo “Renovação automática via PIX no dia do vencimento” com:
-- Scheduler criando/reutilizando cobrança PIX e agendando mensagem especial
-- Dispatcher enviando WhatsApp na ordem escolhida: **texto → imagem (QR)** (e opcionalmente um 2º texto com “copia e cola”, se necessário)
-- Webhook Mercado Pago validando pagamento com o **token correto (do usuário)** quando for PIX de cliente, aplicando renovação automática e notificando o dono (Owner Notifications)
-- Corrigir pontos técnicos pendentes (QR base64 padronizado, reuso de cobrança pendente, registro em renewal_history, etc.)
+## Contexto do problema (o que está acontecendo)
+1) Você tentou habilitar a opção “Prevent use of leaked passwords” (HIBP) no Supabase e não consegue. Pela sua captura de tela, isso ocorre porque esse recurso é **somente do plano Pro** do Supabase (“Only available on Pro plan and above”).  
+2) Esse bloqueio **não tem relação direta** com a funcionalidade pedida (controle de iniciar IA automaticamente em novas conversas). A implementação do toggle “Auto IA” pode (e deve) funcionar mesmo sem HIBP.
 
-Status atual confirmado
-- Migração do banco já foi aplicada: `client_pix_payments` ganhou `client_id`, `expected_plan`, `expected_plan_label`, `renewal_applied_at`, `renewal_error` + índices.
-- Edge functions atuais:
-  - `renewal-reminder-scheduler`: hoje só cria `scheduled_messages` tipo `renewal_reminder` (texto).
-  - `scheduled-dispatcher`: hoje envia apenas texto via `/send/text`.
-  - `generate-client-pix-v2`: cria PIX com token individual do usuário, mas não liga ao `client_id` e não normaliza `pix_qr_code` como Data URI.
-  - `mercado-pago-webhook`: valida no Mercado Pago usando o token global `MERCADO_PAGO_ACCESS_TOKEN` (isso falha para PIX gerados por tokens individuais) e o handler de client PIX hoje “cadastra/atualiza cliente” de um jeito que não segue a regra de renovação (baseDate = max(now, expires_at)).
+Além disso, notei um problema técnico importante no último diff:
+- Foi **editado** `src/integrations/supabase/types.ts`. Isso **não pode** ser editado manualmente neste projeto (e tende a quebrar tipos/geração). Precisamos **reverter** essa alteração e tipar a nova tabela de preferências por interfaces locais no frontend.
 
-Decisões que você escolheu (vou implementar assim)
-1) Validação do PIX: **Renovar mesmo se diferente** (ou seja, não vamos bloquear renovação se valor divergir; apenas registrar/logar para auditoria).
-2) Ordem de envio no WhatsApp: **Texto depois imagem**.
+---
 
-Escopo das mudanças (o que será alterado)
-A) Edge Function `generate-client-pix-v2`
-1. Aceitar `client_id` no body e persistir em `client_pix_payments.client_id`.
-2. Persistir também:
-   - `expected_plan` e/ou `expected_plan_label` (com base no plano atual do cliente)
-   - `duration_days` coerente com o plano
-3. Normalizar `pix_qr_code`:
-   - se vier base64 “cru” do Mercado Pago, salvar como `data:image/png;base64,${base64}`
-4. Robustez Mercado Pago (mitigação de egress/PolicyAgent já usada em `wallet-pix`):
-   - usar `AbortController` (timeout ~15s)
-   - setar headers `Accept: application/json` e `User-Agent: gerenciadorpro/1.0 (supabase-edge)`
-   - ler `response.text()` e só depois tentar `JSON.parse` (para lidar com HTML/WAF)
+## Objetivo do ajuste (requisito aprovado)
+Você aprovou:
+- **Auto IA**: Não iniciar automaticamente
+- **Agente padrão**: Escolher um agente
 
-B) Edge Function `renewal-reminder-scheduler`
-1. Continuar elegibilidade atual (whatsapp_reminders_enabled=true e auto_send_enabled=true), e continuar “só no dia” (0 dias).
-2. Para cada cliente vencendo HOJE:
-   - se `client.price` não existir ou for <= 0:
-     - manter comportamento atual: agenda `scheduled_messages` tipo `renewal_reminder` (texto padrão)
-     - registrar log claro (para você saber que faltou preço)
-   - se tiver preço:
-     - calcular `duration_days` por plano (monthly=30, quarterly=90, semiannual=180, annual=365)
-     - tentar reutilizar cobrança pendente ainda válida:
-       - buscar em `client_pix_payments` por `user_id + client_id` com `status='pending'` e `expires_at > now()`, ordenar desc e pegar 1
-     - se não existir cobrança pendente válida:
-       - gerar uma nova cobrança PIX usando o token individual do usuário (de `user_payment_credentials.mercado_pago_access_token_enc`)
-       - inserir em `client_pix_payments` com:
-         - `client_id`, `client_phone`, `amount=client.price`, `duration_days`, `expected_plan`, `expected_plan_label`, `status='pending'`, `expires_at`
-     - criar `scheduled_messages` com:
-       - `message_type = 'renewal_reminder_pix'`
-       - `message_content` contendo:
-         - mensagem de renovação (template de “today”)
-         - instruções do PIX
-         - o “copia e cola” (`pix_code`)
-       - `scheduled_at = now()` e `status='pending'`
-3. Importante: o scheduler não vai enviar WhatsApp diretamente; ele apenas prepara dados + agenda.
+Então o comportamento final desejado será:
+- Em **novas conversas**: **não iniciar a IA automaticamente** (continua como hoje: IA desativada e aparece a pergunta “Nova conversa — ativar IA?” no Atendimento).
+- Na aba **Agente IA**: existir uma área de configurações para:
+  - Ligar/desligar “Iniciar IA automaticamente em novas conversas”
+  - Escolher um “Agente padrão” (um agente existente)
+- Quando o usuário clicar “Ativar IA” no Atendimento:
+  - Se existir “Agente padrão” configurado, a conversa passa a ter `active_agent_id = default_agent_id` (para não ficar “sem agente” quando a IA for ativada).
 
-C) Edge Function `scheduled-dispatcher`
-1. Detectar `message.message_type === 'renewal_reminder_pix'`
-2. Para esse tipo:
-   - localizar a cobrança em `client_pix_payments`:
-     - preferir `user_id + client_id` (do scheduled_messages)
-     - fallback: `user_id + client_phone` (caso algum registro antigo não tenha client_id)
-     - exigir `status='pending'` e `expires_at > now()`
-   - Envio na ordem escolhida (texto → imagem):
-     1) Enviar texto via `/send/text` com:
-        - `message_content` já com o copia/cola
-     2) Enviar imagem (QR) via `/send/media` com:
-        - `{ number, type: "image", file: pix_qr_code }`
-        - `pix_qr_code` deve estar no formato Data URI (por isso o ajuste no `generate-client-pix-v2`)
-   - Se faltar QR ou faltar pix_code por algum motivo:
-     - degradar com elegância (mandar o que tiver) e marcar o scheduled_message como `sent` apenas se pelo menos 1 envio tiver sucesso; caso ambos falhem, marcar `failed`.
-3. Para outros tipos de mensagem, manter comportamento atual (somente texto).
-4. Logging mais detalhado para debug (IDs de message/client/payment e status de cada envio).
+---
 
-D) Edge Function `mercado-pago-webhook`
-1. Ajustar o fluxo para escolher o token correto:
-   - Antes de consultar Mercado Pago, localizar o pagamento no seu banco por `external_id`:
-     1) `subscription_payments`
-     2) `client_pix_payments`
-     3) `wallet_topups`
-   - Definir o access token a usar no GET /v1/payments/{id}:
-     - subscription_payments: token global `MERCADO_PAGO_ACCESS_TOKEN`
-     - wallet_topups: token global `MERCADO_PAGO_ACCESS_TOKEN`
-     - client_pix_payments: token do dono do pagamento:
-       - buscar `user_payment_credentials.mercado_pago_access_token_enc` pelo `payment.user_id`
-2. Apenas se Mercado Pago retornar `status === 'approved'`:
-   - Para `client_pix_payments`:
-     - marcar como `paid` (se ainda não estiver) + `paid_at`
-     - aplicar renovação automática no cliente:
-       - localizar cliente por `client_id` (preferencial)
-       - calcular:
-         - `baseDate = max(now, clients.expires_at)`
-         - `newExpiresAt = baseDate + duration_days` (em dias)
-       - atualizar `clients.expires_at = newExpiresAt`
-       - inserir `renewal_history`:
-         - client_id, user_id, plan, previous_expires_at, new_expires_at
-       - atualizar `client_pix_payments`:
-         - `renewal_applied_at = now()` em caso de sucesso
-         - `renewal_error = ...` em caso de falha (ex.: cliente não encontrado)
-     - notificar o dono via `send-owner-notification`:
-       - chamada interna (service role Bearer) com:
-         - eventType: `payment_proof`
-         - contactPhone: whatsapp do cliente
-         - contactName (se disponível)
-         - summary: “PIX aprovado — {cliente} — R$X — Renovado até {data}”
-         - conversationId se existir em `client_pix_payments`
-3. Reprocessamento/idempotência:
-   - se `client_pix_payments.status` já for `paid` e `renewal_applied_at` já existir, não renovar de novo.
-4. Robustez e padrões do projeto:
-   - manter comportamento “sempre retornar 200” para evitar retries infinitos do Mercado Pago, mas logar claramente o erro.
-   - adicionar mitigação de egress (headers, timeout, parse resiliente) igual ao `wallet-pix` quando fizer chamadas ao Mercado Pago.
+## O que já existe e será aproveitado
+- O webhook `supabase/functions/whatsapp-inbox-webhook/index.ts` hoje cria novas conversas com:
+  - `ai_enabled: false`
+  - `metadata.ai_prompt_pending: true`
+  Isso é exatamente o modo “não iniciar automaticamente” e causa o prompt no Atendimento.
+- O Atendimento (`src/pages/Atendimento.tsx`) já possui a lógica do prompt via `ai_prompt_pending`.
 
-E) Correção importante de qualidade (types do Supabase no front)
-- Foi alterado `src/integrations/supabase/types.ts` no diff anterior, mas esse arquivo é “auto gerado / não editar”.
-- Na implementação eu vou:
-  - reverter esse arquivo para evitar drift (e respeitar a regra),
-  - ajustar qualquer código TypeScript que precise dos novos campos usando `as any`/tipos locais (ou uma tipagem auxiliar segura), sem depender de mexer no arquivo gerado.
+---
 
-Sequência de implementação (ordem)
-1) Ajustar `generate-client-pix-v2` (client_id + data URI + robustez MP).
-2) Ajustar `renewal-reminder-scheduler` para:
-   - calcular valor/duração
-   - reutilizar/gerar cobrança PIX
-   - criar `scheduled_messages` tipo `renewal_reminder_pix`
-3) Ajustar `scheduled-dispatcher` para:
-   - enviar “texto → imagem QR” quando `renewal_reminder_pix`
-4) Refatorar `mercado-pago-webhook` para:
-   - localizar pagamento no DB antes
-   - consultar MP com token correto (principalmente para client_pix_payments)
-   - aplicar renovação + renewal_history + owner notification
-5) Ajuste técnico: reverter `src/integrations/supabase/types.ts` e acomodar tipagens sem editar arquivo gerado.
-6) Testes ponta-a-ponta + logs
+## Mudanças necessárias (alto nível)
+### A) Banco de dados (já criado)
+A migration já cria a tabela:
+- `public.ai_agent_preferences` com:
+  - `auto_start_ai boolean default false`
+  - `default_agent_id uuid null`
+  - RLS por usuário
 
-Checklist de teste (ponta a ponta)
-1) Preparar um cliente:
-   - expires_at = hoje
-   - plan = monthly/quarterly/semiannual/annual
-   - price preenchido
-   - whatsapp válido
-2) Rodar `renewal-reminder-scheduler`:
-   - deve criar 1 registro em `client_pix_payments` (ou reutilizar um pending válido)
-   - deve criar 1 registro em `scheduled_messages` com `message_type='renewal_reminder_pix'`
-3) Rodar `scheduled-dispatcher`:
-   - WhatsApp deve receber:
-     - primeiro o texto com instruções + copia e cola
-     - depois a imagem do QR
-4) Aprovar o pagamento no Mercado Pago (teste real ou sandbox conforme você usa):
-   - webhook deve:
-     - marcar `client_pix_payments` como paid
-     - atualizar `clients.expires_at` corretamente (baseDate = max(now, antigo))
-     - inserir `renewal_history`
-     - preencher `renewal_applied_at` (e não duplicar em reprocessamento)
-     - disparar `send-owner-notification`
-5) Conferir logs:
-   - `renewal-reminder-scheduler`
-   - `scheduled-dispatcher`
-   - `mercado-pago-webhook`
-   - `send-owner-notification`
+### B) Frontend: criar tela/config no “Agente IA”
+1) Criar um hook novo (ex.: `useAIAgentPreferences`) para:
+   - Buscar preferências do usuário logado
+   - Criar registro se não existir (upsert)
+   - Atualizar `auto_start_ai` e `default_agent_id`
 
-Riscos / pontos de atenção
-- Egress/PolicyAgent: já vimos que pode bloquear chamadas ao Mercado Pago; por isso vou padronizar a estratégia robusta (headers + timeout + parse resiliente) também nos pontos que ainda fazem fetch “cru”.
-- UAZAPI: envio de mídia exige que `pix_qr_code` esteja num formato aceito (Data URI tem funcionado no `wallet-pix`).
-- Idempotência no webhook: essencial para não renovar duas vezes se o Mercado Pago reenviar eventos.
+2) Ajustar a UI em `src/components/AIAgentAdmin.tsx`:
+   - Adicionar um novo `TabsTrigger` e `TabsContent`, por exemplo: **“Preferências”** ou **“Configurações”**
+   - Dentro dessa aba:
+     - `Switch` “Iniciar IA automaticamente em novas conversas”
+     - Um `Select` para escolher o **Agente padrão** (usando a lista `agents`, preferindo “principais” e ativos)
+     - Mostrar validações amigáveis:
+       - Se “Auto-start” estiver ligado e não existir “Agente padrão”, mostrar aviso e/ou impedir salvar (ou salvar mas avisar que a IA ligará sem agente; como você escolheu “Escolher um agente”, vamos exigir agente ao ativar auto-start)
 
-Links operacionais (para você acompanhar)
-- Edge Functions: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions
-- Logs webhook: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/mercado-pago-webhook/logs
-- Logs scheduler: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/renewal-reminder-scheduler/logs
-- Logs dispatcher: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/scheduled-dispatcher/logs
-- Logs owner notification: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/send-owner-notification/logs
+3) Reverter a dependência de tipos gerados:
+   - **Remover** as mudanças manuais em `src/integrations/supabase/types.ts`
+   - Usar uma interface local para a linha da tabela:
+     ```ts
+     type AIAgentPreferences = {
+       user_id: string;
+       auto_start_ai: boolean;
+       default_agent_id: string | null;
+       created_at?: string;
+       updated_at?: string;
+     }
+     ```
+
+### C) Atendimento: ao “Ativar IA”, aplicar agente padrão automaticamente
+No `src/pages/Atendimento.tsx`, dentro de `upsertDecision(true)`:
+- Buscar preferências (`ai_agent_preferences`) e, se tiver `default_agent_id`:
+  - Atualizar a conversa com:
+    - `ai_enabled: true`
+    - `active_agent_id: default_agent_id` (somente se `conv.active_agent_id` estiver vazio, para não sobrescrever transferências)
+    - `metadata.ai_prompt_pending: false`
+
+Isso garante: “Ativar IA” já define qual agente vai responder.
+
+### D) Backend: respeitar preferências quando Auto IA estiver ligado (preparar o caminho)
+Mesmo você tendo escolhido “Não iniciar automaticamente”, precisamos implementar o toggle completo.
+Então no `whatsapp-inbox-webhook` (criação de nova conversa):
+- Ler `ai_agent_preferences` do dono (`instance.user_id`)
+- Se `auto_start_ai === true`:
+  - Criar conversa com:
+    - `ai_enabled: true`
+    - `active_agent_id: default_agent_id` (se setado)
+    - `metadata.ai_prompt_pending: false` (não precisa perguntar)
+- Se `auto_start_ai === false` (seu caso):
+  - Manter o comportamento atual:
+    - `ai_enabled: false`
+    - `metadata.ai_prompt_pending: true`
+
+Também aplicar o mesmo padrão no `sync-chats/index.ts` quando criar conversas “novas” via sincronização (para consistência).
+
+---
+
+## Correção do “não consigo ativar a opção” (HIBP)
+- Explicar claramente no app/documentação interna: isso é limitação do plano do Supabase.
+- Remover qualquer dependência/“bloqueio” no fluxo do nosso app que impeça você de seguir sem HIBP.  
+Ou seja: **não vamos exigir essa opção** para concluir o recurso de Auto IA.
+
+---
+
+## Sequência de implementação (passo a passo)
+1) Reverter/ajustar qualquer alteração manual em `src/integrations/supabase/types.ts` (não pode ser editado).
+2) Implementar hook `useAIAgentPreferences` (React Query) para:
+   - `select` do registro do usuário
+   - `upsert` quando alterar toggle/agente
+3) Atualizar `AIAgentAdmin.tsx` adicionando a aba “Preferências”:
+   - Switch `auto_start_ai`
+   - Select `default_agent_id`
+4) Atualizar `Atendimento.tsx` para, ao clicar “Ativar IA” no prompt:
+   - aplicar `active_agent_id = default_agent_id` (se houver)
+5) Atualizar `whatsapp-inbox-webhook` na criação de conversa para usar `ai_agent_preferences` quando `auto_start_ai` estiver ligado
+6) Atualizar `sync-chats` para usar preferências ao inserir conversas novas
+7) Testes rápidos:
+   - Criar nova conversa (mensagem recebida) com `auto_start_ai=false`: deve aparecer prompt e IA não responde automaticamente.
+   - Habilitar `auto_start_ai=true` + escolher agente padrão: nova conversa já deve vir com IA ligada e respondendo (sem prompt).
+   - No prompt “Ativar IA”: deve setar `active_agent_id` automaticamente para o agente padrão.
+
+---
+
+## Riscos e cuidados
+- RLS: a tabela `ai_agent_preferences` tem RLS por usuário; no webhook precisamos usar cliente com privilégios adequados (service role) ou query com contexto apropriado.
+- Não sobrescrever transferências: ao aplicar agente padrão no Atendimento, só setar `active_agent_id` se estiver vazio.
+- Tipos Supabase: não editar `types.ts` manualmente; usar tipagem local.
+
+---
+
+## Resultado esperado para você (UX)
+- Na aba **Agente IA** você terá um painel simples:
+  - “Iniciar IA automaticamente em novas conversas” [on/off]
+  - “Agente padrão” [selecionar agente]
+- Com o toggle **desligado** (seu caso):
+  - nada muda no automático: chega conversa nova → não inicia IA → aparece pergunta “ativar IA?”
+- Quando você clicar “Ativar IA”, ele já começa usando o agente padrão que você escolheu (sem confusão/sem cair no “início”).
+
