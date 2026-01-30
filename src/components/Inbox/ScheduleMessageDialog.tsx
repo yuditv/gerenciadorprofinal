@@ -12,11 +12,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Conversation } from "@/hooks/useInboxConversations";
 
 type ActiveScheduleStatus = "scheduled" | "processing";
+
+type InboxScheduledMessage = {
+  id: string;
+  status: string;
+  send_at: string;
+  template_key: string | null;
+  created_at?: string;
+};
 
 function toDatetimeLocalValue(date: Date) {
   // yyyy-MM-ddTHH:mm (local)
@@ -38,6 +56,8 @@ export function ScheduleMessageDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [hasActiveSchedule, setHasActiveSchedule] = useState(false);
+  const [activeSchedule, setActiveSchedule] = useState<InboxScheduledMessage | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const defaultDate = useMemo(() => new Date(Date.now() + 3 * 60 * 60 * 1000), []);
 
@@ -53,16 +73,19 @@ export function ScheduleMessageDialog({
       try {
         const { data, error } = await supabase
           .from("inbox_scheduled_messages")
-          .select("id,status")
+          .select("id,status,send_at,template_key,created_at")
           .eq("conversation_id", conversation.id)
           .in("status", ["scheduled", "processing"] as ActiveScheduleStatus[])
           .limit(1);
         if (error) throw error;
-        setHasActiveSchedule((data || []).length > 0);
+        const row = (data || [])[0] as InboxScheduledMessage | undefined;
+        setActiveSchedule(row ?? null);
+        setHasActiveSchedule(!!row);
       } catch (e) {
         // If the table isn't available yet or RLS blocks, don't hard-fail the UI.
         console.warn("[ScheduleMessageDialog] Could not check active schedules:", e);
         setHasActiveSchedule(false);
+        setActiveSchedule(null);
       } finally {
         setChecking(false);
       }
@@ -70,6 +93,71 @@ export function ScheduleMessageDialog({
 
     checkActive();
   }, [open, conversation?.id]);
+
+  const handleCancelActive = async () => {
+    if (!conversation) return;
+
+    setIsLoading(true);
+    try {
+      // Cancel only the active schedule(s) for this conversation
+      const { error } = await supabase
+        .from("inbox_scheduled_messages")
+        .update({ status: "cancelled" } as any)
+        .eq("conversation_id", conversation.id)
+        .in("status", ["scheduled", "processing"] as any);
+      if (error) throw error;
+
+      toast({
+        title: "Agendamento cancelado",
+        description: "O agendamento desta conversa foi cancelado.",
+      });
+
+      setHasActiveSchedule(false);
+      setActiveSchedule(null);
+    } catch (e) {
+      console.error("[ScheduleMessageDialog] cancel error:", e);
+      toast({
+        title: "Erro ao cancelar",
+        description: e instanceof Error ? e.message : "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteActive = async () => {
+    if (!conversation) return;
+
+    setIsLoading(true);
+    try {
+      // Remove ONLY the scheduled/processing rows for this conversation
+      const { error } = await supabase
+        .from("inbox_scheduled_messages")
+        .delete()
+        .eq("conversation_id", conversation.id)
+        .in("status", ["scheduled", "processing"] as any);
+      if (error) throw error;
+
+      toast({
+        title: "Agendamento removido",
+        description: "O agendamento foi removido desta conversa.",
+      });
+
+      setConfirmDeleteOpen(false);
+      setHasActiveSchedule(false);
+      setActiveSchedule(null);
+    } catch (e) {
+      console.error("[ScheduleMessageDialog] delete error:", e);
+      toast({
+        title: "Erro ao remover",
+        description: e instanceof Error ? e.message : "Tente novamente",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSchedule = async () => {
     if (!conversation) return;
@@ -146,6 +234,29 @@ export function ScheduleMessageDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {hasActiveSchedule && activeSchedule && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-sm font-medium">Agendamento ativo nesta conversa</p>
+            <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground/80">Enviar em:</span>{" "}
+                {new Date(activeSchedule.send_at).toLocaleString("pt-BR")}
+              </p>
+              <p>
+                <span className="font-medium text-foreground/80">Status:</span> {activeSchedule.status}
+              </p>
+            </div>
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={handleCancelActive} disabled={isLoading || checking}>
+                Cancelar agendamento
+              </Button>
+              <Button variant="destructive" onClick={() => setConfirmDeleteOpen(true)} disabled={isLoading || checking}>
+                Remover
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="grid gap-2">
           <Label htmlFor="sendAt">Enviar em</Label>
           <Input
@@ -170,6 +281,24 @@ export function ScheduleMessageDialog({
             {isLoading ? "Agendando…" : "Agendar"}
           </Button>
         </DialogFooter>
+
+        {/* Confirm delete */}
+        <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remover agendamento?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso remove o agendamento desta conversa. Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteActive} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isLoading}>
+                {isLoading ? "Removendo…" : "Remover"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
