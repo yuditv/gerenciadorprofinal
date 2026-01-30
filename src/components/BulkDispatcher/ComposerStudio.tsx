@@ -760,7 +760,25 @@ Use spintax {{ opção1 | opção2 }} para variações."
         composeMode={true}
         onCompose={(data) => {
           // Formata o menu para inserir como mensagem especial
-          const menuText = `[MENU:${data.menuType.toUpperCase()}]\n${data.text}\n\nOpções: ${data.choices.join(' | ')}${data.footerText ? `\n\n${data.footerText}` : ''}`;
+          // Inclui também um payload estruturado em Base64 para o disparador conseguir enviar via /send/menu
+          // sem perder campos como listButton / selectableCount.
+          const payloadB64 = btoa(
+            unescape(
+              encodeURIComponent(
+                JSON.stringify({
+                  menuType: data.menuType,
+                  text: data.text,
+                  choices: data.choices,
+                  footerText: data.footerText,
+                  listButton: data.listButton,
+                  selectableCount: data.selectableCount,
+                  imageButton: data.imageButton,
+                })
+              )
+            )
+          );
+
+          const menuText = `[MENU:${data.menuType.toUpperCase()}]\n${data.text}\n\nOpções: ${data.choices.join(' | ')}${data.footerText ? `\n\n${data.footerText}` : ''}\n\n[MENU_DATA:${payloadB64}]`;
           if (activeMessageId) {
             updateMessage(activeMessageId, menuText);
           } else {

@@ -187,6 +187,74 @@ export function useBulkDispatch() {
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  const tryParseInteractiveMenu = (message: string): null | {
+    menuType: 'button' | 'list' | 'poll' | 'carousel';
+    text: string;
+    choices: string[];
+    footerText?: string;
+    listButton?: string;
+    selectableCount?: number;
+    imageButton?: string;
+  } => {
+    // New format: includes a Base64 JSON payload at the end
+    // Example: ...\n\n[MENU_DATA:BASE64]
+    const b64Match = message.match(/\[MENU_DATA:([A-Za-z0-9+/=]+)\]\s*$/m);
+    if (b64Match?.[1]) {
+      try {
+        const json = decodeURIComponent(escape(atob(b64Match[1])));
+        const parsed = JSON.parse(json) as {
+          menuType?: string;
+          text?: string;
+          choices?: string[];
+          footerText?: string;
+          listButton?: string;
+          selectableCount?: number;
+          imageButton?: string;
+        };
+
+        if (!parsed.menuType || !parsed.text || !Array.isArray(parsed.choices) || parsed.choices.length === 0) {
+          return null;
+        }
+
+        const menuType = parsed.menuType as 'button' | 'list' | 'poll' | 'carousel';
+        if (!['button', 'list', 'poll', 'carousel'].includes(menuType)) return null;
+
+        return {
+          menuType,
+          text: String(parsed.text),
+          choices: parsed.choices.map(String),
+          footerText: parsed.footerText ? String(parsed.footerText) : undefined,
+          listButton: parsed.listButton ? String(parsed.listButton) : undefined,
+          selectableCount: typeof parsed.selectableCount === 'number' ? parsed.selectableCount : undefined,
+          imageButton: parsed.imageButton ? String(parsed.imageButton) : undefined,
+        };
+      } catch {
+        // fallthrough
+      }
+    }
+
+    // Legacy format (best-effort):
+    // [MENU:BUTTON]\nText...\n\nOpções: a | b | c\n\nFooter...
+    const headMatch = message.match(/^\[MENU:(BUTTON|LIST|POLL|CAROUSEL)\]\s*\n([\s\S]*)$/m);
+    if (!headMatch) return null;
+
+    const menuType = headMatch[1].toLowerCase() as 'button' | 'list' | 'poll' | 'carousel';
+    const rest = headMatch[2] ?? '';
+
+    const parts = rest.split(/\n\n+/);
+    const optionsPartIndex = parts.findIndex(p => /^Opções\s*:/i.test(p.trim()));
+    if (optionsPartIndex === -1) return null;
+
+    const text = parts.slice(0, optionsPartIndex).join('\n\n').trim();
+    const optionsRaw = parts[optionsPartIndex].replace(/^Opções\s*:\s*/i, '').trim();
+    const choices = optionsRaw ? optionsRaw.split(' | ').map(s => s.trim()).filter(Boolean) : [];
+    const footerText = parts.slice(optionsPartIndex + 1).join('\n\n').trim() || undefined;
+
+    if (!text || choices.length === 0) return null;
+
+    return { menuType, text, choices, footerText };
+  };
+
   const startDispatch = useCallback(async (instancesData: any[]) => {
     if (!user) {
       toast({ title: 'Erro', description: 'Usuário não autenticado', variant: 'destructive' });
@@ -297,25 +365,48 @@ export function useBulkDispatch() {
       }));
 
       try {
-        // Build request body based on media type
-        const requestBody: Record<string, any> = {
-          instanceKey: instance.instance_key,
-          phone,
-          autoArchive: config.autoArchive, // Use config setting
-        };
+        // If message is an interactive menu placeholder, send it via whatsapp-instances -> /send/menu
+        const interactiveMenu = (!selectedMessage.mediaType || selectedMessage.mediaType === 'none')
+          ? tryParseInteractiveMenu(processedMessage)
+          : null;
 
-        if (selectedMessage.mediaType && selectedMessage.mediaType !== 'none' && selectedMessage.mediaUrl) {
-          requestBody.mediaType = selectedMessage.mediaType;
-          requestBody.mediaUrl = selectedMessage.mediaUrl;
-          requestBody.fileName = selectedMessage.fileName;
-          requestBody.caption = processedMessage;
-        } else {
-          requestBody.message = processedMessage;
-        }
+        const { data, error } = interactiveMenu
+          ? await supabase.functions.invoke('whatsapp-instances', {
+              body: {
+                action: 'send_menu',
+                phone,
+                instanceKey: instance.instance_key,
+                menuType: interactiveMenu.menuType,
+                text: interactiveMenu.text,
+                choices: interactiveMenu.choices,
+                footerText: interactiveMenu.footerText,
+                listButton: interactiveMenu.listButton,
+                selectableCount: interactiveMenu.selectableCount,
+                imageButton: interactiveMenu.imageButton,
+              }
+            })
+          : await (async () => {
+              // Build request body based on media type
+              // deno-lint-ignore no-explicit-any
+              const requestBody: Record<string, any> = {
+                instanceKey: instance.instance_key,
+                phone,
+                autoArchive: config.autoArchive, // Use config setting
+              };
 
-        const { data, error } = await supabase.functions.invoke('send-whatsapp-uazapi', {
-          body: requestBody
-        });
+              if (selectedMessage.mediaType && selectedMessage.mediaType !== 'none' && selectedMessage.mediaUrl) {
+                requestBody.mediaType = selectedMessage.mediaType;
+                requestBody.mediaUrl = selectedMessage.mediaUrl;
+                requestBody.fileName = selectedMessage.fileName;
+                requestBody.caption = processedMessage;
+              } else {
+                requestBody.message = processedMessage;
+              }
+
+              return supabase.functions.invoke('send-whatsapp-uazapi', {
+                body: requestBody
+              });
+            })();
 
         if (error) throw error;
 
@@ -341,8 +432,8 @@ export function useBulkDispatch() {
           }
         }
         
-        // Check if chat was archived successfully
-        if (config.autoArchive && data?.archived) {
+        // Check if chat was archived successfully (only available for send-whatsapp-uazapi)
+        if (!interactiveMenu && config.autoArchive && data?.archived) {
           archivedCount++;
           addLog('success', `✓ ${contact.name || phone} (arquivado)`);
         } else {
