@@ -309,12 +309,6 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                       <Settings className="h-4 w-4 mr-2 text-primary" />
                       Configurações
                     </DropdownMenuItem>
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => navigate('/inbox-settings?section=teams')} className="hover:bg-primary/10">
-                        <Users className="h-4 w-4 mr-2 text-primary" />
-                        Team Management
-                      </DropdownMenuItem>
-                    )}
                     <DropdownMenuSeparator className="bg-border/50" />
                   </>
                 )}
