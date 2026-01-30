@@ -1,25 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { WhatsAppInstance } from '@/hooks/useWhatsAppInstances';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { InstanceSettingsGeneralTab } from '@/components/InstanceSettings/InstanceSettingsGeneralTab';
+import { InstanceSettingsUazapiTab } from '@/components/InstanceSettings/InstanceSettingsUazapiTab';
+import { InstanceSettingsPrivacyTab } from '@/components/InstanceSettings/InstanceSettingsPrivacyTab';
 import { 
   Settings, 
-  Clock, 
-  MessageSquare, 
   Smartphone, 
   User, 
-  Save,
   Wifi,
   WifiOff,
-  Loader2
 } from 'lucide-react';
 
 interface InstanceSettingsDialogProps {
@@ -27,19 +24,22 @@ interface InstanceSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: () => void;
+  initialTab?: 'general' | 'instance' | 'privacy';
 }
 
 export function InstanceSettingsDialog({ 
   instance, 
   open, 
   onOpenChange,
-  onSave 
+  onSave,
+  initialTab = 'general',
 }: InstanceSettingsDialogProps) {
   const [dailyLimit, setDailyLimit] = useState(200);
   const [businessHoursEnabled, setBusinessHoursEnabled] = useState(false);
   const [businessHoursStart, setBusinessHoursStart] = useState('08:00');
   const [businessHoursEnd, setBusinessHoursEnd] = useState('18:00');
   const [isSaving, setIsSaving] = useState(false);
+  const [tab, setTab] = useState<'general' | 'instance' | 'privacy'>(initialTab);
 
   useEffect(() => {
     if (instance) {
@@ -53,6 +53,10 @@ export function InstanceSettingsDialog({
       );
     }
   }, [instance]);
+
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
 
   const handleSave = async () => {
     if (!instance) return;
@@ -135,83 +139,40 @@ export function InstanceSettingsDialog({
 
           <Separator />
 
-          {/* Daily Limit */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              <Label htmlFor="daily-limit">Limite diário de mensagens</Label>
-            </div>
-            <Input
-              id="daily-limit"
-              type="number"
-              value={dailyLimit}
-              onChange={(e) => setDailyLimit(Number(e.target.value))}
-              min={1}
-              max={10000}
-              className="max-w-[200px]"
-            />
-            <p className="text-xs text-muted-foreground">
-              Limite máximo de mensagens que podem ser enviadas por dia nesta instância.
-            </p>
-          </div>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="general">Geral</TabsTrigger>
+              <TabsTrigger value="instance">Instância</TabsTrigger>
+              <TabsTrigger value="privacy">Privacidade</TabsTrigger>
+            </TabsList>
 
-          <Separator />
-
-          {/* Business Hours */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <Label htmlFor="business-hours">Horário comercial</Label>
-              </div>
-              <Switch
-                id="business-hours"
-                checked={businessHoursEnabled}
-                onCheckedChange={setBusinessHoursEnabled}
+            <TabsContent value="general">
+              <InstanceSettingsGeneralTab
+                dailyLimit={dailyLimit}
+                setDailyLimit={setDailyLimit}
+                businessHoursEnabled={businessHoursEnabled}
+                setBusinessHoursEnabled={setBusinessHoursEnabled}
+                businessHoursStart={businessHoursStart}
+                setBusinessHoursStart={setBusinessHoursStart}
+                businessHoursEnd={businessHoursEnd}
+                setBusinessHoursEnd={setBusinessHoursEnd}
+                isSaving={isSaving}
+                onSave={handleSave}
               />
-            </div>
-            
-            {businessHoursEnabled && (
-              <div className="grid grid-cols-2 gap-4 pl-6">
-                <div className="space-y-2">
-                  <Label htmlFor="start-time" className="text-xs">Início</Label>
-                  <Input
-                    id="start-time"
-                    type="time"
-                    value={businessHoursStart}
-                    onChange={(e) => setBusinessHoursStart(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end-time" className="text-xs">Fim</Label>
-                  <Input
-                    id="end-time"
-                    type="time"
-                    value={businessHoursEnd}
-                    onChange={(e) => setBusinessHoursEnd(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground pl-6">
-              Define o horário de funcionamento para automações e respostas.
-            </p>
-          </div>
+            </TabsContent>
 
-          <Separator />
+            <TabsContent value="instance">
+              <InstanceSettingsUazapiTab instance={instance} onSaved={onSave} />
+            </TabsContent>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-2">
+            <TabsContent value="privacy">
+              <InstanceSettingsPrivacyTab instanceId={instance.id} active={tab === 'privacy'} />
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Salvar
+              Fechar
             </Button>
           </div>
         </div>

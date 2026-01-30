@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Tabs,
   TabsContent,
@@ -42,6 +45,9 @@ import {
   TestTube2,
   Database,
   Search,
+  Pencil,
+  Shield,
+  LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { WhatsAppTemplateManager } from '@/components/WhatsAppTemplateManager';
@@ -72,6 +78,8 @@ export default function WhatsApp() {
     createInstance, 
     getQRCode, 
     checkStatus, 
+    updateInstanceName,
+    disconnectInstance,
     deleteInstance, 
     getPairingCode,
     configureWebhook,
@@ -118,6 +126,12 @@ export default function WhatsApp() {
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [settingsInstance, setSettingsInstance] = useState<WhatsAppInstance | null>(null);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'instance' | 'privacy'>('general');
+
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameInstance, setRenameInstance] = useState<WhatsAppInstance | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   // Polling for campaign progress
   useEffect(() => {
@@ -139,9 +153,19 @@ export default function WhatsApp() {
   const handleCheckStatus = async (instanceId: string) => {
     setCheckingStatus(instanceId);
     try {
-      await checkStatus(instanceId);
+      const data = await checkStatus(instanceId);
       await refetchInstances();
-      toast.success("Status atualizado!");
+      const status = data?.status;
+      const phone = data?.phone;
+      const profileName = data?.profileName;
+      const message = [
+        status ? `Status: ${status}` : null,
+        phone ? `Número: ${phone}` : null,
+        profileName ? `Perfil: ${profileName}` : null,
+      ]
+        .filter(Boolean)
+        .join(' • ');
+      toast.success(message || 'Status atualizado!');
     } catch (error) {
       toast.error("Erro ao verificar status");
     } finally {
@@ -171,9 +195,46 @@ export default function WhatsApp() {
     }
   };
 
-  const handleOpenSettings = (instance: WhatsAppInstance) => {
+  const handleOpenSettings = (instance: WhatsAppInstance, tab: 'general' | 'instance' | 'privacy' = 'general') => {
     setSettingsInstance(instance);
+    setSettingsInitialTab(tab);
     setSettingsDialogOpen(true);
+  };
+
+  const handleOpenRename = (instance: WhatsAppInstance) => {
+    setRenameInstance(instance);
+    setRenameValue(instance.instance_name || instance.name);
+    setRenameDialogOpen(true);
+  };
+
+  const handleSaveRename = async () => {
+    if (!renameInstance) return;
+    const name = renameValue.trim();
+    if (!name) return;
+    if (name.length > 60) {
+      toast.error('Nome deve ter no máximo 60 caracteres');
+      return;
+    }
+
+    setRenaming(true);
+    try {
+      const ok = await updateInstanceName(renameInstance.id, name);
+      if (ok) {
+        await refetchInstances();
+        setRenameDialogOpen(false);
+      }
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const handleDisconnect = async (instance: WhatsAppInstance) => {
+    const confirmed = confirm(
+      'Isso vai deslogar o WhatsApp desta instância. Você precisará reconectar via QR/pareamento. Deseja continuar?',
+    );
+    if (!confirmed) return;
+    await disconnectInstance(instance.id);
+    await refetchInstances();
   };
   const handleDeleteInstance = async (instanceId: string) => {
     if (confirm("Tem certeza que deseja excluir esta instância?")) {
@@ -536,6 +597,41 @@ export default function WhatsApp() {
                           <RefreshCw className={`w-4 h-4 ${checkingStatus === instance.id ? 'animate-spin' : ''}`} />
                           Status
                         </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenRename(instance)}
+                            className="gap-1.5"
+                            title="Renomear instância"
+                          >
+                            <Pencil className="w-4 h-4" />
+                            Renomear
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenSettings(instance, 'privacy')}
+                            className="gap-1.5"
+                            title="Configurações de privacidade"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Privacidade
+                          </Button>
+
+                          {(instance.status === 'connected' || instance.status === 'connecting') && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDisconnect(instance)}
+                              className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Desconectar (logout)"
+                            >
+                              <LogOut className="w-4 h-4" />
+                              Desconectar
+                            </Button>
+                          )}
                         {instance.status === 'connected' && (
                           <>
                             <Button 
@@ -565,7 +661,7 @@ export default function WhatsApp() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleOpenSettings(instance)}
+                          onClick={() => handleOpenSettings(instance, 'general')}
                           title="Configurações avançadas"
                         >
                           <Settings className="w-4 h-4" />
@@ -814,7 +910,36 @@ export default function WhatsApp() {
         open={settingsDialogOpen}
         onOpenChange={setSettingsDialogOpen}
         onSave={refetchInstances}
+        initialTab={settingsInitialTab}
       />
+
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Renomear instância</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-instance">Nome</Label>
+              <Input
+                id="rename-instance"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                maxLength={60}
+              />
+              <p className="text-xs text-muted-foreground">Esse nome será atualizado no sistema e na UAZAPI.</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveRename} disabled={renaming || !renameValue.trim()}>
+                {renaming ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

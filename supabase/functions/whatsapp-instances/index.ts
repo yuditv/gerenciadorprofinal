@@ -5,9 +5,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   // supabase-js adds extra headers (e.g. x-supabase-client-platform) that must be allowed for CORS preflight.
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 };
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function ok(payload: Record<string, unknown> = {}): Response {
+  return jsonResponse({ success: true, ...payload }, 200);
+}
+
+// Functional/domain errors should be 200 to avoid supabase-js throwing fatal exceptions.
+function fail(error: string, extra: Record<string, unknown> = {}): Response {
+  return jsonResponse({ success: false, error, ...extra }, 200);
+}
 
 /**
  * Format phone number for WhatsApp API - supports international numbers
@@ -61,10 +77,7 @@ serve(async (req: Request): Promise<Response> => {
     // Get auth header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Authorization required" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Authorization required" }, 401);
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -73,10 +86,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
     console.log("User ID:", user.id);
@@ -160,14 +170,7 @@ serve(async (req: Request): Promise<Response> => {
 
       console.log("Instance created in DB:", instance.id, "with UAZAPI key:", !!instanceKey);
       
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          instance,
-          uazapiInitialized: !!instanceKey 
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return ok({ instance, uazapiInitialized: !!instanceKey });
     }
 
     // QRCODE - POST /instance/connect + GET /instance/status
@@ -179,10 +182,7 @@ serve(async (req: Request): Promise<Response> => {
         .single();
 
       if (error || !instance) {
-        return new Response(
-          JSON.stringify({ error: "Instance not found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return fail("Instância não encontrada");
       }
 
       // If no instance_key, we need to init the instance first via UAZAPI
@@ -291,14 +291,9 @@ serve(async (req: Request): Promise<Response> => {
         }
       }
 
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Could not retrieve QR code. Check UAZAPI configuration.",
-          instance: updatedInstance 
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return fail("Não foi possível obter o QR Code. Verifique a configuração da UAZAPI.", {
+        instance: updatedInstance,
+      });
     }
 
     // PAIRCODE - Connect via pairing code
@@ -306,10 +301,7 @@ serve(async (req: Request): Promise<Response> => {
       const phoneNumber = body.phoneNumber as string;
       
       if (!phoneNumber) {
-        return new Response(
-          JSON.stringify({ error: "Número de telefone obrigatório" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return fail("Número de telefone obrigatório");
       }
 
       const { data: instance, error } = await supabase
@@ -319,17 +311,11 @@ serve(async (req: Request): Promise<Response> => {
         .single();
 
       if (error || !instance) {
-        return new Response(
-          JSON.stringify({ error: "Instance not found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return fail("Instância não encontrada");
       }
 
       if (!instance.instance_key) {
-        return new Response(
-          JSON.stringify({ error: "Instância não inicializada. Tente gerar o QR Code primeiro." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return fail("Instância não inicializada. Tente gerar o QR Code primeiro.");
       }
 
       try {
@@ -502,10 +488,169 @@ serve(async (req: Request): Promise<Response> => {
         );
       } catch (e) {
         console.error("UAZAPI paircode error:", e);
-        return new Response(
-          JSON.stringify({ error: "Erro ao comunicar com UAZAPI", details: String(e) }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Erro ao comunicar com UAZAPI", details: String(e) }, 500);
+      }
+    }
+
+    // UPDATE INSTANCE NAME - UAZAPI POST /instance/updateInstanceName
+    if (action === "update_instance_name") {
+      const instanceId = (body.instanceId as string) || "";
+      const nameRaw = (body.name as string) || "";
+      const name = nameRaw.trim();
+
+      if (!instanceId) return fail("instanceId é obrigatório");
+      if (!name) return fail("Nome é obrigatório");
+      if (name.length > 60) return fail("Nome deve ter no máximo 60 caracteres");
+
+      const { data: instance, error: instError } = await supabase
+        .from("whatsapp_instances")
+        .select("id, instance_key")
+        .eq("id", instanceId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (instError || !instance) return fail("Instância não encontrada");
+      if (!instance.instance_key) return fail("Instância sem chave de API configurada");
+
+      try {
+        const resp = await fetch(`${uazapiUrl}/instance/updateInstanceName`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "token": instance.instance_key,
+          },
+          body: JSON.stringify({ name }),
+        });
+
+        const respData = await resp.json().catch(() => null);
+        if (!resp.ok) {
+          return fail("Falha ao atualizar nome na UAZAPI", { details: respData });
+        }
+
+        const { error: updError } = await supabase
+          .from("whatsapp_instances")
+          .update({ instance_name: name })
+          .eq("id", instanceId)
+          .eq("user_id", user.id);
+
+        if (updError) {
+          return fail("Nome atualizado na UAZAPI, mas falhou ao salvar no banco", { details: updError.message });
+        }
+
+        return ok({ name });
+      } catch (e) {
+        console.error("UAZAPI updateInstanceName error:", e);
+        return jsonResponse({ error: `Erro ao comunicar com UAZAPI: ${String(e)}` }, 500);
+      }
+    }
+
+    // GET PRIVACY - UAZAPI GET /instance/privacy
+    if (action === "get_privacy") {
+      const instanceId = (body.instanceId as string) || "";
+      if (!instanceId) return fail("instanceId é obrigatório");
+
+      const { data: instance, error: instError } = await supabase
+        .from("whatsapp_instances")
+        .select("id, instance_key")
+        .eq("id", instanceId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (instError || !instance) return fail("Instância não encontrada");
+      if (!instance.instance_key) return fail("Instância sem chave de API configurada");
+
+      try {
+        const resp = await fetch(`${uazapiUrl}/instance/privacy`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "token": instance.instance_key,
+          },
+        });
+
+        const respData = await resp.json().catch(() => null);
+        if (!resp.ok) {
+          return fail("Falha ao buscar privacidade na UAZAPI", { details: respData });
+        }
+
+        // UAZAPI might return { privacy: {...} } or the object directly
+        const privacy = respData?.privacy ?? respData;
+        return ok({ privacy });
+      } catch (e) {
+        console.error("UAZAPI get privacy error:", e);
+        return jsonResponse({ error: `Erro ao comunicar com UAZAPI: ${String(e)}` }, 500);
+      }
+    }
+
+    // SET PRIVACY - UAZAPI POST /instance/privacy
+    if (action === "set_privacy") {
+      const instanceId = (body.instanceId as string) || "";
+      const patch = (body.privacy as Record<string, unknown>) || {};
+
+      if (!instanceId) return fail("instanceId é obrigatório");
+
+      const allowedKeys = new Set([
+        "groupadd",
+        "last",
+        "status",
+        "profile",
+        "readreceipts",
+        "online",
+        "calladd",
+      ]);
+
+      const allowedValues: Record<string, Set<string>> = {
+        groupadd: new Set(["all", "contacts", "contact_blacklist", "none"]),
+        last: new Set(["all", "contacts", "contact_blacklist", "none"]),
+        status: new Set(["all", "contacts", "contact_blacklist", "none"]),
+        profile: new Set(["all", "contacts", "contact_blacklist", "none"]),
+        readreceipts: new Set(["all", "none"]),
+        online: new Set(["all", "match_last_seen"]),
+        calladd: new Set(["all", "known"]),
+      };
+
+      const sanitized: Record<string, string> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (!allowedKeys.has(k)) continue;
+        if (typeof v !== "string") continue;
+        if (!allowedValues[k]?.has(v)) continue;
+        sanitized[k] = v;
+      }
+
+      if (Object.keys(sanitized).length === 0) {
+        return fail("Nenhuma configuração de privacidade válida para salvar");
+      }
+
+      const { data: instance, error: instError } = await supabase
+        .from("whatsapp_instances")
+        .select("id, instance_key")
+        .eq("id", instanceId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (instError || !instance) return fail("Instância não encontrada");
+      if (!instance.instance_key) return fail("Instância sem chave de API configurada");
+
+      try {
+        const resp = await fetch(`${uazapiUrl}/instance/privacy`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "token": instance.instance_key,
+          },
+          body: JSON.stringify(sanitized),
+        });
+
+        const respData = await resp.json().catch(() => null);
+        if (!resp.ok) {
+          return fail("Falha ao salvar privacidade na UAZAPI", { details: respData });
+        }
+
+        const privacy = respData?.privacy ?? respData;
+        return ok({ privacy });
+      } catch (e) {
+        console.error("UAZAPI set privacy error:", e);
+        return jsonResponse({ error: `Erro ao comunicar com UAZAPI: ${String(e)}` }, 500);
       }
     }
 
@@ -518,10 +663,7 @@ serve(async (req: Request): Promise<Response> => {
         .single();
 
       if (error || !instance) {
-        return new Response(
-          JSON.stringify({ error: "Instance not found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return fail("Instância não encontrada");
       }
 
       // Check UAZAPI status if we have instance_key
@@ -554,6 +696,11 @@ serve(async (req: Request): Promise<Response> => {
             const phoneConnected = statusData.instance?.owner || statusData.phone || null;
             const profileName = statusData.instance?.profileName || null;
             const profilePictureUrl = statusData.instance?.profilePicUrl || statusData.instance?.profilePictureUrl || null;
+            const qrCode = statusData.instance?.qrcode || null;
+            const paircode = statusData.instance?.paircode || statusData.paircode || null;
+            const platform = statusData.instance?.platform || statusData.instance?.systemName || null;
+            const lastDisconnect = statusData.instance?.lastDisconnect || statusData.lastDisconnect || null;
+            const lastDisconnectReason = statusData.instance?.lastDisconnectReason || statusData.lastDisconnectReason || null;
             
             console.log("Mapped status:", newStatus, "Phone:", phoneConnected, "Profile:", profileName, "Picture:", profilePictureUrl);
             
@@ -566,7 +713,8 @@ serve(async (req: Request): Promise<Response> => {
                   phone_connected: phoneConnected,
                   profile_picture_url: profilePictureUrl,
                   profile_name: profileName,
-                  last_connected_at: newStatus === "connected" ? new Date().toISOString() : instance.last_connected_at
+                  last_connected_at: newStatus === "connected" ? new Date().toISOString() : instance.last_connected_at,
+                  qr_code: qrCode ?? instance.qr_code,
                 })
                 .eq("id", entityId);
             }
@@ -600,26 +748,29 @@ serve(async (req: Request): Promise<Response> => {
               }
             }
 
-            return new Response(
-              JSON.stringify({ 
-                success: true, 
-                status: newStatus, 
-                phone: phoneConnected,
-                profileName: profileName,
-                profilePictureUrl: profilePictureUrl
-              }),
-              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
+            return ok({
+              status: newStatus,
+              phone: phoneConnected,
+              profileName,
+              profilePictureUrl,
+              details: {
+                qrCode,
+                paircode,
+                owner: phoneConnected,
+                platform,
+                lastDisconnect,
+                lastDisconnectReason,
+                connected: statusData.status?.connected ?? null,
+                loggedIn: statusData.status?.loggedIn ?? null,
+              },
+            });
           }
         } catch (e) {
           console.error("UAZAPI status error:", e);
         }
       }
 
-      return new Response(
-        JSON.stringify({ success: true, status: instance.status, instance }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return ok({ status: instance.status, instance });
     }
 
     // DISCONNECT
@@ -648,16 +799,10 @@ serve(async (req: Request): Promise<Response> => {
         .eq("id", entityId);
 
       if (error) {
-        return new Response(
-          JSON.stringify({ error: error.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: error.message }, 500);
       }
 
-      return new Response(
-        JSON.stringify({ success: true }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return ok();
     }
 
     // CONFIGURE-WEBHOOK - Manually configure webhook for an instance
