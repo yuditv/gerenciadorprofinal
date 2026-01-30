@@ -106,40 +106,63 @@ serve(async (req) => {
       );
     }
 
+    // Capture values so TS can safely narrow and closures don't lose the refinement.
+    const instanceKey = instance.instance_key;
+    const instanceName = instance.instance_name;
+
     // Prepare UAZAPI request
-    // Keep endpoint consistent with the rest of the codebase (e.g. whatsapp-inbox-webhook).
-    const presenceUrl = `${uazapiUrl}/send/presence`;
+    // UAZAPI has had multiple presence endpoints across versions.
+    // We'll try the preferred one first and fall back if the API returns 405.
+    const preferredPresenceUrl = `${uazapiUrl}/send/presence`;
+    const fallbackPresenceUrl = `${uazapiUrl}/message/presence`;
 
     // Format phone number with international support
     const formattedPhone = formatPhoneNumber(conversation.phone);
 
-    console.log(`[Presence] Sending ${presence} to ${formattedPhone} via ${instance.instance_name}`);
+    console.log(`[Presence] Sending ${presence} to ${formattedPhone} via ${instanceName}`);
 
-    // Send presence update to UAZAPI
-    const uazapiResponse = await fetch(presenceUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'token': instance.instance_key,
-      },
-      body: JSON.stringify({
-        number: formattedPhone,
-        presence: presence,
-        delay: delay
-      }),
-    });
+    const requestBody = {
+      number: formattedPhone,
+      presence: presence,
+      delay: delay,
+    };
 
-    const responseText = await uazapiResponse.text();
+    async function postPresence(url: string) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': instanceKey,
+        },
+        body: JSON.stringify(requestBody),
+      });
+      const text = await res.text();
+      return { res, text };
+    }
+
+    // Send presence update to UAZAPI (with fallback)
+    let { res: uazapiResponse, text: responseText } = await postPresence(preferredPresenceUrl);
+
+    // Some UAZAPI deployments return 405 for the newer endpoint.
+    if (uazapiResponse.status === 405) {
+      console.warn('[Presence] Preferred endpoint returned 405, retrying fallback endpoint');
+      ({ res: uazapiResponse, text: responseText } = await postPresence(fallbackPresenceUrl));
+    }
+
     console.log(`[Presence] Response (${uazapiResponse.status}):`, responseText);
 
+    // IMPORTANT: For functional errors, return 200 with success:false so the browser client
+    // doesn't throw a fatal exception (prevents blank screen).
     if (!uazapiResponse.ok) {
       console.error('[Presence] UAZAPI error:', responseText);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
+          success: false,
           error: 'Failed to send presence update',
-          details: responseText 
+          status: uazapiResponse.status,
+          details: responseText,
         }),
-        { status: uazapiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -151,11 +174,11 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         presence,
         phone: formattedPhone,
-        result 
+        result,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
