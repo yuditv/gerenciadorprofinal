@@ -211,6 +211,40 @@ export function useWhatsAppInstances() {
     }
   };
 
+  const updateProfileName = async (instanceId: string, profileName: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'update_profile_name', instanceId, profileName },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao atualizar nome do perfil');
+      toast.success('Nome do perfil atualizado!');
+      await fetchInstances();
+      return true;
+    } catch (error: any) {
+      console.error('Update profile name error:', error);
+      toast.error(error.message || 'Erro ao atualizar nome do perfil');
+      return false;
+    }
+  };
+
+  const updateProfileImage = async (instanceId: string, image: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'update_profile_image', instanceId, image },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao atualizar foto do perfil');
+      toast.success(image === 'remove' || image === 'delete' ? 'Foto do perfil removida!' : 'Foto do perfil atualizada!');
+      await fetchInstances();
+      return true;
+    } catch (error: any) {
+      console.error('Update profile image error:', error);
+      toast.error(error.message || 'Erro ao atualizar foto do perfil');
+      return false;
+    }
+  };
+
   const disconnectInstance = async (instanceId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
@@ -394,6 +428,8 @@ export function useWhatsAppInstances() {
     configureWebhook,
     testWebhook,
     setInstancePresence,
+    updateProfileName,
+    updateProfileImage,
     refetch: fetchInstances,
     refreshAllStatus,
   };
