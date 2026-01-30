@@ -155,14 +155,14 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
-        <div className="flex items-center h-16 px-6 gap-4">
+        <div className="flex items-center h-14 sm:h-16 px-3 sm:px-6 gap-3 sm:gap-4">
           {/* Logo */}
-          <div className="flex items-center gap-3 pr-6 border-r border-border/50 shrink-0">
+          <div className="flex items-center gap-3 pr-3 sm:pr-6 border-border/50 shrink-0 border-r-0 sm:border-r">
             <div className="relative">
               <img
                 src="/pwa-192x192.png"
                 alt="ATLAS 2.0"
-                className="h-10 w-10 rounded-lg object-contain"
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg object-contain"
               />
               <motion.div 
                 className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary"
@@ -178,7 +178,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
             ref={menuScrollRef}
             {...menuDragHandlers}
             className={cn(
-              "flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide",
+              "flex items-center gap-1.5 sm:gap-2 flex-1 overflow-x-auto scrollbar-hide",
               "select-none",
               isMenuDragging ? "cursor-grabbing" : "cursor-grab",
             )}
@@ -193,7 +193,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                     <motion.button
                       onClick={() => handleClick(item)}
                       className={cn(
-                        "relative flex items-center gap-2.5 px-4 py-2.5 rounded-xl shrink-0",
+                        "relative flex items-center gap-2.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl shrink-0",
                         "transition-all duration-200 ease-out",
                         "hover:bg-muted/50",
                         isActive && "bg-primary text-primary-foreground shadow-lg"
@@ -237,12 +237,12 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
           </nav>
 
           {/* User Menu */}
-          <div className="pl-6 border-l border-border/50 shrink-0">
+          <div className="pl-2 sm:pl-6 border-border/50 shrink-0 border-l-0 sm:border-l">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <motion.button
                   className={cn(
-                    "flex items-center gap-3 p-2 rounded-xl",
+                    "flex items-center gap-3 p-1.5 sm:p-2 rounded-xl",
                     "transition-all duration-200 ease-out",
                     "hover:bg-muted/50"
                   )}
