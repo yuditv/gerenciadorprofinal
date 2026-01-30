@@ -2075,6 +2075,123 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // MARK READ - Mark incoming WhatsApp messages as read via UAZAPI
+    if (action === "mark_read") {
+      const conversationId = body.conversationId as string;
+      const explicitIds = (body.messageIds as string[] | undefined) ?? undefined;
+
+      if (!conversationId) {
+        return new Response(
+          JSON.stringify({ success: false, error: "conversationId obrigatório" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`[Mark Read] conversationId: ${conversationId}`);
+
+      // Get conversation to find instance
+      const { data: conversation, error: convError } = await supabase
+        .from("conversations")
+        .select("id, instance_id")
+        .eq("id", conversationId)
+        .single();
+
+      if (convError || !conversation?.instance_id) {
+        console.error('[Mark Read] Conversation not found:', convError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Conversa não encontrada" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Get instance key
+      const { data: instance, error: instanceError } = await supabase
+        .from("whatsapp_instances")
+        .select("instance_key")
+        .eq("id", conversation.instance_id)
+        .single();
+
+      if (instanceError || !instance?.instance_key) {
+        console.error('[Mark Read] Instance not connected:', instanceError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Instância não conectada" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Resolve IDs to mark
+      let ids: string[] = [];
+      if (explicitIds?.length) {
+        ids = explicitIds;
+      } else {
+        const { data: unreadMsgs, error: msgError } = await supabase
+          .from('chat_inbox_messages')
+          .select('id, metadata')
+          .eq('conversation_id', conversationId)
+          .eq('sender_type', 'contact')
+          .eq('is_read', false)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (msgError) {
+          console.error('[Mark Read] Error fetching unread messages:', msgError);
+        }
+
+        // Extract whatsapp_id from metadata
+        ids = (unreadMsgs || [])
+          .map((m: any) => m?.metadata?.whatsapp_id || m?.metadata?.whatsapp_message_id)
+          .filter(Boolean)
+          .map((v: any) => String(v))
+          // UAZAPI may include composite "instance:id" format
+          .map((v: string) => (v.includes(':') ? v.split(':').pop() || v : v));
+      }
+
+      // Deduplicate and cap
+      ids = Array.from(new Set(ids)).slice(0, 250);
+
+      if (!ids.length) {
+        console.log('[Mark Read] No message IDs to mark as read');
+        return new Response(
+          JSON.stringify({ success: true, marked: 0 }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        console.log(`[Mark Read] Calling UAZAPI /message/markread for ${ids.length} messages`);
+        const markResp = await fetch(`${uazapiUrl}/message/markread`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'token': instance.instance_key,
+          },
+          body: JSON.stringify({ id: ids }),
+        });
+
+        const text = await markResp.text();
+        console.log(`[Mark Read] UAZAPI status: ${markResp.status}`);
+        console.log(`[Mark Read] UAZAPI response: ${text}`);
+
+        if (!markResp.ok) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Erro ao marcar como lida', details: text }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, marked: ids.length }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (e) {
+        console.error('[Mark Read] Error:', e);
+        return new Response(
+          JSON.stringify({ success: false, error: String(e) }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // SEND MEDIA CAROUSEL - Rich carousel with images and structured buttons
     if (action === "send_carousel") {
       const phone = body.phone as string;

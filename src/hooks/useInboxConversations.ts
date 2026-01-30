@@ -364,6 +364,19 @@ export function useInboxConversations() {
       .update({ is_read: true })
       .eq('conversation_id', conversationId)
       .eq('is_read', false);
+
+    // Mark as read on WhatsApp (best-effort)
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'mark_read', conversationId }
+      });
+      if (error) throw error;
+      if (data?.success === false) {
+        console.warn('[Inbox] mark_read failed:', data?.error, data?.details);
+      }
+    } catch (e) {
+      console.warn('[Inbox] mark_read invoke error:', e);
+    }
   };
 
   const saveContactToWhatsApp = async (conversationId: string, customName?: string): Promise<boolean> => {
