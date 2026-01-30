@@ -699,6 +699,54 @@ async function transcribeAudioViaEdge(
   }
 }
 
+async function describeImageViaGateway(imageUrl: string): Promise<string | null> {
+  try {
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.error('[Image Describe] LOVABLE_API_KEY is not configured');
+      return null;
+    }
+    if (!imageUrl) return null;
+
+    const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-image',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Você descreve imagens de forma objetiva e curta em pt-BR. Se houver texto, faça OCR e transcreva. Se for comprovante/pagamento, extraia valor, data, nome e status se aparecer.',
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Descreva a imagem e transcreva qualquer texto que houver.' },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!resp.ok) {
+      const t = await resp.text();
+      console.error('[Image Describe] Gateway failed:', resp.status, t);
+      return null;
+    }
+    const data = await resp.json();
+    const text = (data?.choices?.[0]?.message?.content ?? '').toString().trim();
+    return text || null;
+  } catch (e) {
+    console.error('[Image Describe] Error:', e);
+    return null;
+  }
+}
+
 // Map simple media type to proper MIME type
 function mapMediaTypeToMime(mediaType: string | undefined, mimetype: string | undefined): string | undefined {
   if (mimetype) return mimetype;
@@ -2141,6 +2189,19 @@ serve(async (req: Request) => {
             // ============ MESSAGE BUFFER SYSTEM ============
             const bufferWaitSeconds = agent.buffer_wait_seconds || 5;
             const scheduledAt = new Date(Date.now() + bufferWaitSeconds * 1000).toISOString();
+
+            // Build the effective text for AI (audio transcription + image description/OCR)
+            const isIncomingImage = !fromMe && (mediaType === 'image' || (finalMediaType?.startsWith('image/') ?? false));
+            let imageDesc: string | null = null;
+            if (isIncomingImage && mediaUrl) {
+              imageDesc = await describeImageViaGateway(mediaUrl);
+            }
+
+            const effectiveTextForAI = transcriptText?.trim()
+              ? `(ÁUDIO) ${transcriptText.trim()}`
+              : (imageDesc?.trim()
+                  ? `${message || caption || ''}\n\n(IMAGEM) ${imageDesc.trim()}`.trim()
+                  : (message || caption || ''));
             
             // Check for existing active buffer
             const { data: existingBuffer } = await supabase
@@ -2153,9 +2214,6 @@ serve(async (req: Request) => {
             if (existingBuffer) {
               // Add message to existing buffer and reschedule
               const currentMessages = existingBuffer.messages as Array<{ content: string; timestamp: string }>;
-                const effectiveTextForAI = transcriptText?.trim()
-                  ? `(ÁUDIO) ${transcriptText.trim()}`
-                  : (message || caption || '');
               const updatedMessages = [...currentMessages, {
                   content: effectiveTextForAI,
                 timestamp: new Date().toISOString()
@@ -2177,9 +2235,6 @@ serve(async (req: Request) => {
               console.log(`[Inbox Webhook] Added to buffer (${updatedMessages.length}/${maxMessages} msgs), ${shouldForceProcess ? 'forcing process' : `will respond in ${bufferWaitSeconds}s`}`);
             } else {
               // Create new buffer
-                const effectiveTextForAI = transcriptText?.trim()
-                  ? `(ÁUDIO) ${transcriptText.trim()}`
-                  : (message || caption || '');
               await supabase
                 .from('ai_message_buffer')
                 .insert({
@@ -2222,6 +2277,18 @@ serve(async (req: Request) => {
             // ============ IMMEDIATE RESPONSE (OLD BEHAVIOR) ============
             const sessionId = conversation.id;
             let assistantResponse = '';
+
+            const isIncomingImage = !fromMe && (mediaType === 'image' || (finalMediaType?.startsWith('image/') ?? false));
+            let imageDesc: string | null = null;
+            if (isIncomingImage && mediaUrl) {
+              imageDesc = await describeImageViaGateway(mediaUrl);
+            }
+
+            const effectiveTextForAI = transcriptText?.trim()
+              ? `(ÁUDIO) ${transcriptText.trim()}`
+              : (imageDesc?.trim()
+                  ? `${message || caption || ''}\n\n(IMAGEM) ${imageDesc.trim()}`.trim()
+                  : (message || caption || ''));
             
             try {
               if (agent.use_native_ai) {
@@ -2240,7 +2307,7 @@ serve(async (req: Request) => {
                     },
                     body: JSON.stringify({
                       agentId: agent.id,
-                      message: transcriptText?.trim() ? `(ÁUDIO) ${transcriptText.trim()}` : message,
+                      message: effectiveTextForAI,
                       sessionId: sessionId,
                       source: 'whatsapp-inbox',
                       phone: normalizedPhone,

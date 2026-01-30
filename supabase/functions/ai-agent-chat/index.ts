@@ -71,7 +71,154 @@ interface ChatRequest {
 
 interface AIMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  // Lovable AI Gateway is OpenAI-compatible and can accept multimodal content.
+  // For normal chat we still send a plain string.
+  content: any;
+}
+
+type MediaPayload =
+  | {
+      kind: 'audio';
+      dataUrl?: string; // data:audio/...;base64,...
+      mediaUrl?: string; // http(s)
+      mimeType?: string;
+      name?: string;
+    }
+  | {
+      kind: 'image';
+      dataUrl?: string; // data:image/...;base64,...
+      mediaUrl?: string; // http(s)
+      mimeType?: string;
+      name?: string;
+    };
+
+function safeString(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
+function isHttpUrl(url: string) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function parseDataUrl(dataUrl: string): { mime: string; buffer: ArrayBuffer } | null {
+  try {
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    const mime = match[1];
+    const b64 = match[2];
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // Ensure we return a real ArrayBuffer (not ArrayBufferLike) for Deno type safety.
+    const buffer = bytes.buffer.slice(0);
+    return { mime, buffer };
+  } catch {
+    return null;
+  }
+}
+
+async function transcribeAudioFromDataUrl(dataUrl: string, language: 'pt' | 'pt-BR' = 'pt'): Promise<string | null> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) throw new Error('OPENAI_API_KEY is not configured');
+
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) return null;
+
+  const file = new File([parsed.buffer], `audio`, { type: parsed.mime || 'application/octet-stream' });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('model', 'whisper-1');
+  form.append('language', language === 'pt-BR' ? 'pt' : language);
+
+  const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${openaiKey}` },
+    body: form,
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text();
+    console.error('[ai-agent-chat] Whisper transcription failed:', resp.status, t);
+    return null;
+  }
+
+  const data = await resp.json();
+  const text = (data?.text ?? '').toString().trim();
+  return text || null;
+}
+
+async function describeImageWithGateway(LOVABLE_API_KEY: string, imageUrlOrDataUrl: string): Promise<string | null> {
+  const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      // Image-specialized model for better OCR/vision
+      model: 'google/gemini-2.5-flash-image',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Você é um assistente que descreve imagens de forma objetiva e curta. Se houver texto na imagem, extraia (OCR) e transcreva. Responda em pt-BR.',
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Descreva a imagem e transcreva qualquer texto que aparecer.' },
+            { type: 'image_url', image_url: { url: imageUrlOrDataUrl } },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text();
+    console.error('[ai-agent-chat] Image description failed:', resp.status, t);
+    return null;
+  }
+
+  const data: AIResponse = await resp.json();
+  const text = (data?.choices?.[0]?.message?.content ?? '').toString().trim();
+  return text || null;
+}
+
+function getMediaFromMetadata(metadata: Record<string, unknown>): MediaPayload | null {
+  const media = metadata?.media as any;
+  if (media && typeof media === 'object') {
+    const kind = media.kind;
+    if (kind === 'audio' || kind === 'image') {
+      return {
+        kind,
+        dataUrl: safeString(media.dataUrl) || undefined,
+        mediaUrl: safeString(media.mediaUrl) || undefined,
+        mimeType: safeString(media.mimeType) || undefined,
+        name: safeString(media.name) || undefined,
+      } as MediaPayload;
+    }
+  }
+
+  // Backwards-compat/alternate keys
+  const audioDataUrl = safeString((metadata as any).audio_data_url);
+  if (audioDataUrl) return { kind: 'audio', dataUrl: audioDataUrl };
+  const imageDataUrl = safeString((metadata as any).image_data_url);
+  if (imageDataUrl) return { kind: 'image', dataUrl: imageDataUrl };
+
+  const mediaUrl = safeString((metadata as any).media_url);
+  const mediaType = safeString((metadata as any).media_type);
+  if (mediaUrl && isHttpUrl(mediaUrl)) {
+    if (mediaType.startsWith('audio') || mediaType === 'audio' || mediaType === 'ptt') return { kind: 'audio', mediaUrl };
+    if (mediaType.startsWith('image') || mediaType === 'image') return { kind: 'image', mediaUrl };
+  }
+
+  return null;
 }
 
 interface AIResponse {
@@ -763,8 +910,66 @@ INSTRUÇÕES IMPORTANTES:
             }
           }
 
-          // Add current user message
-          messages.push({ role: 'user', content: message });
+           // If a media payload is present, extract text (audio→transcription, image→description/OCR)
+           // and append to the user message. This keeps “prompt-only” behavior intact because we
+           // are only enriching the user message with what was actually sent.
+           let finalUserMessage = message;
+           const mediaPayload = getMediaFromMetadata(metadata);
+           if (mediaPayload) {
+             try {
+               if (mediaPayload.kind === 'audio') {
+                 console.log(`[${VERSION}] Media detected: audio`);
+
+                 // Prefer dataUrl (from chat test) to avoid any storage.
+                 let transcript: string | null = null;
+                 if (mediaPayload.dataUrl) {
+                   transcript = await transcribeAudioFromDataUrl(mediaPayload.dataUrl, 'pt-BR');
+                 } else if (mediaPayload.mediaUrl && isHttpUrl(mediaPayload.mediaUrl)) {
+                   // Reuse existing transcribe-audio edge function for URL-based audio.
+                   const tResp = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+                     method: 'POST',
+                     headers: {
+                       'Content-Type': 'application/json',
+                       Authorization: `Bearer ${supabaseServiceKey}`,
+                     },
+                     body: JSON.stringify({
+                       mediaUrl: mediaPayload.mediaUrl,
+                       mimeType: mediaPayload.mimeType,
+                       language: 'pt-BR',
+                       source: source === 'web' ? 'inbox' : 'whatsapp',
+                     }),
+                   });
+                   if (tResp.ok) {
+                     const tData = await tResp.json();
+                     transcript = (tData?.text ?? '').toString().trim() || null;
+                   } else {
+                     const t = await tResp.text();
+                     console.error('[ai-agent-chat] transcribe-audio failed:', tResp.status, t);
+                   }
+                 }
+
+                 if (transcript) {
+                   finalUserMessage = `${message}\n\n(ÁUDIO) ${transcript}`;
+                 }
+               }
+
+               if (mediaPayload.kind === 'image') {
+                 console.log(`[${VERSION}] Media detected: image`);
+                 const imgRef = mediaPayload.dataUrl || mediaPayload.mediaUrl;
+                 if (imgRef && LOVABLE_API_KEY) {
+                   const desc = await describeImageWithGateway(LOVABLE_API_KEY, imgRef);
+                   if (desc) {
+                     finalUserMessage = `${message}\n\n(IMAGEM) ${desc}`;
+                   }
+                 }
+               }
+             } catch (e) {
+               console.error('[ai-agent-chat] Media extraction error (ignored):', e);
+             }
+           }
+
+           // Add current user message
+           messages.push({ role: 'user', content: finalUserMessage });
 
           // Build OpenAI-compatible tools array (Lovable AI Gateway)
           // Disabled entirely for prompt-only sources.
