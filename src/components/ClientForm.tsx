@@ -338,7 +338,7 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
                     </Label>
                     <Input
                       id="servicePassword"
-                      type="password"
+                      type="text"
                       value={servicePassword}
                       onChange={(e) => setServicePassword(e.target.value)}
                       placeholder="Digite a senha"
