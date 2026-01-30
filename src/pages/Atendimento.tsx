@@ -28,10 +28,12 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
+import { useAccountContext } from "@/hooks/useAccountContext";
 
 export default function Atendimento() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { permissions: accountPerms } = useAccountContext();
   
   const [activeTab, setActiveTab] = useState<'conversations' | 'dashboard'>('conversations');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -456,15 +458,17 @@ export default function Atendimento() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate('/inbox-settings')} 
-            disabled={subscriptionExpired}
-            title="Configurações do Inbox"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          {accountPerms.canManageLabelsMacros && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/inbox-settings')} 
+              disabled={subscriptionExpired}
+              title="Configurações do Inbox"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
 
           <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={subscriptionExpired}>
             <RefreshCw className="h-4 w-4" />

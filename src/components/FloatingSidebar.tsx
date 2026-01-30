@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import logoFuturistic from "@/assets/logo-red-futuristic.png";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useAccountContext } from "@/hooks/useAccountContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useDragScroll } from "@/hooks/useDragScroll";
@@ -112,6 +113,7 @@ interface FloatingSidebarProps {
 export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSidebarProps) {
   const navigate = useNavigate();
   const { permissions, isAdmin } = useUserPermissions();
+  const { isMember } = useAccountContext();
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { ref: menuScrollRef, isDragging: isMenuDragging, handlers: menuDragHandlers } = useDragScroll<HTMLDivElement>();
@@ -131,7 +133,10 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
     toast.success('Logout realizado com sucesso!');
   };
 
-  const visibleMenuItems = menuItems.filter(item => {
+  const visibleMenuItems = menuItems.filter((item) => {
+    // Attendants: Inbox only
+    if (isMember) return item.id === "atendimento";
+
     if (item.adminOnly) return isAdmin;
     if (item.permissionKey) return permissions[item.permissionKey];
     return true;
@@ -271,44 +276,48 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                     <span className="text-xs text-muted-foreground truncate block">{user?.email}</span>
                   </div>
                 </div>
-                <DropdownMenuItem onClick={() => navigate('/profile')} className="hover:bg-primary/10 mt-1">
-                  <User className="h-4 w-4 mr-2 text-primary" />
-                  Meu Perfil
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/payment-history')} className="hover:bg-primary/10">
-                  <CreditCard className="h-4 w-4 mr-2 text-primary" />
-                  Histórico de Pagamentos
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate('/carteira')} className="hover:bg-primary/10">
-                    <Wallet className="h-4 w-4 mr-2 text-primary" />
-                    Carteira
-                  </DropdownMenuItem>
+                {!isMember && (
+                  <>
+                    <DropdownMenuItem onClick={() => navigate('/profile')} className="hover:bg-primary/10 mt-1">
+                      <User className="h-4 w-4 mr-2 text-primary" />
+                      Meu Perfil
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/payment-history')} className="hover:bg-primary/10">
+                      <CreditCard className="h-4 w-4 mr-2 text-primary" />
+                      Histórico de Pagamentos
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate('/carteira')} className="hover:bg-primary/10">
+                        <Wallet className="h-4 w-4 mr-2 text-primary" />
+                        Carteira
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => navigate('/my-dashboard')} className="hover:bg-primary/10">
+                      <BarChart3 className="h-4 w-4 mr-2 text-primary" />
+                      Meu Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/dashboard')} className="hover:bg-primary/10">
+                      <BarChart3 className="h-4 w-4 mr-2 text-accent" />
+                      Dashboard Geral
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-border/50" />
+                    <DropdownMenuItem onClick={() => navigate('/install')} className="hover:bg-primary/10">
+                      <Smartphone className="h-4 w-4 mr-2 text-primary" />
+                      Instalar App
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/settings')} className="hover:bg-primary/10">
+                      <Settings className="h-4 w-4 mr-2 text-primary" />
+                      Configurações
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem onClick={() => navigate('/inbox-settings?section=teams')} className="hover:bg-primary/10">
+                        <Users className="h-4 w-4 mr-2 text-primary" />
+                        Team Management
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator className="bg-border/50" />
+                  </>
                 )}
-                <DropdownMenuItem onClick={() => navigate('/my-dashboard')} className="hover:bg-primary/10">
-                  <BarChart3 className="h-4 w-4 mr-2 text-primary" />
-                  Meu Dashboard
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/dashboard')} className="hover:bg-primary/10">
-                  <BarChart3 className="h-4 w-4 mr-2 text-accent" />
-                  Dashboard Geral
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-border/50" />
-                <DropdownMenuItem onClick={() => navigate('/install')} className="hover:bg-primary/10">
-                  <Smartphone className="h-4 w-4 mr-2 text-primary" />
-                  Instalar App
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/settings')} className="hover:bg-primary/10">
-                  <Settings className="h-4 w-4 mr-2 text-primary" />
-                  Configurações
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem onClick={() => navigate('/inbox-settings?section=teams')} className="hover:bg-primary/10">
-                    <Users className="h-4 w-4 mr-2 text-primary" />
-                    Team Management
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator className="bg-border/50" />
                 <DropdownMenuItem onClick={handleSignOut} className="hover:bg-destructive/10 text-destructive">
                   <LogOut className="h-4 w-4 mr-2" />
                   Sair

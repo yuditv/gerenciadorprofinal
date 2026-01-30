@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Settings, Users, Tag, Zap, Play, ScrollText, Clock, Ban, MessageSquareText, PhoneOff, Bot } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useAccountContext } from "@/hooks/useAccountContext";
 
 // Settings components
 import { LabelsSettings } from "@/components/Inbox/Settings/LabelsSettings";
 import { TeamsSettings } from "@/components/Inbox/Settings/TeamsSettings";
+import { AttendantsSettings } from "@/components/Inbox/Settings/AttendantsSettings";
 import { MacrosSettings } from "@/components/Inbox/Settings/MacrosSettings";
 import { AutomationSettings } from "@/components/Inbox/Settings/AutomationSettings";
 import { AuditLogsSettings } from "@/components/Inbox/Settings/AuditLogsSettings";
@@ -21,6 +23,7 @@ import { BotProxySettings } from "@/components/Inbox/Settings/BotProxySettings";
 type SettingsSection = 
   | "labels"
   | "teams"
+  | "attendants"
   | "macros"
   | "automation"
   | "business-hours"
@@ -48,6 +51,12 @@ const menuItems: MenuItem[] = [
     id: "teams",
     title: "Equipes",
     description: "Agrupar agentes em times",
+    icon: Users,
+  },
+  {
+    id: "attendants",
+    title: "Atendentes",
+    description: "Criar acessos restritos",
     icon: Users,
   },
   {
@@ -104,6 +113,20 @@ export default function InboxSettings() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SettingsSection>("labels");
+  const { isMember, isLoading: accountLoading } = useAccountContext();
+
+  const effectiveMenu = useMemo(() => {
+    // Attendants should not access the settings area
+    if (isMember) return [] as MenuItem[];
+    // If owner disabled label/macro management for attendants, still owner sees everything.
+    return menuItems;
+  }, [isMember]);
+
+  useEffect(() => {
+    if (!accountLoading && isMember) {
+      navigate("/atendimento", { replace: true });
+    }
+  }, [accountLoading, isMember, navigate]);
 
   useEffect(() => {
     const section = searchParams.get('section') as SettingsSection | null;
@@ -112,6 +135,7 @@ export default function InboxSettings() {
     const allowed: SettingsSection[] = [
       'labels',
       'teams',
+      'attendants',
       'macros',
       'automation',
       'business-hours',
@@ -131,6 +155,8 @@ export default function InboxSettings() {
         return <LabelsSettings />;
       case "teams":
         return <TeamsSettings />;
+      case "attendants":
+        return <AttendantsSettings />;
       case "macros":
         return <MacrosSettings />;
       case "automation":
@@ -173,7 +199,7 @@ export default function InboxSettings() {
         <aside className="w-64 border-r shrink-0">
           <ScrollArea className="h-full">
             <nav className="p-3 space-y-1">
-              {menuItems.map((item) => {
+              {effectiveMenu.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeSection === item.id;
                 
