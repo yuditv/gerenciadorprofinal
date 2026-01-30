@@ -12,7 +12,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Conversation, InboxLabel } from "@/hooks/useInboxConversations";
 import { ChatMessage } from "@/hooks/useInboxMessages";
@@ -533,6 +542,7 @@ export function ChatPanel({
       </div>;
   }
   const assignedLabels = conversation.labels?.map(l => l.label) || [];
+  const nonNullAssignedLabels = assignedLabels.filter(Boolean) as InboxLabel[];
   const availableLabels = labels.filter(l => !assignedLabels.some(al => al?.id === l.id));
   return <div className="flex-1 flex h-full inbox-container overflow-hidden">
       {/* Main Chat Area */}
@@ -769,15 +779,20 @@ export function ChatPanel({
               <DropdownMenuSeparator />
               {/* Labels submenu */}
               {availableLabels.length > 0 && <>
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                    Adicionar etiqueta
-                  </div>
-                  {availableLabels.map(label => <DropdownMenuItem key={label.id} onClick={() => onAssignLabel(label.id)}>
-                      <div className="h-3 w-3 rounded-full mr-2" style={{
-                    backgroundColor: label.color
-                  }} />
-                      {label.name}
-                    </DropdownMenuItem>)}
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="gap-2">
+                      <Tag className="h-4 w-4" />
+                      Adicionar etiqueta
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-64 max-h-72 overflow-y-auto bg-popover border border-border">
+                      {availableLabels.map(label => <DropdownMenuItem key={label.id} onClick={() => onAssignLabel(label.id)}>
+                          <div className="h-3 w-3 rounded-full mr-2" style={{
+                        backgroundColor: label.color
+                      }} />
+                          <span className="truncate">{label.name}</span>
+                        </DropdownMenuItem>)}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
                   <DropdownMenuSeparator />
                 </>}
               {/* Block/Unblock contact */}
@@ -805,17 +820,39 @@ export function ChatPanel({
       </div>
 
       {/* Labels bar */}
-      {assignedLabels.length > 0 && <div className="px-3 py-2 border-b border-border/50 bg-card/10 backdrop-blur-md flex items-center gap-2 flex-wrap">
-          <Tag className="h-3 w-3 text-muted-foreground" />
-          {assignedLabels.map(label => label && <Badge key={label.id} variant="secondary" className="text-xs cursor-pointer hover:opacity-80" style={{
+      {nonNullAssignedLabels.length > 0 && (() => {
+      const MAX_INLINE = 3;
+      const inlineLabels = nonNullAssignedLabels.slice(0, MAX_INLINE);
+      const overflowLabels = nonNullAssignedLabels.slice(MAX_INLINE);
+      return <div className="px-3 py-2 border-b border-border/50 bg-card/10 backdrop-blur-md flex items-center gap-2 flex-wrap">
+            <Tag className="h-3 w-3 text-muted-foreground" />
+            {inlineLabels.map(label => <Badge key={label.id} variant="secondary" className="text-xs cursor-pointer hover:opacity-80" style={{
           backgroundColor: `${label.color}20`,
           borderColor: label.color,
           color: label.color
         }} onClick={() => onRemoveLabel(label.id)}>
-              {label.name}
-              <span className="ml-1">×</span>
-            </Badge>)}
-        </div>}
+                {label.name}
+                <span className="ml-1">×</span>
+              </Badge>)}
+
+            {overflowLabels.length > 0 && <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" size="sm" className="h-6 px-2 text-xs">
+                    +{overflowLabels.length}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64 bg-popover border border-border">
+                  {overflowLabels.map(label => <DropdownMenuItem key={label.id} onClick={() => onRemoveLabel(label.id)} className="gap-2">
+                      <div className="h-3 w-3 rounded-full" style={{
+                  backgroundColor: label.color
+                }} />
+                      <span className="flex-1 truncate">{label.name}</span>
+                      <span className="text-muted-foreground">×</span>
+                    </DropdownMenuItem>)}
+                </DropdownMenuContent>
+              </DropdownMenu>}
+          </div>;
+    })()}
 
       {/* Messages */}
       <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-0 inbox-scroll">
