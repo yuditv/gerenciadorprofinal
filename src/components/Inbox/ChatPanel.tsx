@@ -52,6 +52,7 @@ import { IPTVTestChoiceDialog } from "./IPTVTestChoiceDialog";
 import { GextvTestGeneratorDialog } from "./GextvTestGeneratorDialog";
 import { VPNTestGeneratorDialog } from "./VPNTestGeneratorDialog";
 import { GeneratePIXDialog } from "./GeneratePIXDialog";
+import { ScheduleMessageDialog } from "./ScheduleMessageDialog";
 interface ChatPanelProps {
   conversation: Conversation | null;
   messages: ChatMessage[];
@@ -141,6 +142,7 @@ export function ChatPanel({
   const [showIPTVGextv, setShowIPTVGextv] = useState(false);
   const [showVPNTestGenerator, setShowVPNTestGenerator] = useState(false);
   const [showPIXDialog, setShowPIXDialog] = useState(false);
+  const [showScheduleMessage, setShowScheduleMessage] = useState(false);
   const [isStartingNumericMenu, setIsStartingNumericMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -606,6 +608,17 @@ export function ChatPanel({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Gerar Teste VPN / Internet</TooltipContent>
+          </Tooltip>
+
+          {/* Schedule Message */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="sm" onClick={() => setShowScheduleMessage(true)}>
+                <Clock className="h-4 w-4 mr-1" />
+                Agendar
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Agendar mensagem</TooltipContent>
           </Tooltip>
 
           {/* Quick Messages Panel toggle removed - management moved to Settings */}
@@ -1221,6 +1234,9 @@ export function ChatPanel({
 
       {/* VPN Test Generator Dialog */}
       <VPNTestGeneratorDialog open={showVPNTestGenerator} onOpenChange={setShowVPNTestGenerator} />
+
+      {/* Schedule Message Dialog */}
+      <ScheduleMessageDialog open={showScheduleMessage} onOpenChange={setShowScheduleMessage} conversation={conversation} />
 
       {/* PIX Generation Dialog */}
       {conversation && <GeneratePIXDialog open={showPIXDialog} onOpenChange={setShowPIXDialog} conversationId={conversation.id} instanceId={conversation.instance_id} clientPhone={conversation.phone} clientName={conversation.contact_name || undefined} onSendMessage={onSendMessage} />}
