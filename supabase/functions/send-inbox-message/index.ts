@@ -33,6 +33,13 @@ interface SendMessageRequest {
 }
 
 function getMediaType(mimeType: string): string {
+  // Accept both real MIME types (image/png) and our simplified tags (image|video|audio|document)
+  const raw = (mimeType ?? '').toString().trim().toLowerCase();
+  if (raw === 'image' || raw.startsWith('image/')) return 'image';
+  if (raw === 'video' || raw.startsWith('video/')) return 'video';
+  if (raw === 'audio' || raw.startsWith('audio/')) return 'audio';
+  if (raw === 'document') return 'document';
+
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType.startsWith('audio/')) return 'audio';
