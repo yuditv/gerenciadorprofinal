@@ -240,7 +240,7 @@ export function MediaCarouselComposer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col min-h-0">
+      <DialogContent className="max-w-2xl h-[90vh] max-h-[90vh] flex flex-col min-h-0 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GalleryHorizontal className="h-5 w-5 text-primary" />
