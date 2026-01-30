@@ -4,6 +4,7 @@ import { CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -59,11 +60,18 @@ export function ScheduleMessageDialog({
   const [activeSchedule, setActiveSchedule] = useState<InboxScheduledMessage | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
+  const [messageMode, setMessageMode] = useState<"template" | "manual">("template");
+  const [templateKey, setTemplateKey] = useState<string>("test_finished");
+  const [manualMessage, setManualMessage] = useState<string>("");
+
   const defaultDate = useMemo(() => new Date(Date.now() + 3 * 60 * 60 * 1000), []);
 
   useEffect(() => {
     if (!open) return;
     setSendAtLocal(toDatetimeLocalValue(defaultDate));
+    setMessageMode("template");
+    setTemplateKey("test_finished");
+    setManualMessage("");
   }, [open, defaultDate]);
 
   useEffect(() => {
@@ -190,6 +198,19 @@ export function ScheduleMessageDialog({
         conversation_id: conversation.id,
       };
 
+      const finalTemplateKey = (messageMode === "template" ? templateKey : "manual").toString().trim();
+      if (!finalTemplateKey) {
+        throw new Error("Informe a chave do template");
+      }
+
+      const finalTemplateVars: Record<string, unknown> = { ...templateVars };
+      if (messageMode === "manual") {
+        if (!manualMessage.trim()) {
+          throw new Error("Escreva a mensagem manual");
+        }
+        finalTemplateVars.message = manualMessage.trim();
+      }
+
       const { error } = await supabase
         .from("inbox_scheduled_messages")
         .insert({
@@ -197,8 +218,8 @@ export function ScheduleMessageDialog({
           conversation_id: conversation.id,
           instance_id: conversation.instance_id,
           phone: conversation.phone,
-          template_key: "test_finished",
-          template_vars: templateVars,
+          template_key: finalTemplateKey,
+          template_vars: finalTemplateVars,
           send_at: sendAt.toISOString(),
           status: "scheduled",
         } as any);
@@ -245,6 +266,11 @@ export function ScheduleMessageDialog({
               <p>
                 <span className="font-medium text-foreground/80">Status:</span> {activeSchedule.status}
               </p>
+              {activeSchedule.template_key && (
+                <p>
+                  <span className="font-medium text-foreground/80">Template:</span> {activeSchedule.template_key}
+                </p>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap justify-end gap-2">
               <Button variant="outline" onClick={handleCancelActive} disabled={isLoading || checking}>
@@ -256,6 +282,61 @@ export function ScheduleMessageDialog({
             </div>
           </div>
         )}
+
+        <div className="grid gap-2">
+          <Label>Mensagem do agendamento</Label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={messageMode === "template" ? "default" : "outline"}
+              onClick={() => setMessageMode("template")}
+              disabled={isLoading || checking}
+            >
+              Usar template
+            </Button>
+            <Button
+              type="button"
+              variant={messageMode === "manual" ? "default" : "outline"}
+              onClick={() => setMessageMode("manual")}
+              disabled={isLoading || checking}
+            >
+              Escrever manual
+            </Button>
+          </div>
+
+          {messageMode === "template" ? (
+            <div className="grid gap-2">
+              <Label htmlFor="templateKey" className="text-xs text-muted-foreground">
+                Chave do template
+              </Label>
+              <Input
+                id="templateKey"
+                value={templateKey}
+                onChange={(e) => setTemplateKey(e.target.value)}
+                placeholder="ex: test_finished"
+              />
+              <p className="text-xs text-muted-foreground">
+                Variáveis automáticas: <span className="font-medium">{"{{nome}}"}</span> e <span className="font-medium">{"{{telefone}}"}</span>.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <Label htmlFor="manualMessage" className="text-xs text-muted-foreground">
+                Texto da mensagem
+              </Label>
+              <Textarea
+                id="manualMessage"
+                value={manualMessage}
+                onChange={(e) => setManualMessage(e.target.value)}
+                placeholder="Digite a mensagem que será enviada automaticamente…"
+                className="min-h-[100px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Dica: você pode usar <span className="font-medium">{"{{nome}}"}</span> e <span className="font-medium">{"{{telefone}}"}</span> no texto.
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="grid gap-2">
           <Label htmlFor="sendAt">Enviar em</Label>
