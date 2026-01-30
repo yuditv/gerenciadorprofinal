@@ -24,6 +24,7 @@ import {
 import { useAIAgents, type AIAgent, type AIChatMessage } from "@/hooks/useAIAgents";
 import { useCannedResponses } from "@/hooks/useCannedResponses";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function AIAgentChat() {
   const { agents, isLoadingAgents, useChatMessages, sendMessage, clearChatHistory, rateMessage } = useAIAgents();
@@ -32,8 +33,18 @@ export function AIAgentChat() {
   const [sessionId] = useState(() => crypto.randomUUID());
   const [inputMessage, setInputMessage] = useState("");
   const [localMessages, setLocalMessages] = useState<AIChatMessage[]>([]);
+  const [attachment, setAttachment] = useState<
+    | null
+    | {
+        kind: "audio" | "image";
+        name: string;
+        mimeType: string;
+        dataUrl: string;
+      }
+  >(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Count available canned responses
   const cannedResponsesCount = cannedResponses?.length || 0;
@@ -65,9 +76,9 @@ export function AIAgentChat() {
   }, [localMessages]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !selectedAgent || sendMessage.isPending) return;
+    if ((!inputMessage.trim() && !attachment) || !selectedAgent || sendMessage.isPending) return;
 
-    const messageContent = inputMessage;
+    const messageContent = inputMessage || (attachment ? `📎 ${attachment.kind === 'audio' ? 'Áudio' : 'Imagem'}: ${attachment.name}` : '');
     const userMessageId = crypto.randomUUID();
     
     const userMessage: AIChatMessage = {
@@ -89,11 +100,21 @@ export function AIAgentChat() {
     inputRef.current?.focus();
 
     try {
-      const result = await sendMessage.mutateAsync({
+       const result = await sendMessage.mutateAsync({
         agentId: selectedAgent.id,
-        message: messageContent,
+         message: messageContent,
         sessionId,
         source: 'web',
+         metadata: attachment
+           ? {
+               media: {
+                 kind: attachment.kind,
+                 name: attachment.name,
+                 mimeType: attachment.mimeType,
+                 dataUrl: attachment.dataUrl,
+               },
+             }
+           : {},
       });
 
       // If backend returned a structured error, surface it (instead of masking with a generic message)
@@ -150,6 +171,35 @@ export function AIAgentChat() {
         created_at: new Date().toISOString(),
       }]);
     }
+  };
+
+  const handlePickFile = async (file: File) => {
+    const maxBytes = 12 * 1024 * 1024; // keep it reasonable for data URLs
+    if (file.size > maxBytes) {
+      toast.error("Arquivo muito grande (máx. 12MB)");
+      return;
+    }
+
+    const isImage = file.type.startsWith("image/");
+    const isAudio = file.type.startsWith("audio/");
+    if (!isImage && !isAudio) {
+      toast.error("Envie apenas imagem ou áudio");
+      return;
+    }
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+      reader.readAsDataURL(file);
+    });
+
+    setAttachment({
+      kind: isAudio ? "audio" : "image",
+      name: file.name || (isAudio ? "audio" : "imagem"),
+      mimeType: file.type || (isAudio ? "audio/mpeg" : "image/jpeg"),
+      dataUrl,
+    });
   };
 
   const handleClearChat = () => {
@@ -432,7 +482,45 @@ export function AIAgentChat() {
 
       {/* Input */}
       <div className="p-4 border-t border-border/30 bg-background/30">
+        {attachment && (
+          <div className="mb-2 flex items-center justify-between rounded-lg border border-border/50 bg-background/40 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              Anexo: <span className="text-foreground font-medium">{attachment.name}</span>
+            </span>
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setAttachment(null)}>
+              Remover
+            </Button>
+          </div>
+        )}
+
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) {
+                handlePickFile(f).catch((err) => {
+                  console.error(err);
+                  toast.error("Falha ao anexar arquivo");
+                });
+              }
+              // allow picking same file again
+              e.currentTarget.value = "";
+            }}
+          />
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sendMessage.isPending}
+            className="shrink-0"
+          >
+            Anexar
+          </Button>
           <Input
             ref={inputRef}
             placeholder="Digite sua mensagem..."
@@ -444,7 +532,7 @@ export function AIAgentChat() {
           />
           <Button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || sendMessage.isPending}
+            disabled={(!inputMessage.trim() && !attachment) || sendMessage.isPending}
             className="bg-gradient-to-r from-primary to-accent hover:opacity-90 px-4"
           >
             {sendMessage.isPending ? (
