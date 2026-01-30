@@ -104,6 +104,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_agent_preferences: {
+        Row: {
+          auto_start_ai: boolean
+          created_at: string
+          default_agent_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_start_ai?: boolean
+          created_at?: string
+          default_agent_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_start_ai?: boolean
+          created_at?: string
+          default_agent_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_agent_transfer_rules: {
         Row: {
           created_at: string | null
