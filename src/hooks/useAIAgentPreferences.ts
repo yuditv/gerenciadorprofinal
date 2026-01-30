@@ -6,6 +6,7 @@ export type AIAgentPreferences = {
   user_id: string;
   auto_start_ai: boolean;
   default_agent_id: string | null;
+  expired_client_agent_id?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -26,7 +27,7 @@ export function useAIAgentPreferences() {
       const userId = await requireUserId();
       const { data, error } = await supabase
         .from("ai_agent_preferences")
-        .select("user_id, auto_start_ai, default_agent_id, created_at, updated_at")
+        .select("user_id, auto_start_ai, default_agent_id, expired_client_agent_id, created_at, updated_at")
         .eq("user_id", userId)
         .maybeSingle();
 
@@ -38,13 +39,16 @@ export function useAIAgentPreferences() {
           user_id: userId,
           auto_start_ai: false,
           default_agent_id: null,
+            expired_client_agent_id: null,
         }
       );
     },
   });
 
   const upsertPreferences = useMutation({
-    mutationFn: async (patch: Partial<Pick<AIAgentPreferences, "auto_start_ai" | "default_agent_id">>) => {
+    mutationFn: async (
+      patch: Partial<Pick<AIAgentPreferences, "auto_start_ai" | "default_agent_id" | "expired_client_agent_id">>,
+    ) => {
       const userId = await requireUserId();
       const { data, error } = await supabase
         .from("ai_agent_preferences")
@@ -56,7 +60,7 @@ export function useAIAgentPreferences() {
           },
           { onConflict: "user_id" },
         )
-        .select("user_id, auto_start_ai, default_agent_id, created_at, updated_at")
+        .select("user_id, auto_start_ai, default_agent_id, expired_client_agent_id, created_at, updated_at")
         .single();
 
       if (error) throw error;

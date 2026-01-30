@@ -7,7 +7,7 @@ import { useWhatsAppInstances } from '@/hooks/useWhatsAppInstances';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { Client, PlanType, planLabels } from '@/types/client';
+import { Client, PlanType, planLabels, getExpirationStatus } from '@/types/client';
 import { ClientCard } from '@/components/ClientCard';
 import { ClientTable } from '@/components/ClientTable';
 import { ClientForm } from '@/components/ClientForm';
@@ -53,6 +53,8 @@ import { exportClientsToCSV, exportRenewalHistoryToCSV } from '@/lib/exportClien
 import { exportReportToPDF } from '@/lib/exportPDF';
 import { getDaysUntilExpiration } from '@/types/client';
 import { supabase } from '@/integrations/supabase/client';
+import { useAIAgentPreferences } from '@/hooks/useAIAgentPreferences';
+import { activateAIForExpiredClient } from '@/lib/activateExpiredClientAI';
 
 const Index = () => {
   const { user } = useAuth();
@@ -62,6 +64,7 @@ const Index = () => {
   const { instances } = useWhatsAppInstances();
   const { isActive, canAccessFeature } = useSubscription();
   const { isAdmin } = useUserPermissions();
+  const { preferences: aiPrefs } = useAIAgentPreferences();
   const { 
     notifications, 
     unreadConversations, 
@@ -377,6 +380,41 @@ const Index = () => {
   const handleSendWhatsApp = (client: Client) => {
     setWhatsappClient(client);
     setWhatsappDialogOpen(true);
+  };
+
+  const handleActivateAIForExpiredClient = async (client: Client) => {
+    if (!isSubscriptionActive) {
+      showSubscriptionRequired();
+      return;
+    }
+
+    if (getExpirationStatus(client.expiresAt) !== 'expired') {
+      toast.error('A IA só pode ser ativada por aqui para clientes expirados.');
+      return;
+    }
+
+    const agentId = aiPrefs?.expired_client_agent_id ?? null;
+    if (!agentId) {
+      toast.error('Configure o agente para clientes expirados', {
+        description: 'Vá em Agente IA → Preferências → “Agente para Clientes Expirados (CRM)”.',
+      });
+      return;
+    }
+
+    try {
+      const { conversationId } = await activateAIForExpiredClient({
+        clientWhatsapp: client.whatsapp,
+        agentId,
+      });
+      toast.success('IA ativada no Atendimento!', {
+        description: `Conversa: ${conversationId}`,
+      });
+    } catch (e: any) {
+      console.error('[CRM] activateAIForExpiredClient error:', e);
+      toast.error('Não foi possível ativar a IA.', {
+        description: e?.message ? String(e.message) : 'Erro inesperado',
+      });
+    }
   };
 
   const handleConfirmChangePlan = async (clientId: string, newPlan: PlanType, newExpiresAt: Date) => {
@@ -731,6 +769,7 @@ const Index = () => {
                       onViewNotifications={handleViewNotifications}
                       onSendEmail={handleSendEmail}
                       onSendWhatsApp={handleSendWhatsappClick}
+                      onActivateAI={handleActivateAIForExpiredClient}
                       getPlanName={getPlanName}
                     />
                   </div>
@@ -746,6 +785,7 @@ const Index = () => {
                 onChangePlan={handleOpenChangePlan}
                 onViewNotifications={handleViewNotifications}
                 onSendEmail={handleSendEmail}
+                onActivateAI={handleActivateAIForExpiredClient}
                 getPlanName={getPlanName}
                 selectedClients={selectedClients}
                 onToggleSelection={toggleClientSelection}
