@@ -12,6 +12,7 @@ export interface WhatsAppInstance {
   instance_key: string | null;
   qr_code: string | null;
   phone_connected: string | null;
+  presence_status: 'available' | 'unavailable';
   profile_picture_url: string | null;
   profile_name: string | null;
   business_hours_start: string | null;
@@ -75,6 +76,7 @@ export function useWhatsAppInstances() {
         phone_connected: item.phone_connected || null,
         profile_picture_url: item.profile_picture_url || null,
         profile_name: item.profile_name || null,
+        presence_status: item.presence_status || 'available',
         business_hours_start: item.business_hours_start || "08:00:00",
         business_hours_end: item.business_hours_end || "18:00:00",
         last_connected_at: item.last_connected_at,
@@ -189,6 +191,23 @@ export function useWhatsAppInstances() {
       console.error('Set privacy error:', error);
       toast.error(error.message || 'Erro ao salvar privacidade');
       return null;
+    }
+  };
+
+  const setInstancePresence = async (instanceId: string, presence: 'available' | 'unavailable') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'set_presence', instanceId, presence },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao atualizar presença');
+      toast.success(presence === 'available' ? 'Status alterado para Online' : 'Status alterado para Offline');
+      await fetchInstances();
+      return true;
+    } catch (error: any) {
+      console.error('Set presence error:', error);
+      toast.error(error.message || 'Erro ao atualizar presença');
+      return false;
     }
   };
 
@@ -374,6 +393,7 @@ export function useWhatsAppInstances() {
     checkNumbers,
     configureWebhook,
     testWebhook,
+    setInstancePresence,
     refetch: fetchInstances,
     refreshAllStatus,
   };

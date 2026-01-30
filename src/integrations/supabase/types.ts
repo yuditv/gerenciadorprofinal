@@ -3092,6 +3092,7 @@ export type Database = {
           instance_name: string
           last_connected_at: string | null
           phone_connected: string | null
+          presence_status: string | null
           profile_name: string | null
           profile_picture_url: string | null
           qr_code: string | null
@@ -3109,6 +3110,7 @@ export type Database = {
           instance_name: string
           last_connected_at?: string | null
           phone_connected?: string | null
+          presence_status?: string | null
           profile_name?: string | null
           profile_picture_url?: string | null
           qr_code?: string | null
@@ -3126,6 +3128,7 @@ export type Database = {
           instance_name?: string
           last_connected_at?: string | null
           phone_connected?: string | null
+          presence_status?: string | null
           profile_name?: string | null
           profile_picture_url?: string | null
           qr_code?: string | null
