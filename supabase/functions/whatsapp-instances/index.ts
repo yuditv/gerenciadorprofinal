@@ -706,6 +706,121 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    // UPDATE PROFILE NAME - UAZAPI POST /profile/name
+    if (action === "update_profile_name") {
+      const instanceId = (body.instanceId as string) || "";
+      const profileNameRaw = (body.profileName as string) || "";
+      const profileName = profileNameRaw.trim();
+
+      if (!instanceId) return fail("instanceId is required");
+      if (!profileName || profileName.length === 0 || profileName.length > 100) {
+        return fail("profileName must be between 1 and 100 characters");
+      }
+
+      const { data: instance, error: fetchError } = await supabase
+        .from('whatsapp_instances')
+        .select('id, instance_key')
+        .eq('id', instanceId)
+        .single();
+
+      if (fetchError || !instance?.instance_key) {
+        return fail('Instance not found or not configured');
+      }
+
+      try {
+        const uazapiResponse = await fetch(`${uazapiUrl}/profile/name`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'token': instance.instance_key },
+          body: JSON.stringify({ name: profileName }),
+        });
+
+        const respText = await uazapiResponse.text();
+
+        if (!uazapiResponse.ok) {
+          console.error('[update_profile_name] UAZAPI error:', respText);
+          return fail(`UAZAPI error: ${respText}`);
+        }
+
+        // Update profile_name in database
+        const { error: updateError } = await supabase
+          .from('whatsapp_instances')
+          .update({ profile_name: profileName })
+          .eq('id', instanceId);
+
+        if (updateError) {
+          console.error('[update_profile_name] DB update error:', updateError);
+        }
+
+        return ok({ success: true, profileName, message: 'Profile name updated successfully' });
+      } catch (e) {
+        console.error("UAZAPI update profile name error:", e);
+        return fail(`Erro ao comunicar com UAZAPI: ${String(e)}`);
+      }
+    }
+
+    // UPDATE PROFILE IMAGE - UAZAPI POST /profile/image
+    if (action === "update_profile_image") {
+      const instanceId = (body.instanceId as string) || "";
+      const imageData = (body.image as string) || "";
+
+      if (!instanceId) return fail("instanceId is required");
+      if (!imageData) return fail("image is required (URL, base64, or 'remove')");
+
+      const { data: instance, error: fetchError } = await supabase
+        .from('whatsapp_instances')
+        .select('id, instance_key')
+        .eq('id', instanceId)
+        .single();
+
+      if (fetchError || !instance?.instance_key) {
+        return fail('Instance not found or not configured');
+      }
+
+      try {
+        const uazapiResponse = await fetch(`${uazapiUrl}/profile/image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'token': instance.instance_key },
+          body: JSON.stringify({ image: imageData }),
+        });
+
+        const respText = await uazapiResponse.text();
+
+        if (!uazapiResponse.ok) {
+          console.error('[update_profile_image] UAZAPI error:', respText);
+          return fail(`UAZAPI error: ${respText}`);
+        }
+
+        let result;
+        try {
+          result = JSON.parse(respText);
+        } catch {
+          result = { raw: respText };
+        }
+
+        // Update profile_picture_url in database (null if removed)
+        const isRemoved = imageData === 'remove' || imageData === 'delete';
+        const newProfilePicUrl = isRemoved ? null : (imageData.startsWith('http') ? imageData : null);
+        
+        const { error: updateError } = await supabase
+          .from('whatsapp_instances')
+          .update({ profile_picture_url: newProfilePicUrl })
+          .eq('id', instanceId);
+
+        if (updateError) {
+          console.error('[update_profile_image] DB update error:', updateError);
+        }
+
+        return ok({ 
+          success: true, 
+          message: isRemoved ? 'Profile image removed successfully' : 'Profile image updated successfully',
+          result
+        });
+      } catch (e) {
+        console.error("UAZAPI update profile image error:", e);
+        return fail(`Erro ao comunicar com UAZAPI: ${String(e)}`);
+      }
+    }
+
     // STATUS - check instance status
     if (action === "status" && entityId) {
       const { data: instance, error } = await supabase
