@@ -1,138 +1,184 @@
 
-## Contexto do problema (o que está acontecendo)
-1) Você tentou habilitar a opção “Prevent use of leaked passwords” (HIBP) no Supabase e não consegue. Pela sua captura de tela, isso ocorre porque esse recurso é **somente do plano Pro** do Supabase (“Only available on Pro plan and above”).  
-2) Esse bloqueio **não tem relação direta** com a funcionalidade pedida (controle de iniciar IA automaticamente em novas conversas). A implementação do toggle “Auto IA” pode (e deve) funcionar mesmo sem HIBP.
+Objetivo
+- Pegar as “opções de instância” da documentação UAZAPI que você mostrou (Status detalhado, Atualizar nome, Privacidade, Desconectar) e colocar no seu sistema de Instâncias:
+  - Resumo/atalhos no card da instância (aba WhatsApp → Instâncias)
+  - Completo dentro do dialog de Configurações (botão de engrenagem)
 
-Além disso, notei um problema técnico importante no último diff:
-- Foi **editado** `src/integrations/supabase/types.ts`. Isso **não pode** ser editado manualmente neste projeto (e tende a quebrar tipos/geração). Precisamos **reverter** essa alteração e tipar a nova tabela de preferências por interfaces locais no frontend.
+O que eu vi no seu código (estado atual)
+- Frontend:
+  - Aba “WhatsApp → Instâncias” (src/pages/WhatsApp.tsx) já tem botões: QR Code, Status, Webhook, Testar, Configurações, Excluir.
+  - O dialog atual “Configurações da Instância” (src/components/InstanceSettingsDialog.tsx) só salva:
+    - daily_limit
+    - business hours (start/end)
+- Backend (Edge Function):
+  - supabase/functions/whatsapp-instances/index.ts já implementa várias ações (create, qrcode, paircode, status, disconnect, delete, etc.)
+  - Porém NÃO implementa ações para:
+    - Atualizar nome da instância via UAZAPI (/instance/updateInstanceName)
+    - Ler privacidade via UAZAPI (/instance/privacy)
+    - Alterar privacidade via UAZAPI (/instance/privacy)
+  - A action “status” já consulta /instance/status, mas retorna apenas status/phone/profileName/profilePictureUrl (vamos expandir para “detalhado”).
 
----
+Requisitos confirmados (suas respostas)
+- Opções a adicionar agora: Status detalhado + Atualizar nome + Privacidade + Desconectar
+- Onde aparecer: Ambos (card + dialog)
 
-## Objetivo do ajuste (requisito aprovado)
-Você aprovou:
-- **Auto IA**: Não iniciar automaticamente
-- **Agente padrão**: Escolher um agente
+Escopo funcional (como vai ficar para o usuário)
+1) No card da instância (aba WhatsApp → Instâncias)
+- Manter os botões existentes (QR Code, Status…)
+- Adicionar mais atalhos (sem poluir):
+  - “Renomear” (abre modal rápido)
+  - “Privacidade” (abre modal rápido ou abre o dialog já na aba Privacidade)
+  - “Desconectar” (confirmação + executa logout)
+- “Status” passará a mostrar “detalhado” (com mais infos) e também atualizará melhor o banco.
 
-Então o comportamento final desejado será:
-- Em **novas conversas**: **não iniciar a IA automaticamente** (continua como hoje: IA desativada e aparece a pergunta “Nova conversa — ativar IA?” no Atendimento).
-- Na aba **Agente IA**: existir uma área de configurações para:
-  - Ligar/desligar “Iniciar IA automaticamente em novas conversas”
-  - Escolher um “Agente padrão” (um agente existente)
-- Quando o usuário clicar “Ativar IA” no Atendimento:
-  - Se existir “Agente padrão” configurado, a conversa passa a ter `active_agent_id = default_agent_id` (para não ficar “sem agente” quando a IA for ativada).
+2) No dialog de Configurações (engrenagem)
+- Transformar o dialog em um layout com abas (Tabs) para ficar organizado:
+  - Geral (o que já existe hoje: limites + horário comercial)
+  - UAZAPI / Instância (Status detalhado + Renomear + Desconectar)
+  - Privacidade (ver e alterar configurações)
+- Tudo com feedback (toast) e loading states.
 
----
+Detalhes técnicos por funcionalidade
 
-## O que já existe e será aproveitado
-- O webhook `supabase/functions/whatsapp-inbox-webhook/index.ts` hoje cria novas conversas com:
-  - `ai_enabled: false`
-  - `metadata.ai_prompt_pending: true`
-  Isso é exatamente o modo “não iniciar automaticamente” e causa o prompt no Atendimento.
-- O Atendimento (`src/pages/Atendimento.tsx`) já possui a lógica do prompt via `ai_prompt_pending`.
+A) Status detalhado (UAZAPI GET /instance/status)
+Backend (Edge Function whatsapp-instances)
+- Expandir a action "status":
+  - Continuar chamando GET `${UAZAPI_URL}/instance/status` com header `token: instance.instance_key`
+  - Normalizar resposta para incluir (quando existir):
+    - instance.status (connected/connecting/disconnected)
+    - instance.qrcode (se existir)
+    - instance.paircode (se existir)
+    - instance.owner (número conectado)
+    - instance.profileName
+    - instance.profilePicUrl
+    - instance.platform / systemName (se vier)
+    - lastDisconnect / lastDisconnectReason (se vier)
+    - status.connected / status.loggedIn (se vier)
+  - Atualizar o banco public.whatsapp_instances com o que já atualiza hoje:
+    - status, phone_connected, profile_name, profile_picture_url, last_connected_at, qr_code (quando vier)
+- Padrão de erro:
+  - Para erros “funcionais” (sem instance_key, instance não encontrada etc.), retornar HTTP 200 com `{ success:false, error:'...' }` (para evitar supabase.functions.invoke estourar erro fatal no front).
 
----
+Frontend
+- No botão “Status” do card: além do toast “Status atualizado”, mostrar um resumo (ex.: “Conectado”, “Última desconexão…” quando existir).
+- No dialog: mostrar um “painel de status” com campos em formato de lista (chave/valor) + botão “Atualizar agora”.
 
-## Mudanças necessárias (alto nível)
-### A) Banco de dados (já criado)
-A migration já cria a tabela:
-- `public.ai_agent_preferences` com:
-  - `auto_start_ai boolean default false`
-  - `default_agent_id uuid null`
-  - RLS por usuário
+B) Atualizar nome da instância (UAZAPI POST /instance/updateInstanceName)
+Backend
+- Adicionar nova action no whatsapp-instances: "update_instance_name"
+  - Validar:
+    - instanceId obrigatório
+    - name string 1..60 (ou 100) e trim
+  - Chamar POST `${UAZAPI_URL}/instance/updateInstanceName` com header `token` e body `{ name }`
+  - Se sucesso:
+    - Atualizar `whatsapp_instances.instance_name = name` no banco (para refletir no sistema)
+    - Retornar `{ success:true }`
+  - Se falhar:
+    - Retornar `{ success:false, error:'...' }` (HTTP 200)
 
-### B) Frontend: criar tela/config no “Agente IA”
-1) Criar um hook novo (ex.: `useAIAgentPreferences`) para:
-   - Buscar preferências do usuário logado
-   - Criar registro se não existir (upsert)
-   - Atualizar `auto_start_ai` e `default_agent_id`
+Frontend
+- Card: botão/ação “Renomear” abre dialog simples (Input) e salva.
+- Dialog: campo “Nome da instância” com botão “Salvar nome”.
+- Após salvar, refetchInstances() para atualizar lista imediatamente.
 
-2) Ajustar a UI em `src/components/AIAgentAdmin.tsx`:
-   - Adicionar um novo `TabsTrigger` e `TabsContent`, por exemplo: **“Preferências”** ou **“Configurações”**
-   - Dentro dessa aba:
-     - `Switch` “Iniciar IA automaticamente em novas conversas”
-     - Um `Select` para escolher o **Agente padrão** (usando a lista `agents`, preferindo “principais” e ativos)
-     - Mostrar validações amigáveis:
-       - Se “Auto-start” estiver ligado e não existir “Agente padrão”, mostrar aviso e/ou impedir salvar (ou salvar mas avisar que a IA ligará sem agente; como você escolheu “Escolher um agente”, vamos exigir agente ao ativar auto-start)
+C) Privacidade (UAZAPI GET/POST /instance/privacy)
+Backend
+- Adicionar action "get_privacy"
+  - Validar instanceId
+  - Chamar GET `${UAZAPI_URL}/instance/privacy` com header `token`
+  - Retornar `{ success:true, privacy: {...} }`
+- Adicionar action "set_privacy"
+  - Validar instanceId
+  - Validar payload com whitelist:
+    - groupadd, last, status, profile, readreceipts, online, calladd
+  - Validar valores permitidos:
+    - groupadd/last/status/profile: all | contacts | contact_blacklist | none
+    - readreceipts: all | none
+    - online: all | match_last_seen
+    - calladd: all | known
+  - Chamar POST `${UAZAPI_URL}/instance/privacy` com header `token` e body com apenas campos enviados
+  - Retornar `{ success:true, privacy: {...atualizado} }`
 
-3) Reverter a dependência de tipos gerados:
-   - **Remover** as mudanças manuais em `src/integrations/supabase/types.ts`
-   - Usar uma interface local para a linha da tabela:
-     ```ts
-     type AIAgentPreferences = {
-       user_id: string;
-       auto_start_ai: boolean;
-       default_agent_id: string | null;
-       created_at?: string;
-       updated_at?: string;
-     }
-     ```
+Frontend (aba “Privacidade”)
+- Ao abrir aba:
+  - Carregar configurações atuais via "get_privacy"
+  - Mostrar Selects (um para cada campo), com labels em PT-BR:
+    - Quem pode adicionar aos grupos (groupadd)
+    - Quem pode ver visto por último (last)
+    - Quem pode ver recado/status (status)
+    - Quem pode ver foto de perfil (profile)
+    - Confirmação de leitura (readreceipts)
+    - Quem pode ver online (online)
+    - Quem pode fazer chamadas (calladd)
+- Botões:
+  - “Carregar do WhatsApp” (refetch)
+  - “Salvar alterações” (chama set_privacy)
+  - Mostrar aviso: “Broadcast/stories não é configurável pela API” (como na doc)
 
-### C) Atendimento: ao “Ativar IA”, aplicar agente padrão automaticamente
-No `src/pages/Atendimento.tsx`, dentro de `upsertDecision(true)`:
-- Buscar preferências (`ai_agent_preferences`) e, se tiver `default_agent_id`:
-  - Atualizar a conversa com:
-    - `ai_enabled: true`
-    - `active_agent_id: default_agent_id` (somente se `conv.active_agent_id` estiver vazio, para não sobrescrever transferências)
-    - `metadata.ai_prompt_pending: false`
+D) Desconectar (logout sem apagar instância)
+Backend
+- Reaproveitar action existente "disconnect" (já chama /instance/logout e seta status no banco).
+- Ajustar a resposta para também seguir padrão `{ success:true }` e para erros funcionais retornar 200 `{ success:false, error }` quando possível.
 
-Isso garante: “Ativar IA” já define qual agente vai responder.
+Frontend
+- Card: botão “Desconectar” (apenas se status conectado/connecting), com confirmação:
+  - “Isso vai deslogar o WhatsApp desta instância. Você precisará reconectar via QR/pareamento.”
+- Dialog: botão “Desconectar instância” em destaque (destructive).
 
-### D) Backend: respeitar preferências quando Auto IA estiver ligado (preparar o caminho)
-Mesmo você tendo escolhido “Não iniciar automaticamente”, precisamos implementar o toggle completo.
-Então no `whatsapp-inbox-webhook` (criação de nova conversa):
-- Ler `ai_agent_preferences` do dono (`instance.user_id`)
-- Se `auto_start_ai === true`:
-  - Criar conversa com:
-    - `ai_enabled: true`
-    - `active_agent_id: default_agent_id` (se setado)
-    - `metadata.ai_prompt_pending: false` (não precisa perguntar)
-- Se `auto_start_ai === false` (seu caso):
-  - Manter o comportamento atual:
-    - `ai_enabled: false`
-    - `metadata.ai_prompt_pending: true`
+Mudanças de código (arquivos que serão mexidos)
+Frontend
+- src/pages/WhatsApp.tsx
+  - Adicionar ações novas no card (Renomear, Privacidade, Desconectar)
+  - Abrir InstanceSettingsDialog já com “aba inicial” (ex.: abrir direto em Privacidade quando clicar)
+- src/components/InstanceSettingsDialog.tsx
+  - Refatorar para Tabs: Geral / Instância / Privacidade
+  - Implementar UI e chamadas (via hook) para:
+    - status detalhado
+    - update name
+    - get/set privacy
+    - disconnect
+- src/hooks/useWhatsAppInstances.ts
+  - Adicionar funções:
+    - updateInstanceName(instanceId, name)
+    - getInstancePrivacy(instanceId)
+    - setInstancePrivacy(instanceId, privacyPatch)
+    - disconnectInstance(instanceId)
+  - Reusar supabase.functions.invoke('whatsapp-instances', { action: ... })
 
-Também aplicar o mesmo padrão no `sync-chats/index.ts` quando criar conversas “novas” via sincronização (para consistência).
+Backend
+- supabase/functions/whatsapp-instances/index.ts
+  - Adicionar actions:
+    - update_instance_name
+    - get_privacy
+    - set_privacy
+  - Melhorar "status" para devolver payload mais completo
+  - Ajustar resposta de erros para HTTP 200 com `{ success:false }` quando apropriado
 
----
+Validações e segurança
+- Frontend:
+  - Validar nome (não vazio, limite de caracteres) antes de enviar.
+- Backend:
+  - Validar todos os inputs (instanceId, name, valores de privacidade) antes de chamar API externa.
+  - Não aceitar chaves de privacidade fora da whitelist (para evitar injeção/valores inesperados).
+- Manter a regra do projeto: erros funcionais retornam 200 com success:false para evitar “blank screen”.
 
-## Correção do “não consigo ativar a opção” (HIBP)
-- Explicar claramente no app/documentação interna: isso é limitação do plano do Supabase.
-- Remover qualquer dependência/“bloqueio” no fluxo do nosso app que impeça você de seguir sem HIBP.  
-Ou seja: **não vamos exigir essa opção** para concluir o recurso de Auto IA.
+Testes manuais (checklist rápido)
+1) Status detalhado:
+- Clicar “Status” no card → deve atualizar badge e informações (e atualizar DB com foto/nome/número se existir).
+2) Atualizar nome:
+- Renomear no card e no dialog → deve refletir na lista após refetch.
+3) Privacidade:
+- Abrir aba Privacidade → carregar valores atuais.
+- Alterar 1-2 campos e salvar → confirmar que a API responde e o UI mostra “salvo”.
+4) Desconectar:
+- Clicar “Desconectar” → status deve ir para disconnected no banco e no UI.
 
----
+Observação sobre “ainda tem mais fotos”
+- Com as opções acima implementadas, você pode enviar depois as outras capturas (em blocos de 10) e eu adiciono o restante das opções que aparecerem nelas, seguindo o mesmo padrão (card + dialog).
 
-## Sequência de implementação (passo a passo)
-1) Reverter/ajustar qualquer alteração manual em `src/integrations/supabase/types.ts` (não pode ser editado).
-2) Implementar hook `useAIAgentPreferences` (React Query) para:
-   - `select` do registro do usuário
-   - `upsert` quando alterar toggle/agente
-3) Atualizar `AIAgentAdmin.tsx` adicionando a aba “Preferências”:
-   - Switch `auto_start_ai`
-   - Select `default_agent_id`
-4) Atualizar `Atendimento.tsx` para, ao clicar “Ativar IA” no prompt:
-   - aplicar `active_agent_id = default_agent_id` (se houver)
-5) Atualizar `whatsapp-inbox-webhook` na criação de conversa para usar `ai_agent_preferences` quando `auto_start_ai` estiver ligado
-6) Atualizar `sync-chats` para usar preferências ao inserir conversas novas
-7) Testes rápidos:
-   - Criar nova conversa (mensagem recebida) com `auto_start_ai=false`: deve aparecer prompt e IA não responde automaticamente.
-   - Habilitar `auto_start_ai=true` + escolher agente padrão: nova conversa já deve vir com IA ligada e respondendo (sem prompt).
-   - No prompt “Ativar IA”: deve setar `active_agent_id` automaticamente para o agente padrão.
-
----
-
-## Riscos e cuidados
-- RLS: a tabela `ai_agent_preferences` tem RLS por usuário; no webhook precisamos usar cliente com privilégios adequados (service role) ou query com contexto apropriado.
-- Não sobrescrever transferências: ao aplicar agente padrão no Atendimento, só setar `active_agent_id` se estiver vazio.
-- Tipos Supabase: não editar `types.ts` manualmente; usar tipagem local.
-
----
-
-## Resultado esperado para você (UX)
-- Na aba **Agente IA** você terá um painel simples:
-  - “Iniciar IA automaticamente em novas conversas” [on/off]
-  - “Agente padrão” [selecionar agente]
-- Com o toggle **desligado** (seu caso):
-  - nada muda no automático: chega conversa nova → não inicia IA → aparece pergunta “ativar IA?”
-- Quando você clicar “Ativar IA”, ele já começa usando o agente padrão que você escolheu (sem confusão/sem cair no “início”).
-
+Entregável final (resultado)
+- Seu painel de Instâncias terá:
+  - Status mais completo
+  - Renomear instância integrado com UAZAPI e com seu banco
+  - Tela de Privacidade completa (ler e alterar)
+  - Botão de Desconectar (logout) sem excluir instância
