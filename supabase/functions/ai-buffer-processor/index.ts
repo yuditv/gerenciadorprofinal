@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// WhatsApp/UAZAPI may truncate very long messages; also, the desired UX is “humanized”
+// by sending in smaller bursts (sentence-by-sentence).
+const AUTO_SPLIT_THRESHOLD_CHARS = 420;
+const AUTO_SPLIT_MAX_CHARS_PER_MESSAGE = 380;
+
+type SplitMode = 'none' | 'paragraph' | 'lines' | 'sentences' | 'chars';
+
+interface MessageSendConfig {
+  response_delay_min: number;
+  response_delay_max: number;
+  max_lines_per_message: number;
+  split_mode: SplitMode;
+  split_delay_min: number;
+  split_delay_max: number;
+  max_chars_per_message: number;
+  typing_simulation: boolean;
+}
+
 // UAZAPI utilities
 function formatPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/\D/g, '');
@@ -28,6 +46,96 @@ function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function splitMessage(text: string, config: MessageSendConfig): string[] {
+  if (!text || text.trim().length === 0) return [];
+
+  if (config.split_mode === 'none' && config.max_lines_per_message === 0 && config.max_chars_per_message === 0) {
+    return [text];
+  }
+
+  let parts: string[] = [];
+
+  switch (config.split_mode) {
+    case 'paragraph':
+      parts = text.split(/\n\n+/).filter(p => p.trim());
+      break;
+    case 'lines':
+      parts = text.split(/\n/).filter(p => p.trim());
+      break;
+    case 'sentences': {
+      // Split by sentence-ending punctuation
+      const sentenceMatches = text.match(/[^.!?]+[.!?]+[\s]*/g);
+      if (sentenceMatches && sentenceMatches.length > 0) {
+        parts = sentenceMatches.map(s => s.trim()).filter(Boolean);
+      } else {
+        parts = [text];
+      }
+      break;
+    }
+    case 'chars':
+      if (config.max_chars_per_message > 0) {
+        parts = chunkByChars(text, config.max_chars_per_message);
+      } else {
+        parts = [text];
+      }
+      break;
+    default:
+      parts = [text];
+  }
+
+  // Apply character limit if set and mode is not 'chars'
+  if (config.split_mode !== 'chars' && config.max_chars_per_message > 0) {
+    parts = parts.flatMap(p => chunkByChars(p, config.max_chars_per_message));
+  }
+
+  // Apply line limit if set
+  if (config.max_lines_per_message > 0) {
+    parts = parts.flatMap(p => chunkByLines(p, config.max_lines_per_message));
+  }
+
+  return parts.filter(p => p.trim());
+}
+
+function chunkByChars(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxChars) {
+      chunks.push(remaining.trim());
+      break;
+    }
+
+    let breakPoint = maxChars;
+    const lastSpace = remaining.lastIndexOf(' ', maxChars);
+    const lastNewline = remaining.lastIndexOf('\n', maxChars);
+
+    if (lastSpace > maxChars * 0.5 || lastNewline > maxChars * 0.5) {
+      breakPoint = Math.max(lastSpace, lastNewline);
+    }
+
+    chunks.push(remaining.substring(0, breakPoint).trim());
+    remaining = remaining.substring(breakPoint).trim();
+  }
+
+  return chunks;
+}
+
+function chunkByLines(text: string, maxLines: number): string[] {
+  const lines = text.split('\n');
+  if (lines.length <= maxLines) return [text];
+
+  const chunks: string[] = [];
+  for (let i = 0; i < lines.length; i += maxLines) {
+    const chunk = lines.slice(i, i + maxLines).join('\n');
+    if (chunk.trim()) chunks.push(chunk);
+  }
+
+  return chunks;
+}
+
 async function sendTypingIndicator(uazapiUrl: string, token: string, phone: string): Promise<void> {
   try {
     await fetch(`${uazapiUrl}/send/presence`, {
@@ -47,11 +155,9 @@ async function sendTypingIndicator(uazapiUrl: string, token: string, phone: stri
 }
 
 function calculateTypingTime(message: string): number {
-  const wordsPerMinute = 40;
-  const words = message.split(/\s+/).length;
-  const minutes = words / wordsPerMinute;
-  const milliseconds = Math.min(minutes * 60 * 1000, 8000);
-  return Math.max(milliseconds, 1000);
+  // Simulate typing at ~30-50 chars per second, with some randomness.
+  const baseTime = (message.length / 40) * 1000;
+  return Math.min(Math.max(baseTime, 500), 3000); // Between 0.5s and 3s
 }
 
 async function sendTextViaUazapi(uazapiUrl: string, token: string, phone: string, text: string): Promise<void> {
@@ -70,6 +176,66 @@ async function sendTextViaUazapi(uazapiUrl: string, token: string, phone: string
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[Buffer Processor] UAZAPI send error:', errorText);
+  }
+}
+
+async function sendAIResponseWithConfig(
+  uazapiUrl: string,
+  token: string,
+  phone: string,
+  fullResponse: string,
+  config: MessageSendConfig
+): Promise<void> {
+  const hasExplicitSplitConfig =
+    config.split_mode !== 'none' ||
+    config.max_lines_per_message > 0 ||
+    config.max_chars_per_message > 0;
+
+  const effectiveConfig: MessageSendConfig = (!hasExplicitSplitConfig && fullResponse.length > AUTO_SPLIT_THRESHOLD_CHARS)
+    ? {
+        ...config,
+        split_mode: 'sentences',
+        max_chars_per_message: AUTO_SPLIT_MAX_CHARS_PER_MESSAGE,
+        response_delay_min: Math.min(config.response_delay_min, 2),
+        response_delay_max: Math.min(config.response_delay_max, 4),
+        split_delay_min: Math.min(config.split_delay_min, 1),
+        split_delay_max: Math.max(Math.min(config.split_delay_max, 3), 1),
+        typing_simulation: true,
+      }
+    : config;
+
+  console.log('[Buffer Processor] Sending AI response with config:', {
+    split_mode: effectiveConfig.split_mode,
+    response_delay: `${effectiveConfig.response_delay_min}-${effectiveConfig.response_delay_max}s`,
+    typing: effectiveConfig.typing_simulation,
+    auto_split: !hasExplicitSplitConfig && fullResponse.length > AUTO_SPLIT_THRESHOLD_CHARS,
+  });
+
+  // Initial delay
+  if (effectiveConfig.response_delay_max > 0) {
+    const delaySeconds = randomBetween(effectiveConfig.response_delay_min, effectiveConfig.response_delay_max);
+    await sleep(delaySeconds * 1000);
+  }
+
+  const parts = splitMessage(fullResponse, effectiveConfig);
+  console.log(`[Buffer Processor] Message split into ${parts.length} parts`);
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+
+    if (effectiveConfig.typing_simulation) {
+      await sendTypingIndicator(uazapiUrl, token, phone);
+      const typingTime = calculateTypingTime(part);
+      await sleep(typingTime);
+    }
+
+    await sendTextViaUazapi(uazapiUrl, token, phone, part);
+    console.log(`[Buffer Processor] Sent part ${i + 1}/${parts.length}`);
+
+    if (i < parts.length - 1 && effectiveConfig.split_delay_max > 0) {
+      const splitDelay = randomBetween(effectiveConfig.split_delay_min, effectiveConfig.split_delay_max);
+      await sleep(splitDelay * 1000);
+    }
   }
 }
 
@@ -124,11 +290,19 @@ serve(async (req: Request) => {
 
     for (const buffer of readyBuffers) {
       try {
-        // Mark as processing
-        await supabase
+        // Mark as processing (idempotency / avoid double-send when multiple runs overlap)
+        const { data: claimed } = await supabase
           .from('ai_message_buffer')
           .update({ status: 'processing' })
-          .eq('id', buffer.id);
+          .eq('id', buffer.id)
+          .eq('status', 'buffering')
+          .select('id')
+          .maybeSingle();
+
+        if (!claimed?.id) {
+          console.log(`[Buffer Processor] Buffer ${buffer.id} already claimed/processed, skipping`);
+          continue;
+        }
 
         // Combine all messages into one context
         const messages = buffer.messages as Array<{ content: string; timestamp: string }>;
@@ -277,28 +451,23 @@ serve(async (req: Request) => {
             console.log(`[Buffer Processor] Conversation preview updated: "${previewText.substring(0, 30)}..."`);
           }
 
-          // Send via WhatsApp
+          // Send via WhatsApp (humanized splitting)
           const formattedPhone = formatPhoneNumber(buffer.phone);
           const token = instance.instance_key;
 
-          // Apply response delay
-          const delayMin = agent.response_delay_min ?? 2;
-          const delayMax = agent.response_delay_max ?? 5;
-          const delay = randomBetween(delayMin * 1000, delayMax * 1000);
-          
-          console.log(`[Buffer Processor] Waiting ${delay}ms before responding`);
-          await sleep(delay);
+          const sendConfig: MessageSendConfig = {
+            response_delay_min: agent.response_delay_min ?? 2,
+            response_delay_max: agent.response_delay_max ?? 5,
+            max_lines_per_message: agent.max_lines_per_message ?? 0,
+            split_mode: (agent.split_mode ?? 'none') as SplitMode,
+            split_delay_min: agent.split_delay_min ?? 1,
+            split_delay_max: agent.split_delay_max ?? 3,
+            max_chars_per_message: agent.max_chars_per_message ?? 0,
+            typing_simulation: agent.typing_simulation ?? true,
+          };
 
-          // Typing simulation
-          if (agent.typing_simulation) {
-            await sendTypingIndicator(uazapiUrl, token, formattedPhone);
-            const typingTime = calculateTypingTime(assistantResponse);
-            await sleep(typingTime);
-          }
-
-          // Send message
-          await sendTextViaUazapi(uazapiUrl, token, formattedPhone, assistantResponse);
-          console.log(`[Buffer Processor] Response sent for buffer ${buffer.id}`);
+          await sendAIResponseWithConfig(uazapiUrl, token, formattedPhone, assistantResponse, sendConfig);
+          console.log(`[Buffer Processor] Response sent (possibly split) for buffer ${buffer.id}`);
         }
 
         // Mark as completed

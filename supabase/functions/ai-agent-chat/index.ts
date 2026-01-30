@@ -19,6 +19,13 @@ function getCorsHeaders(req: Request) {
 
 const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 
+// When true, the model receives ONLY the system_prompt + the current user message
+// (no extra rules, no canned responses, no client memory context, no history, no tools).
+// This is enforced for WhatsApp sources to match the expected “prompt-only” behavior.
+function isPromptOnlySource(source: string | null | undefined) {
+  return source === 'whatsapp-inbox' || source === 'whatsapp';
+}
+
 const LOVABLE_ALLOWED_MODELS = new Set([
   'openai/gpt-5-mini',
   'openai/gpt-5',
@@ -637,30 +644,39 @@ serve(async (req: Request) => {
         assistantResponse = 'Desculpe, o serviço de IA não está configurado corretamente. Contate o administrador.';
       } else {
         try {
-          // Fetch conversation history for context.
+          const promptOnly = isPromptOnlySource(source);
+          if (promptOnly) {
+            console.log(`[${VERSION}] Prompt-only mode enabled for source=${source} (ignoring history/memory/tools/system injections)`);
+          }
+
+          // Fetch conversation history for context (disabled for prompt-only sources).
           // IMPORTANT: When the agent config changes, old history can keep the model behaving like before.
           // To make config updates take effect immediately, we only include messages created AFTER agent.updated_at.
-          const historyQuery = supabaseAdmin
-            .from('ai_chat_messages')
-            .select('role, content, created_at')
-            .eq('session_id', chatSessionId)
-            .order('created_at', { ascending: true })
-            .limit(20);
+          let history: Array<{ role: string; content: string; created_at: string }> | null = null;
+          if (!promptOnly) {
+            const historyQuery = supabaseAdmin
+              .from('ai_chat_messages')
+              .select('role, content, created_at')
+              .eq('session_id', chatSessionId)
+              .order('created_at', { ascending: true })
+              .limit(20);
 
-          const agentUpdatedAt = agent.updated_at ? String(agent.updated_at) : null;
-          const { data: history } = agentUpdatedAt
-            ? await historyQuery.gt('created_at', agentUpdatedAt)
-            : await historyQuery;
+            const agentUpdatedAt = agent.updated_at ? String(agent.updated_at) : null;
+            const { data } = agentUpdatedAt
+              ? await historyQuery.gt('created_at', agentUpdatedAt)
+              : await historyQuery;
+            history = data ?? null;
 
-          if (agentUpdatedAt) {
-            console.log(`[${VERSION}] Context cutoff enabled: only messages after agent.updated_at=${agentUpdatedAt}`);
+            if (agentUpdatedAt) {
+              console.log(`[${VERSION}] Context cutoff enabled: only messages after agent.updated_at=${agentUpdatedAt}`);
+            }
           }
 
           // Build system prompt with client context and anti-hallucination rules
           const baseSystemPrompt = agent.system_prompt || 'Você é um assistente útil e prestativo. Responda sempre em português brasileiro.';
 
-          // Anti-hallucination rules
-          const antiHallucinationRules = agent.anti_hallucination_enabled !== false ? `
+          // Anti-hallucination rules (disabled for prompt-only)
+          const antiHallucinationRules = (!promptOnly && agent.anti_hallucination_enabled !== false) ? `
 
 ## REGRAS CRÍTICAS DE COMPORTAMENTO (OBEDEÇA SEMPRE)
 
@@ -693,9 +709,9 @@ serve(async (req: Request) => {
    - Se o cliente pedir algo fora do seu escopo, direcione para um atendente humano
 ` : '';
 
-          // ============ CANNED RESPONSES INTEGRATION ==========
+          // ============ CANNED RESPONSES INTEGRATION (disabled for prompt-only) ==========
           let cannedResponsesContext = '';
-          if (agent.use_canned_responses !== false) {
+          if (!promptOnly && agent.use_canned_responses !== false) {
             const { data: cannedResponses, error: cannedError } = await supabaseAdmin
               .from('canned_responses')
               .select('short_code, content')
@@ -724,19 +740,25 @@ INSTRUÇÕES IMPORTANTES:
             }
           }
 
-          const enrichedSystemPrompt = baseSystemPrompt + antiHallucinationRules + cannedResponsesContext + clientContext;
+          // In prompt-only mode we enforce EXACTLY the system prompt.
+          // Otherwise we enrich with rules/knowledge/memory.
+          const enrichedSystemPrompt = promptOnly
+            ? baseSystemPrompt
+            : (baseSystemPrompt + antiHallucinationRules + cannedResponsesContext + clientContext);
 
-          // Build messages array with system prompt and history
+          // Build messages array with system prompt and (optional) history
           const messages: AIMessage[] = [{ role: 'system', content: enrichedSystemPrompt }];
 
-          // Add history (excluding the message we just saved)
-          if (history && history.length > 0) {
-            for (const msg of history) {
-              if (msg.role === 'user' && msg.content === message) continue;
-              messages.push({
-                role: msg.role as 'user' | 'assistant',
-                content: msg.content,
-              });
+          if (!promptOnly) {
+            // Add history (excluding the message we just saved)
+            if (history && history.length > 0) {
+              for (const msg of history) {
+                if (msg.role === 'user' && msg.content === message) continue;
+                messages.push({
+                  role: msg.role as 'user' | 'assistant',
+                  content: msg.content,
+                });
+              }
             }
           }
 
@@ -744,21 +766,24 @@ INSTRUÇÕES IMPORTANTES:
           messages.push({ role: 'user', content: message });
 
           // Build OpenAI-compatible tools array (Lovable AI Gateway)
+          // Disabled entirely for prompt-only sources.
           const tools: any[] = [];
-          if (agent.memory_enabled && agent.memory_auto_extract && phone) {
-            tools.push({ type: 'function', function: extractionToolDef.function });
-          }
+          if (!promptOnly) {
+            if (agent.memory_enabled && agent.memory_auto_extract && phone) {
+              tools.push({ type: 'function', function: extractionToolDef.function });
+            }
 
-          const transferTool = buildTransferTool(availableTargetAgents);
-          if (transferTool) {
-            tools.push({ type: 'function', function: transferTool.function });
-            console.log(`[ai-agent-chat] Transfer tool added with ${availableTargetAgents.length} target agents`);
-          }
+            const transferTool = buildTransferTool(availableTargetAgents);
+            if (transferTool) {
+              tools.push({ type: 'function', function: transferTool.function });
+              console.log(`[ai-agent-chat] Transfer tool added with ${availableTargetAgents.length} target agents`);
+            }
 
-          const pixTool = buildPIXTool(availablePlans);
-          if (pixTool) {
-            tools.push({ type: 'function', function: pixTool.function });
-            console.log(`[ai-agent-chat] PIX tool added with ${availablePlans.length} plans`);
+            const pixTool = buildPIXTool(availablePlans);
+            if (pixTool) {
+              tools.push({ type: 'function', function: pixTool.function });
+              console.log(`[ai-agent-chat] PIX tool added with ${availablePlans.length} plans`);
+            }
           }
 
            console.log(`[${VERSION}] Sending ${messages.length} messages to Lovable AI Gateway`);
