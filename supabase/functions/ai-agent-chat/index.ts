@@ -23,7 +23,8 @@ const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 // (no extra rules, no canned responses, no client memory context, no history, no tools).
 // This is enforced for WhatsApp sources to match the expected “prompt-only” behavior.
 function isPromptOnlySource(source: string | null | undefined) {
-  return source === 'whatsapp-inbox' || source === 'whatsapp';
+  // User-requested: enforce prompt-only for all sources.
+  return true;
 }
 
 const LOVABLE_ALLOWED_MODELS = new Set([
