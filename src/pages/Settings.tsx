@@ -10,6 +10,8 @@ import { usePlanSettings, PlanSetting } from '@/hooks/usePlanSettings';
 import { RenewalReminderSettings } from '@/components/RenewalReminderSettings';
 import { SubscriptionReminderSettings } from '@/components/SubscriptionReminderSettings';
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
+ import { CredentialsSettings } from '@/components/CredentialsSettings';
+ import { Key } from 'lucide-react';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -67,7 +69,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="plans" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Planos</span>
@@ -83,6 +85,10 @@ export default function Settings() {
             <TabsTrigger value="owner-notifications" className="flex items-center gap-2">
               <BellRing className="h-4 w-4" />
               <span className="hidden sm:inline">Alertas</span>
+            </TabsTrigger>
+            <TabsTrigger value="credentials" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              <span className="hidden sm:inline">Credenciais</span>
             </TabsTrigger>
           </TabsList>
 
@@ -163,6 +169,11 @@ export default function Settings() {
           {/* Owner Notifications Tab */}
           <TabsContent value="owner-notifications" className="space-y-6">
             <OwnerNotificationSettings />
+          </TabsContent>
+
+          {/* Credentials Tab */}
+          <TabsContent value="credentials" className="space-y-6">
+            <CredentialsSettings />
           </TabsContent>
         </Tabs>
       </div>
