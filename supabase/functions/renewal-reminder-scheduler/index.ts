@@ -99,8 +99,9 @@ serve(async (req: Request): Promise<Response> => {
     for (const setting of eligibleSettings) {
       results.usersProcessed++;
       const userId = setting.user_id;
-      // Default: 1 day before, on the day, 1 day after
-      const reminderDays: number[] = setting.reminder_days || [1, 0, -1];
+      // ATLAS policy: send ONLY on the expiration day (prevents 2-3 reminders across days)
+      // We intentionally ignore user-configured reminder_days here to ensure a single reminder.
+      const reminderDays: number[] = [0];
       
       // Parse custom messages or use defaults
       let reminderMessages: ReminderMessages = defaultMessages;
@@ -147,7 +148,7 @@ serve(async (req: Request): Promise<Response> => {
             continue;
           }
 
-          const dayLabel = days > 0 ? `${days} day(s) before` : days === 0 ? 'today' : `${Math.abs(days)} day(s) after`;
+           const dayLabel = days > 0 ? `${days} day(s) before` : days === 0 ? 'today' : `${Math.abs(days)} day(s) after`;
           console.log(`Found ${expiringClients.length} clients expiring ${dayLabel} for user ${userId}`);
 
           for (const client of expiringClients) {
@@ -168,15 +169,16 @@ serve(async (req: Request): Promise<Response> => {
               continue;
             }
 
-            // Select the appropriate message template based on days
-            let messageTemplate: string;
-            if (days > 0) {
-              messageTemplate = reminderMessages.before;
-            } else if (days === 0) {
-              messageTemplate = reminderMessages.today;
-            } else {
-              messageTemplate = reminderMessages.after;
-            }
+             // Select the appropriate message template based on days
+             // (With reminderDays=[0], this will always pick the 'today' template)
+             let messageTemplate: string;
+             if (days > 0) {
+               messageTemplate = reminderMessages.before;
+             } else if (days === 0) {
+               messageTemplate = reminderMessages.today;
+             } else {
+               messageTemplate = reminderMessages.after;
+             }
 
             // Replace variables in the message
             const message = replaceVariables(messageTemplate, client);
