@@ -89,6 +89,76 @@ export default function Atendimento() {
   const { permission, requestPermission, showLocalNotification, isSupported } = usePushNotifications();
   const { playNewMessage, playMessageSent } = useSoundEffects();
   const lastNotifiedMessageRef = useRef<string | null>(null);
+  const promptedAiConversationsRef = useRef<Set<string>>(new Set());
+
+  const maybePromptAIForConversation = useCallback((conv: Conversation) => {
+    const meta = (conv.metadata as Record<string, unknown> | null) || {};
+    const isPending = meta.ai_prompt_pending === true;
+    if (!isPending) return;
+    if (promptedAiConversationsRef.current.has(conv.id)) return;
+    promptedAiConversationsRef.current.add(conv.id);
+
+    const contactName = conv.contact_name || 'Cliente';
+
+    const upsertDecision = async (enable: boolean) => {
+      const nextMeta: Record<string, unknown> = {
+        ...meta,
+        ai_prompt_pending: false,
+        ai_prompt_decided_at: new Date().toISOString(),
+        ai_prompt_decision: enable ? 'enabled' : 'disabled',
+      };
+
+      const updateData: Record<string, unknown> = {
+        metadata: nextMeta,
+        ai_enabled: enable,
+        // Keep as "desativada" (not paused) if user chooses no.
+        ai_paused_at: enable ? null : null,
+      };
+
+      if (enable) {
+        updateData.assigned_to = null;
+      }
+
+      await supabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', conv.id);
+    };
+
+    let toastHandle: { dismiss: () => void } | null = null;
+
+    toastHandle = toast({
+      title: 'Nova conversa — ativar IA?',
+      description: (
+        <div className="mt-2 space-y-2">
+          <div className="text-sm text-muted-foreground">
+            Mensagem recebida de <span className="font-medium text-foreground">{contactName}</span>.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={async () => {
+                toastHandle?.dismiss();
+                await upsertDecision(true);
+              }}
+            >
+              Ativar IA
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                toastHandle?.dismiss();
+                await upsertDecision(false);
+              }}
+            >
+              Manter desligada
+            </Button>
+          </div>
+        </div>
+      ),
+    });
+  }, [toast]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -251,6 +321,8 @@ export default function Atendimento() {
           const newConversation = payload.new as Conversation;
           console.log('[Automation] New conversation created, checking triggers...');
           triggerConversationCreated(newConversation);
+          // Ask whether to enable AI on new conversations (only when flagged by backend).
+          maybePromptAIForConversation(newConversation);
         }
       )
       .subscribe();
@@ -258,7 +330,7 @@ export default function Atendimento() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversations, triggerMessageCreated, triggerConversationCreated, lastProcessedMessageId]);
+  }, [conversations, triggerMessageCreated, triggerConversationCreated, lastProcessedMessageId, maybePromptAIForConversation]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilter(prev => ({ ...prev, search: searchQuery || undefined }));
