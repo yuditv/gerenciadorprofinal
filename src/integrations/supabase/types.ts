@@ -1052,11 +1052,14 @@ export type Database = {
       client_pix_payments: {
         Row: {
           amount: number
+          client_id: string | null
           client_phone: string
           conversation_id: string | null
           created_at: string
           description: string | null
           duration_days: number | null
+          expected_plan: string | null
+          expected_plan_label: string | null
           expires_at: string | null
           external_id: string | null
           id: string
@@ -1066,17 +1069,22 @@ export type Database = {
           pix_qr_code: string | null
           plan_id: string | null
           plan_name: string
+          renewal_applied_at: string | null
+          renewal_error: string | null
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
           amount: number
+          client_id?: string | null
           client_phone: string
           conversation_id?: string | null
           created_at?: string
           description?: string | null
           duration_days?: number | null
+          expected_plan?: string | null
+          expected_plan_label?: string | null
           expires_at?: string | null
           external_id?: string | null
           id?: string
@@ -1086,17 +1094,22 @@ export type Database = {
           pix_qr_code?: string | null
           plan_id?: string | null
           plan_name: string
+          renewal_applied_at?: string | null
+          renewal_error?: string | null
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
+          client_id?: string | null
           client_phone?: string
           conversation_id?: string | null
           created_at?: string
           description?: string | null
           duration_days?: number | null
+          expected_plan?: string | null
+          expected_plan_label?: string | null
           expires_at?: string | null
           external_id?: string | null
           id?: string
@@ -1106,11 +1119,20 @@ export type Database = {
           pix_qr_code?: string | null
           plan_id?: string | null
           plan_name?: string
+          renewal_applied_at?: string | null
+          renewal_error?: string | null
           status?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_pix_payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_pix_payments_conversation_id_fkey"
             columns: ["conversation_id"]
