@@ -160,8 +160,8 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
           <div className="flex items-center gap-3 pr-6 border-r border-border/50 shrink-0">
             <div className="relative">
               <img
-                src={logoFuturistic}
-                alt="Logo"
+                src="/pwa-192x192.png"
+                alt="ATLAS 2.0"
                 className="h-10 w-10 rounded-lg object-contain"
               />
               <motion.div 
@@ -170,7 +170,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                 transition={{ duration: 2, repeat: Infinity }}
               />
             </div>
-            <span className="font-bold text-xl text-gradient hidden sm:inline">Painel</span>
+            <span className="font-bold text-xl text-gradient hidden sm:inline">ATLAS 2.0</span>
           </div>
 
           {/* Menu Items */}
