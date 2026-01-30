@@ -1,163 +1,170 @@
 
-Objetivo (o que vai acontecer)
-- No dia do vencimento (HOJE), quando a automação enviar a mensagem para o cliente, ela já vai incluir:
-  1) a mensagem de renovação,
-  2) o QR Code do PIX (imagem),
-  3) o “copia e cola” do PIX (código).
-- Quando o cliente pagar:
-  1) o sistema identifica automaticamente via webhook do Mercado Pago,
-  2) renova automaticamente o plano do cliente (com base no plano do cliente e no valor esperado),
-  3) envia uma notificação para você via WhatsApp usando Configurações > Notificações do Dono.
+Objetivo (seguir agora)
+Implementar o fluxo completo “Renovação automática via PIX no dia do vencimento” com:
+- Scheduler criando/reutilizando cobrança PIX e agendando mensagem especial
+- Dispatcher enviando WhatsApp na ordem escolhida: **texto → imagem (QR)** (e opcionalmente um 2º texto com “copia e cola”, se necessário)
+- Webhook Mercado Pago validando pagamento com o **token correto (do usuário)** quando for PIX de cliente, aplicando renovação automática e notificando o dono (Owner Notifications)
+- Corrigir pontos técnicos pendentes (QR base64 padronizado, reuso de cobrança pendente, registro em renewal_history, etc.)
 
-Como está hoje (diagnóstico rápido)
-- `renewal-reminder-scheduler` cria registros em `scheduled_messages` e o `scheduled-dispatcher` envia somente texto via WhatsApp.
-- Já existe Edge Function `generate-client-pix-v2` que cria PIX usando o Access Token do próprio usuário e grava em `client_pix_payments`.
-- O webhook `mercado-pago-webhook` processa pagamentos aprovados, inclusive `client_pix_payments`, mas hoje ele valida o pagamento no Mercado Pago usando o token global `MERCADO_PAGO_ACCESS_TOKEN` — isso pode falhar para PIX criados com tokens individuais (cada usuário).
+Status atual confirmado
+- Migração do banco já foi aplicada: `client_pix_payments` ganhou `client_id`, `expected_plan`, `expected_plan_label`, `renewal_applied_at`, `renewal_error` + índices.
+- Edge functions atuais:
+  - `renewal-reminder-scheduler`: hoje só cria `scheduled_messages` tipo `renewal_reminder` (texto).
+  - `scheduled-dispatcher`: hoje envia apenas texto via `/send/text`.
+  - `generate-client-pix-v2`: cria PIX com token individual do usuário, mas não liga ao `client_id` e não normaliza `pix_qr_code` como Data URI.
+  - `mercado-pago-webhook`: valida no Mercado Pago usando o token global `MERCADO_PAGO_ACCESS_TOKEN` (isso falha para PIX gerados por tokens individuais) e o handler de client PIX hoje “cadastra/atualiza cliente” de um jeito que não segue a regra de renovação (baseDate = max(now, expires_at)).
 
-Mudanças necessárias (alto nível)
-A) Automação: gerar PIX automaticamente no momento do envio da mensagem
-B) Envio: mandar QR Code como mídia + depois mandar texto com código copia/cola
-C) Pagamento: webhook validar e processar o pagamento usando o token do próprio usuário (credencial individual)
-D) Renovação: estender o vencimento do cliente corretamente (e registrar histórico)
-E) Notificação: avisar você via WhatsApp (Notificações do Dono)
+Decisões que você escolheu (vou implementar assim)
+1) Validação do PIX: **Renovar mesmo se diferente** (ou seja, não vamos bloquear renovação se valor divergir; apenas registrar/logar para auditoria).
+2) Ordem de envio no WhatsApp: **Texto depois imagem**.
 
-1) Banco de dados (migrations)
-1.1. Ajustar `client_pix_payments` para suportar renovação automática com rastreio melhor
-- Adicionar colunas (todas opcionais para não quebrar dados antigos):
-  - `client_id` (uuid, referencia `clients.id`) para ligar o pagamento a um cliente específico
-  - `expected_plan` (text) e/ou `expected_plan_label` (text) para registrar o plano esperado no momento da cobrança
-  - `renewal_applied_at` (timestamptz) para marcar quando a renovação foi aplicada automaticamente
-  - `renewal_error` (text) para guardar motivo caso falhe (ex.: credencial faltando, cliente não encontrado)
-- Índices recomendados:
-  - índice em `client_pix_payments(external_id)` (se ainda não existir/garantir performance)
-  - índice em `client_pix_payments(user_id, client_id, status, expires_at)` para reuso de cobranças pendentes
+Escopo das mudanças (o que será alterado)
+A) Edge Function `generate-client-pix-v2`
+1. Aceitar `client_id` no body e persistir em `client_pix_payments.client_id`.
+2. Persistir também:
+   - `expected_plan` e/ou `expected_plan_label` (com base no plano atual do cliente)
+   - `duration_days` coerente com o plano
+3. Normalizar `pix_qr_code`:
+   - se vier base64 “cru” do Mercado Pago, salvar como `data:image/png;base64,${base64}`
+4. Robustez Mercado Pago (mitigação de egress/PolicyAgent já usada em `wallet-pix`):
+   - usar `AbortController` (timeout ~15s)
+   - setar headers `Accept: application/json` e `User-Agent: gerenciadorpro/1.0 (supabase-edge)`
+   - ler `response.text()` e só depois tentar `JSON.parse` (para lidar com HTML/WAF)
 
-1.2. Garantir que a renovação fique registrada
-- Se já existir `renewal_history` (você tem no front), garantir que o webhook insira um registro quando renovar via PIX:
-  - `client_id`, `user_id`, `plan`, `previous_expires_at`, `new_expires_at`
+B) Edge Function `renewal-reminder-scheduler`
+1. Continuar elegibilidade atual (whatsapp_reminders_enabled=true e auto_send_enabled=true), e continuar “só no dia” (0 dias).
+2. Para cada cliente vencendo HOJE:
+   - se `client.price` não existir ou for <= 0:
+     - manter comportamento atual: agenda `scheduled_messages` tipo `renewal_reminder` (texto padrão)
+     - registrar log claro (para você saber que faltou preço)
+   - se tiver preço:
+     - calcular `duration_days` por plano (monthly=30, quarterly=90, semiannual=180, annual=365)
+     - tentar reutilizar cobrança pendente ainda válida:
+       - buscar em `client_pix_payments` por `user_id + client_id` com `status='pending'` e `expires_at > now()`, ordenar desc e pegar 1
+     - se não existir cobrança pendente válida:
+       - gerar uma nova cobrança PIX usando o token individual do usuário (de `user_payment_credentials.mercado_pago_access_token_enc`)
+       - inserir em `client_pix_payments` com:
+         - `client_id`, `client_phone`, `amount=client.price`, `duration_days`, `expected_plan`, `expected_plan_label`, `status='pending'`, `expires_at`
+     - criar `scheduled_messages` com:
+       - `message_type = 'renewal_reminder_pix'`
+       - `message_content` contendo:
+         - mensagem de renovação (template de “today”)
+         - instruções do PIX
+         - o “copia e cola” (`pix_code`)
+       - `scheduled_at = now()` e `status='pending'`
+3. Importante: o scheduler não vai enviar WhatsApp diretamente; ele apenas prepara dados + agenda.
 
-2) Edge Function: `generate-client-pix-v2` (melhorias)
-2.1. Normalizar QR Code base64
-- Hoje `pix_qr_code` pode estar vindo sem o prefixo `data:image/png;base64,`.
-- Ajustar para sempre salvar como `data:image/png;base64,${...}` (igual já é feito em outras funções), para o envio de mídia funcionar consistente.
+C) Edge Function `scheduled-dispatcher`
+1. Detectar `message.message_type === 'renewal_reminder_pix'`
+2. Para esse tipo:
+   - localizar a cobrança em `client_pix_payments`:
+     - preferir `user_id + client_id` (do scheduled_messages)
+     - fallback: `user_id + client_phone` (caso algum registro antigo não tenha client_id)
+     - exigir `status='pending'` e `expires_at > now()`
+   - Envio na ordem escolhida (texto → imagem):
+     1) Enviar texto via `/send/text` com:
+        - `message_content` já com o copia/cola
+     2) Enviar imagem (QR) via `/send/media` com:
+        - `{ number, type: "image", file: pix_qr_code }`
+        - `pix_qr_code` deve estar no formato Data URI (por isso o ajuste no `generate-client-pix-v2`)
+   - Se faltar QR ou faltar pix_code por algum motivo:
+     - degradar com elegância (mandar o que tiver) e marcar o scheduled_message como `sent` apenas se pelo menos 1 envio tiver sucesso; caso ambos falhem, marcar `failed`.
+3. Para outros tipos de mensagem, manter comportamento atual (somente texto).
+4. Logging mais detalhado para debug (IDs de message/client/payment e status de cada envio).
 
-2.2. Permitir vincular a cobrança ao cliente
-- Aceitar `client_id` no payload e salvar em `client_pix_payments.client_id`.
-- Salvar também `duration_days` calculado a partir do plano do cliente (ver item 3).
+D) Edge Function `mercado-pago-webhook`
+1. Ajustar o fluxo para escolher o token correto:
+   - Antes de consultar Mercado Pago, localizar o pagamento no seu banco por `external_id`:
+     1) `subscription_payments`
+     2) `client_pix_payments`
+     3) `wallet_topups`
+   - Definir o access token a usar no GET /v1/payments/{id}:
+     - subscription_payments: token global `MERCADO_PAGO_ACCESS_TOKEN`
+     - wallet_topups: token global `MERCADO_PAGO_ACCESS_TOKEN`
+     - client_pix_payments: token do dono do pagamento:
+       - buscar `user_payment_credentials.mercado_pago_access_token_enc` pelo `payment.user_id`
+2. Apenas se Mercado Pago retornar `status === 'approved'`:
+   - Para `client_pix_payments`:
+     - marcar como `paid` (se ainda não estiver) + `paid_at`
+     - aplicar renovação automática no cliente:
+       - localizar cliente por `client_id` (preferencial)
+       - calcular:
+         - `baseDate = max(now, clients.expires_at)`
+         - `newExpiresAt = baseDate + duration_days` (em dias)
+       - atualizar `clients.expires_at = newExpiresAt`
+       - inserir `renewal_history`:
+         - client_id, user_id, plan, previous_expires_at, new_expires_at
+       - atualizar `client_pix_payments`:
+         - `renewal_applied_at = now()` em caso de sucesso
+         - `renewal_error = ...` em caso de falha (ex.: cliente não encontrado)
+     - notificar o dono via `send-owner-notification`:
+       - chamada interna (service role Bearer) com:
+         - eventType: `payment_proof`
+         - contactPhone: whatsapp do cliente
+         - contactName (se disponível)
+         - summary: “PIX aprovado — {cliente} — R$X — Renovado até {data}”
+         - conversationId se existir em `client_pix_payments`
+3. Reprocessamento/idempotência:
+   - se `client_pix_payments.status` já for `paid` e `renewal_applied_at` já existir, não renovar de novo.
+4. Robustez e padrões do projeto:
+   - manter comportamento “sempre retornar 200” para evitar retries infinitos do Mercado Pago, mas logar claramente o erro.
+   - adicionar mitigação de egress (headers, timeout, parse resiliente) igual ao `wallet-pix` quando fizer chamadas ao Mercado Pago.
 
-3) Edge Function: `renewal-reminder-scheduler` (gerar PIX + agendar mensagem)
-Você escolheu:
-- Quando enviar: No dia (HOJE)
-- Valor do PIX: Preço do cliente (`clients.price`)
-Então a lógica ficará:
-3.1. Para cada cliente que vence HOJE:
-- Validar se `client.price` existe e é > 0:
-  - Se não existir: mandar somente a mensagem normal (sem PIX) e registrar log/notification_history como “sem preço”.
-- Se existir:
-  - Calcular `duration_days` baseado no `clients.plan`:
-    - monthly → 30
-    - quarterly → 90
-    - semiannual → 180
-    - annual → 365
-  - Reusar PIX pendente existente:
-    - buscar em `client_pix_payments` o mais recente para esse `client_id` com `status='pending'` e `expires_at > now()`
-    - se existir, reaproveitar (evita mandar vários PIX seguidos)
-  - Se não existir, criar um novo PIX chamando a lógica do `generate-client-pix-v2` (ou replicar a criação diretamente no scheduler usando o Access Token do usuário):
-    - usar o Access Token salvo em `user_payment_credentials` do próprio usuário
-    - salvar em `client_pix_payments` com:
-      - `client_id`, `client_phone`, `plan_name`, `expected_plan`, `amount`, `duration_days`, `pix_code`, `pix_qr_code`, `external_id`, `status='pending'`, `expires_at`
-3.2. Criar o `scheduled_messages` com um tipo específico, por exemplo:
-- `message_type = 'renewal_reminder_pix'`
-- `message_content` já com:
-  - valor (formatado),
-  - instrução “escaneie o QR Code”,
-  - bloco com o pix copia/cola.
-Obs.: O envio do QR Code (imagem) será feito no dispatcher (item 4), buscando no `client_pix_payments`.
+E) Correção importante de qualidade (types do Supabase no front)
+- Foi alterado `src/integrations/supabase/types.ts` no diff anterior, mas esse arquivo é “auto gerado / não editar”.
+- Na implementação eu vou:
+  - reverter esse arquivo para evitar drift (e respeitar a regra),
+  - ajustar qualquer código TypeScript que precise dos novos campos usando `as any`/tipos locais (ou uma tipagem auxiliar segura), sem depender de mexer no arquivo gerado.
 
-4) Edge Function: `scheduled-dispatcher` (enviar QR + texto)
-4.1. Se `message_type === 'renewal_reminder_pix'`:
-- Antes de enviar, buscar o `client_pix_payments` “ativo” (pending e não expirado) para aquele `client_id` (ou por `user_id + client_phone` como fallback).
-- Enviar primeiro a mídia (QR code) via UAZAPI `/send/media` usando `type: "image"`, `file: pix_qr_code`.
-- Em seguida, enviar o texto (mensagem + pix_code).
-4.2. Manter o comportamento atual para outros tipos de mensagem (só texto).
+Sequência de implementação (ordem)
+1) Ajustar `generate-client-pix-v2` (client_id + data URI + robustez MP).
+2) Ajustar `renewal-reminder-scheduler` para:
+   - calcular valor/duração
+   - reutilizar/gerar cobrança PIX
+   - criar `scheduled_messages` tipo `renewal_reminder_pix`
+3) Ajustar `scheduled-dispatcher` para:
+   - enviar “texto → imagem QR” quando `renewal_reminder_pix`
+4) Refatorar `mercado-pago-webhook` para:
+   - localizar pagamento no DB antes
+   - consultar MP com token correto (principalmente para client_pix_payments)
+   - aplicar renovação + renewal_history + owner notification
+5) Ajuste técnico: reverter `src/integrations/supabase/types.ts` e acomodar tipagens sem editar arquivo gerado.
+6) Testes ponta-a-ponta + logs
 
-5) Edge Function: `mercado-pago-webhook` (validar com token correto + renovar + notificar)
-Problema atual:
-- Ele tenta validar todos os pagamentos no Mercado Pago com `MERCADO_PAGO_ACCESS_TOKEN` global.
-- Para PIX criados com tokens individuais, isso pode retornar 404 e impedir o processamento.
-Ajuste proposto:
-5.1. Primeiro localizar o pagamento no seu banco (por `external_id`) antes de consultar a API do Mercado Pago:
-- procurar em `subscription_payments`
-- se não achar, procurar em `client_pix_payments`
-- se não achar, procurar em `wallet_topups`
-5.2. Escolher o token certo para consultar o Mercado Pago:
-- Para `client_pix_payments`: buscar `user_payment_credentials.mercado_pago_access_token_enc` do `payment.user_id` e usar esse token para `GET /v1/payments/{id}`.
-- Para `subscription_payments` e `wallet_topups`: manter o token global atual (porque são fluxos centralizados).
-5.3. Se aprovado:
-- Atualizar `client_pix_payments.status='paid'` + `paid_at`
-- Renovar cliente:
-  - localizar o cliente por `client_id` (preferencial) ou por `user_id + whatsapp`
-  - calcular a nova data:
-    - `baseDate = max(now, clients.expires_at)`
-    - `newExpiresAt = baseDate + duration_days` (ou converter para meses, mas dias resolve e é consistente com o que você já armazena)
-  - atualizar `clients.expires_at = newExpiresAt` e manter `clients.plan` como o plano atual
-  - inserir em `renewal_history` o registro da renovação automática
-- Notificar você (WhatsApp) via Notificações do Dono:
-  - chamar internamente a função `send-owner-notification` com:
-    - `eventType: 'payment_proof'`
-    - `summary`: “PIX aprovado para {cliente} — Valor R$X — Plano {plano} — Renovado até {data}”
-    - `contactPhone`: telefone do cliente
-    - `conversationId` se estiver disponível no `client_pix_payments.conversation_id`
-Obs.: isso respeita quiet hours e anti-spam já existentes.
+Checklist de teste (ponta a ponta)
+1) Preparar um cliente:
+   - expires_at = hoje
+   - plan = monthly/quarterly/semiannual/annual
+   - price preenchido
+   - whatsapp válido
+2) Rodar `renewal-reminder-scheduler`:
+   - deve criar 1 registro em `client_pix_payments` (ou reutilizar um pending válido)
+   - deve criar 1 registro em `scheduled_messages` com `message_type='renewal_reminder_pix'`
+3) Rodar `scheduled-dispatcher`:
+   - WhatsApp deve receber:
+     - primeiro o texto com instruções + copia e cola
+     - depois a imagem do QR
+4) Aprovar o pagamento no Mercado Pago (teste real ou sandbox conforme você usa):
+   - webhook deve:
+     - marcar `client_pix_payments` como paid
+     - atualizar `clients.expires_at` corretamente (baseDate = max(now, antigo))
+     - inserir `renewal_history`
+     - preencher `renewal_applied_at` (e não duplicar em reprocessamento)
+     - disparar `send-owner-notification`
+5) Conferir logs:
+   - `renewal-reminder-scheduler`
+   - `scheduled-dispatcher`
+   - `mercado-pago-webhook`
+   - `send-owner-notification`
 
-6) UI (opcional, mas recomendado)
-- Em Configurações > Notificações do Dono:
-  - garantir que existe uma opção ligada para “pagamento” (hoje é “payment_proof”).
-- Em Clientes:
-  - garantir que `price` esteja preenchido (porque o valor do PIX sai daí).
-- (Opcional) Em histórico do cliente:
-  - mostrar entradas de `renewal_history` “Renovado via PIX”.
+Riscos / pontos de atenção
+- Egress/PolicyAgent: já vimos que pode bloquear chamadas ao Mercado Pago; por isso vou padronizar a estratégia robusta (headers + timeout + parse resiliente) também nos pontos que ainda fazem fetch “cru”.
+- UAZAPI: envio de mídia exige que `pix_qr_code` esteja num formato aceito (Data URI tem funcionado no `wallet-pix`).
+- Idempotência no webhook: essencial para não renovar duas vezes se o Mercado Pago reenviar eventos.
 
-7) Regras/edge cases importantes
-- Se o cliente não tiver `price`, o sistema envia só a mensagem (sem PIX) e registra log (para você identificar e corrigir).
-- Se o usuário não tiver credencial do Mercado Pago configurada, o sistema:
-  - não gera PIX automático,
-  - envia só a mensagem,
-  - registra erro no log do scheduler (para debug).
-- Reuso de PIX: se já existe cobrança pendente e ainda válida, não cria outra.
-- Segurança: o webhook continua retornando 200 sempre (como já faz) para evitar retries infinitos, mas vai logar claramente quando falhar.
-
-8) Sequência de implementação (ordem)
-1. Migrations no banco (novas colunas/índices no `client_pix_payments`).
-2. Ajustar `generate-client-pix-v2` (QR code data URI + aceitar `client_id`).
-3. Ajustar `renewal-reminder-scheduler` para gerar/reusar PIX e criar `scheduled_messages` do tipo `renewal_reminder_pix`.
-4. Ajustar `scheduled-dispatcher` para enviar QR code (mídia) + texto quando `renewal_reminder_pix`.
-5. Ajustar `mercado-pago-webhook` para:
-   - validar com token correto por tipo
-   - renovar cliente corretamente
-   - chamar `send-owner-notification`
-6. Testes ponta-a-ponta (ver checklist abaixo).
-
-9) Checklist de teste (ponta a ponta)
-- Preparar um cliente com:
-  - `expires_at` = hoje,
-  - `price` preenchido,
-  - `plan` definido,
-  - WhatsApp válido.
-- Rodar o scheduler (via cron/execução manual) e confirmar:
-  - criou `client_pix_payments` pendente,
-  - criou `scheduled_messages` pendente.
-- Rodar o dispatcher e confirmar:
-  - WhatsApp recebeu imagem (QR) e depois texto (código).
-- Simular pagamento (ou fazer um pagamento real de teste) e confirmar:
-  - webhook marcou `client_pix_payments` como paid,
-  - `clients.expires_at` foi estendido corretamente,
-  - `renewal_history` recebeu o registro,
-  - você recebeu a notificação via Notificações do Dono.
-
-Links úteis no Supabase (para você acompanhar logs)
-- Edge Functions (lista): https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions
-- Logs do webhook: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/mercado-pago-webhook/logs
-- Logs do scheduler: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/renewal-reminder-scheduler/logs
-- Logs do dispatcher: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/scheduled-dispatcher/logs
-- Secrets (para conferir tokens): https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/settings/functions
+Links operacionais (para você acompanhar)
+- Edge Functions: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions
+- Logs webhook: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/mercado-pago-webhook/logs
+- Logs scheduler: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/renewal-reminder-scheduler/logs
+- Logs dispatcher: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/scheduled-dispatcher/logs
+- Logs owner notification: https://supabase.com/dashboard/project/tlanmmbgyyxuqvezudir/functions/send-owner-notification/logs
