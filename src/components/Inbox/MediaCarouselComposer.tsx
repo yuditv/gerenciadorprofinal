@@ -240,7 +240,7 @@ export function MediaCarouselComposer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col min-h-0">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GalleryHorizontal className="h-5 w-5 text-primary" />
@@ -248,7 +248,7 @@ export function MediaCarouselComposer({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+        <div className="flex-1 overflow-hidden flex flex-col gap-4 min-h-0">
           {/* Header Text */}
           <div className="space-y-2">
             <Label>Texto Principal</Label>
@@ -288,7 +288,7 @@ export function MediaCarouselComposer({
           </div>
 
           {/* Active Card Editor */}
-          <ScrollArea className="flex-1 pr-4">
+          <ScrollArea className="flex-1 pr-4 min-h-0">
             <div className="space-y-4">
               {/* Card Header */}
               <div className="flex items-center justify-between">
