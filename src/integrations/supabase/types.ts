@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_member_permissions: {
+        Row: {
+          can_manage_labels_macros: boolean
+          can_send: boolean
+          can_transfer: boolean
+          created_at: string
+          id: string
+          member_id: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_manage_labels_macros?: boolean
+          can_send?: boolean
+          can_transfer?: boolean
+          created_at?: string
+          id?: string
+          member_id: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_manage_labels_macros?: boolean
+          can_send?: boolean
+          can_transfer?: boolean
+          created_at?: string
+          id?: string
+          member_id?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      account_members: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          owner_id?: string
+        }
+        Relationships: []
+      }
       agent_status: {
         Row: {
           auto_offline: boolean | null
@@ -2930,6 +2984,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_owner_id: { Args: { p_user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
