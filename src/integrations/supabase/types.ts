@@ -2623,6 +2623,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_payment_credentials: {
+        Row: {
+          created_at: string
+          mercado_pago_access_token_enc: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          mercado_pago_access_token_enc: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          mercado_pago_access_token_enc?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_manage_campaigns: boolean | null
