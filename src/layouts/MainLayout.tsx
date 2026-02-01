@@ -15,6 +15,7 @@ const FilterNumbers = lazy(() => import("@/pages/FilterNumbers"));
 const AIAgent = lazy(() => import("@/pages/AIAgent"));
 const WarmChips = lazy(() => import("@/pages/WarmChips"));
 const Atendimento = lazy(() => import("@/pages/Atendimento"));
+const CRMKanban = lazy(() => import("@/pages/CRMKanban"));
 const ContentLoader = () => <div className="flex items-center justify-center h-full min-h-[400px]">
     <div className="relative">
       <div className="h-12 w-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
@@ -50,7 +51,7 @@ export function MainLayout() {
   });
   useEffect(() => {
     const section = searchParams.get('section') as AppSection;
-    if (section && ['clients', 'whatsapp', 'atendimento', 'filter-numbers', 'ai-agent', 'warm-chips'].includes(section)) {
+    if (section && ['clients', 'whatsapp', 'atendimento', 'filter-numbers', 'ai-agent', 'warm-chips', 'crm-kanban'].includes(section)) {
       setActiveSection(section);
     }
   }, [searchParams]);
@@ -68,6 +69,8 @@ export function MainLayout() {
         return <WarmChips />;
       case "atendimento":
         return <Atendimento />;
+      case "crm-kanban":
+        return <CRMKanban />;
       default:
         return <Index />;
     }
