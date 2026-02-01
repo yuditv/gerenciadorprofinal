@@ -32,9 +32,10 @@ import { useAccountContext } from "@/hooks/useAccountContext";
 import { useCustomerChatLinks } from "@/hooks/useCustomerChatLinks";
 import { useCustomerConversations } from "@/hooks/useCustomerConversations";
 import { useCustomerMessages } from "@/hooks/useCustomerMessages";
-import { CreateCustomerChatLinkDialog } from "@/components/CustomerChat/CreateCustomerChatLinkDialog";
+import { CreateCustomerChatLinkDialog, QuickCopyLinkButton } from "@/components/CustomerChat/CreateCustomerChatLinkDialog";
 import { CustomerChatList } from "@/components/CustomerChat/CustomerChatList";
 import { CustomerChatPanel } from "@/components/CustomerChat/CustomerChatPanel";
+import { useAIAgents } from "@/hooks/useAIAgents";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,7 +71,13 @@ export default function Atendimento() {
     conversations: customerConversations,
     unreadTotal: customerUnreadTotal,
     isLoading: isCustomerConversationsLoading,
+    deleteConversation: deleteCustomerConversation,
+    toggleAI: toggleCustomerAI,
+    setActiveAgent: setCustomerActiveAgent,
   } = useCustomerConversations(!isMember ? ownerId : null);
+
+  const { agents: aiAgents } = useAIAgents();
+  const [isDeletingCustomerConv, setIsDeletingCustomerConv] = useState(false);
 
   const selectedCustomerConversation = customerConversations.find((c) => c.id === selectedCustomerConversationId) ?? null;
   const {
@@ -680,6 +687,7 @@ export default function Atendimento() {
                           {l.customer_name ? ` • ${l.customer_name}` : ""}
                         </div>
                         <div className="flex items-center gap-2">
+                          <QuickCopyLinkButton url={getInviteUrl(l.token)} />
                           <Button
                             variant="outline"
                             size="sm"
@@ -693,7 +701,6 @@ export default function Atendimento() {
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm" disabled={isCustomerLinksMutating}>
                                 <Trash2 className="h-4 w-4" />
-                                Excluir
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -721,7 +728,22 @@ export default function Atendimento() {
                 conversations={customerConversations}
                 selectedId={selectedCustomerConversationId}
                 onSelect={(c) => setSelectedCustomerConversationId(c.id)}
+                onDelete={async (id) => {
+                  setIsDeletingCustomerConv(true);
+                  const success = await deleteCustomerConversation(id);
+                  if (success && selectedCustomerConversationId === id) {
+                    setSelectedCustomerConversationId(null);
+                  }
+                  setIsDeletingCustomerConv(false);
+                  if (success) {
+                    toast({ title: "Conversa excluída" });
+                  } else {
+                    toast({ title: "Erro ao excluir conversa", variant: "destructive" });
+                  }
+                  return success;
+                }}
                 isLoading={isCustomerConversationsLoading}
+                isDeleting={isDeletingCustomerConv}
               />
 
               <CustomerChatPanel
@@ -731,6 +753,16 @@ export default function Atendimento() {
                 isSending={isCustomerSending}
                 onSend={sendCustomerMessage}
                 viewer="owner"
+                conversation={selectedCustomerConversation}
+                agents={aiAgents}
+                onToggleAI={async (enabled, agentId) => {
+                  if (!selectedCustomerConversationId) return false;
+                  return toggleCustomerAI(selectedCustomerConversationId, enabled, agentId);
+                }}
+                onSetAgent={async (agentId) => {
+                  if (!selectedCustomerConversationId) return false;
+                  return setCustomerActiveAgent(selectedCustomerConversationId, agentId);
+                }}
               />
             </div>
           ) : (

@@ -11,6 +11,8 @@ export type CustomerConversation = {
   last_message_at: string | null;
   unread_owner_count: number;
   unread_customer_count: number;
+  ai_enabled: boolean;
+  active_agent_id: string | null;
 };
 
 export type CustomerConversationView = CustomerConversation & {
@@ -32,7 +34,7 @@ export function useCustomerConversations(ownerId: string | null) {
       const { data: convs, error: convError } = await supabase
         .from("customer_conversations")
         .select(
-          "id, owner_id, customer_user_id, link_id, created_at, updated_at, last_message_at, unread_owner_count, unread_customer_count"
+          "id, owner_id, customer_user_id, link_id, created_at, updated_at, last_message_at, unread_owner_count, unread_customer_count, ai_enabled, active_agent_id"
         )
         .eq("owner_id", ownerId)
         .order("last_message_at", { ascending: false, nullsFirst: false });
@@ -101,5 +103,68 @@ export function useCustomerConversations(ownerId: string | null) {
     [conversations]
   );
 
-  return { conversations, unreadTotal, isLoading, refetch };
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    try {
+      // First delete all messages in the conversation
+      const { error: messagesError } = await supabase
+        .from("customer_messages")
+        .delete()
+        .eq("conversation_id", conversationId);
+
+      if (messagesError) throw messagesError;
+
+      // Then delete the conversation itself
+      const { error: convError } = await supabase
+        .from("customer_conversations")
+        .delete()
+        .eq("id", conversationId);
+
+      if (convError) throw convError;
+
+      await refetch();
+      return true;
+    } catch (e) {
+      console.error("[useCustomerConversations] deleteConversation failed", e);
+      return false;
+    }
+  }, [refetch]);
+
+  const toggleAI = useCallback(async (conversationId: string, enabled: boolean, agentId?: string | null) => {
+    try {
+      const updateData: Record<string, unknown> = { ai_enabled: enabled };
+      if (agentId !== undefined) {
+        updateData.active_agent_id = agentId;
+      }
+      
+      const { error } = await supabase
+        .from("customer_conversations")
+        .update(updateData)
+        .eq("id", conversationId);
+
+      if (error) throw error;
+      await refetch();
+      return true;
+    } catch (e) {
+      console.error("[useCustomerConversations] toggleAI failed", e);
+      return false;
+    }
+  }, [refetch]);
+
+  const setActiveAgent = useCallback(async (conversationId: string, agentId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from("customer_conversations")
+        .update({ active_agent_id: agentId })
+        .eq("id", conversationId);
+
+      if (error) throw error;
+      await refetch();
+      return true;
+    } catch (e) {
+      console.error("[useCustomerConversations] setActiveAgent failed", e);
+      return false;
+    }
+  }, [refetch]);
+
+  return { conversations, unreadTotal, isLoading, refetch, deleteConversation, toggleAI, setActiveAgent };
 }
