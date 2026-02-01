@@ -73,16 +73,41 @@ export function useCustomerChatLinks(ownerId: string | null) {
     [ownerId, refetch]
   );
 
-  const deactivateLink = useCallback(
-    async (id: string) => {
+  const setLinkActive = useCallback(
+    async (id: string, is_active: boolean) => {
       setIsMutating(true);
       try {
-        const { error } = await supabase.from("customer_chat_links").update({ is_active: false }).eq("id", id);
+        const { error } = await supabase.from("customer_chat_links").update({ is_active }).eq("id", id);
         if (error) throw error;
         await refetch();
         return true;
       } catch (e) {
-        console.error("[useCustomerChatLinks] deactivateLink failed", e);
+        console.error("[useCustomerChatLinks] setLinkActive failed", e);
+        return false;
+      } finally {
+        setIsMutating(false);
+      }
+    },
+    [refetch]
+  );
+
+  const deactivateLink = useCallback(
+    async (id: string) => {
+      return setLinkActive(id, false);
+    },
+    [setLinkActive]
+  );
+
+  const deleteLink = useCallback(
+    async (id: string) => {
+      setIsMutating(true);
+      try {
+        const { error } = await supabase.from("customer_chat_links").delete().eq("id", id);
+        if (error) throw error;
+        await refetch();
+        return true;
+      } catch (e) {
+        console.error("[useCustomerChatLinks] deleteLink failed", e);
         return false;
       } finally {
         setIsMutating(false);
@@ -113,7 +138,9 @@ export function useCustomerChatLinks(ownerId: string | null) {
     isMutating,
     refetch,
     createLink,
+    setLinkActive,
     deactivateLink,
+    deleteLink,
     getInviteUrl,
   };
 }
