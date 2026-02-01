@@ -482,18 +482,26 @@ const Index = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-background cyber-grid">
+      <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-50 glass-card border-b border-border/50">
+      <header className="sticky top-0 z-50 border-b border-primary/20" style={{
+        background: "hsl(230 18% 8% / 0.65)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.2), 0 0 40px hsl(0 75% 55% / 0.06)"
+      }}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="relative group">
-                <div className="h-14 w-14 rounded-xl overflow-hidden logo-glow glow-border">
-                  <img src={logoFuturistic} alt="Logo" className="h-full w-full object-cover glitch-subtle" />
+                <div className="h-14 w-14 rounded-xl overflow-hidden" style={{
+                  boxShadow: "0 0 30px hsl(0 75% 55% / 0.4), 0 0 60px hsl(0 75% 55% / 0.2)",
+                  border: "1px solid hsl(0 75% 55% / 0.3)"
+                }}>
+                  <img src={logoFuturistic} alt="Logo" className="h-full w-full object-cover" />
                 </div>
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary animate-pulse flicker"></div>
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary animate-pulse" style={{ boxShadow: "0 0 10px hsl(0 75% 55%)" }}></div>
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gradient">Gerenciador de Clientes</h1>
@@ -509,11 +517,12 @@ const Index = () => {
                 variant="outline" 
                 size="sm"
                 onClick={() => setGlobalSearchOpen(true)}
-                className="hidden md:flex gap-2 glass-card border-border/50 hover:border-primary text-muted-foreground"
+                className="hidden md:flex gap-2 border-primary/30 text-muted-foreground hover:border-primary hover:bg-primary/10"
+                style={{ background: "hsl(230 18% 10% / 0.6)", backdropFilter: "blur(12px)" }}
               >
                 <Search className="h-4 w-4" />
                 <span>Buscar...</span>
-                <kbd className="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-muted">⌘K</kbd>
+                <kbd className="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-primary/20 text-primary">⌘K</kbd>
               </Button>
 
               {/* Notification Center */}

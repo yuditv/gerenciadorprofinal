@@ -103,46 +103,46 @@
   }
 
   .dark {
-    /* Dark theme - Premium Dark Glass - IMPROVED for reduced eye strain */
-    --background: 230 18% 8%;
-    --foreground: 220 12% 88%;
+    /* Dark theme - Premium Dark Glass with Transparency */
+    --background: 230 18% 6% / 0.85;
+    --foreground: 220 12% 90%;
 
-    --card: 230 16% 11%;
-    --card-foreground: 220 12% 88%;
+    --card: 230 16% 10% / 0.75;
+    --card-foreground: 220 12% 90%;
 
-    --popover: 230 16% 11%;
-    --popover-foreground: 220 12% 88%;
+    --popover: 230 16% 10% / 0.9;
+    --popover-foreground: 220 12% 90%;
 
-    --primary: 0 72% 58%;
+    --primary: 0 75% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 230 14% 16%;
-    --secondary-foreground: 220 12% 82%;
+    --secondary: 230 14% 15% / 0.7;
+    --secondary-foreground: 220 12% 85%;
 
-    --muted: 230 12% 18%;
-    --muted-foreground: 220 8% 52%;
+    --muted: 230 12% 16% / 0.6;
+    --muted-foreground: 220 8% 55%;
 
-    --accent: 15 70% 52%;
+    --accent: 15 75% 55%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 65% 55%;
+    --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 230 12% 20%;
-    --input: 230 14% 14%;
-    --ring: 0 72% 58%;
+    --border: 230 12% 25% / 0.4;
+    --input: 230 14% 12% / 0.8;
+    --ring: 0 75% 58%;
 
-    /* Plan colors - softer */
-    --plan-monthly: 350 75% 55%;
-    --plan-quarterly: 15 75% 52%;
-    --plan-semiannual: 145 60% 45%;
-    --plan-annual: 45 75% 52%;
+    /* Plan colors - vibrant */
+    --plan-monthly: 350 80% 55%;
+    --plan-quarterly: 15 80% 55%;
+    --plan-semiannual: 145 65% 48%;
+    --plan-annual: 45 80% 55%;
 
-    /* Dark glass effects - softer */
-    --glass-bg: 230 18% 13% / 0.9;
-    --glass-border: 220 15% 30% / 0.15;
-    --glass-shadow: 0 8px 32px hsl(0 0% 0% / 0.25);
-    --glass-blur: 24px;
+    /* Dark glass effects - enhanced transparency */
+    --glass-bg: 230 18% 10% / 0.65;
+    --glass-border: 0 75% 58% / 0.15;
+    --glass-shadow: 0 8px 32px hsl(0 0% 0% / 0.35), 0 0 60px hsl(0 75% 55% / 0.08);
+    --glass-blur: 28px;
 
     /* Dark shadows - reduced intensity */
     --shadow-sm:
@@ -386,28 +386,46 @@
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid hsl(var(--glass-border));
     box-shadow: var(--glass-shadow);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .glass-card:hover {
-    box-shadow: var(--glass-shadow), var(--shadow-glow);
-    border-color: hsl(var(--primary) / 0.2);
+    box-shadow: var(--glass-shadow), var(--shadow-glow), 0 0 80px hsl(var(--primary) / 0.12);
+    border-color: hsl(var(--primary) / 0.35);
+    transform: translateY(-2px);
   }
 
-  /* Inner highlight for depth */
+  /* Inner highlight for depth - enhanced glow */
   .glass-card::before {
     content: '';
     position: absolute;
     inset: 0;
     background: linear-gradient(
       135deg, 
-      hsl(0 0% 100% / 0.08) 0%, 
-      transparent 40%,
-      transparent 60%,
-      hsl(0 0% 0% / 0.03) 100%
+      hsl(0 75% 55% / 0.08) 0%, 
+      transparent 30%,
+      transparent 70%,
+      hsl(0 0% 0% / 0.05) 100%
     );
     pointer-events: none;
     border-radius: inherit;
+  }
+
+  /* Accent glow line on top */
+  .glass-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.5) 50%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .glass-card:hover::after {
+    opacity: 1;
   }
 
   /* ============================================
@@ -1975,4 +1993,132 @@
   background: hsl(var(--primary) / 0.1);
   border-color: hsl(var(--primary) / 0.3);
   color: hsl(var(--primary));
+}
+
+/* ============================================
+   ENHANCED TRANSPARENCY UTILITIES
+   ============================================ */
+.bg-glass {
+  background: hsl(230 18% 10% / 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.bg-glass-light {
+  background: hsl(230 18% 12% / 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.bg-glass-dark {
+  background: hsl(230 18% 8% / 0.8);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+}
+
+/* Neon glow effects */
+.neon-red {
+  box-shadow: 0 0 20px hsl(0 75% 55% / 0.3), 0 0 40px hsl(0 75% 55% / 0.15), 0 0 60px hsl(0 75% 55% / 0.08);
+}
+
+.neon-green {
+  box-shadow: 0 0 20px hsl(142 70% 45% / 0.3), 0 0 40px hsl(142 70% 45% / 0.15);
+}
+
+.neon-blue {
+  box-shadow: 0 0 20px hsl(200 85% 55% / 0.3), 0 0 40px hsl(200 85% 55% / 0.15);
+}
+
+.neon-purple {
+  box-shadow: 0 0 20px hsl(260 85% 60% / 0.3), 0 0 40px hsl(260 85% 60% / 0.15);
+}
+
+.neon-orange {
+  box-shadow: 0 0 20px hsl(25 95% 55% / 0.3), 0 0 40px hsl(25 95% 55% / 0.15);
+}
+
+/* Animated border glow */
+.border-glow {
+  position: relative;
+}
+
+.border-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, hsl(0 75% 55% / 0.5) 0%, hsl(15 80% 55% / 0.3) 50%, hsl(0 75% 55% / 0.5) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.border-glow:hover::before {
+  opacity: 1;
+}
+
+/* Text gradient enhancement */
+.text-gradient {
+  background: linear-gradient(135deg, hsl(0 75% 60%) 0%, hsl(15 80% 58%) 50%, hsl(30 85% 55%) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Card hover lift effect */
+.card-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -20px hsl(0 0% 0% / 0.4), 0 0 60px hsl(0 75% 55% / 0.1);
+}
+
+/* Pulse ring animation */
+.pulse-ring {
+  position: relative;
+}
+
+.pulse-ring::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid hsl(var(--primary) / 0.5);
+  animation: pulse-ring-anim 2s ease-out infinite;
+}
+
+@keyframes pulse-ring-anim {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+/* Futuristic scanline effect for headers */
+.scanline::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    hsl(0 0% 100% / 0.01) 2px,
+    hsl(0 0% 100% / 0.01) 4px
+  );
+  pointer-events: none;
 }

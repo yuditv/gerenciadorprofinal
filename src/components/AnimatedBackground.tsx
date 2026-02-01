@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
+import cyberpunkBg from "@/assets/cyberpunk-bg.jpg";
 
 const AnimatedBackground = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,9 +33,9 @@ const AnimatedBackground = () => {
         this.x = Math.random() * canvas!.width;
         this.y = Math.random() * canvas!.height;
         this.size = Math.random() * 2 + 0.5;
-        this.speedX = (Math.random() - 0.5) * 0.3;
-        this.speedY = (Math.random() - 0.5) * 0.3;
-        this.opacity = Math.random() * 0.5 + 0.1;
+        this.speedX = (Math.random() - 0.5) * 0.4;
+        this.speedY = (Math.random() - 0.5) * 0.4;
+        this.opacity = Math.random() * 0.6 + 0.2;
         this.hue = Math.random() > 0.5 ? 0 : 15; // Red or orange hue
       }
 
@@ -52,14 +53,17 @@ const AnimatedBackground = () => {
         if (!ctx) return;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${this.hue}, 70%, 50%, ${this.opacity})`;
+        ctx.fillStyle = `hsla(${this.hue}, 80%, 55%, ${this.opacity})`;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `hsla(${this.hue}, 80%, 55%, 0.5)`;
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
     }
 
     const init = () => {
       particles = [];
-      const particleCount = Math.min(80, Math.floor((canvas.width * canvas.height) / 15000));
+      const particleCount = Math.min(100, Math.floor((canvas.width * canvas.height) / 12000));
       for (let i = 0; i < particleCount; i++) {
         particles.push(new Particle());
       }
@@ -72,10 +76,10 @@ const AnimatedBackground = () => {
           const dy = particles[i].y - particles[j].y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < 120) {
+          if (distance < 150) {
             ctx!.beginPath();
-            ctx!.strokeStyle = `hsla(0, 70%, 50%, ${0.08 * (1 - distance / 120)})`;
-            ctx!.lineWidth = 0.5;
+            ctx!.strokeStyle = `hsla(0, 80%, 55%, ${0.12 * (1 - distance / 150)})`;
+            ctx!.lineWidth = 0.8;
             ctx!.moveTo(particles[i].x, particles[i].y);
             ctx!.lineTo(particles[j].x, particles[j].y);
             ctx!.stroke();
@@ -113,35 +117,37 @@ const AnimatedBackground = () => {
 
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      {/* Animated gradient orbs */}
-      <motion.div
-        className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full opacity-30"
+      {/* Static cyberpunk background image */}
+      <div
+        className="absolute inset-0"
         style={{
-          background: "radial-gradient(circle, hsl(0 85% 50% / 0.4) 0%, transparent 70%)",
-          filter: "blur(80px)",
-        }}
-        animate={{
-          x: [0, 100, 50, 0],
-          y: [0, 50, 100, 0],
-          scale: [1, 1.2, 0.9, 1],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "easeInOut",
+          backgroundImage: `url(${cyberpunkBg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          opacity: 0.4,
         }}
       />
 
-      <motion.div
-        className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full opacity-25"
+      {/* Dark overlay for better contrast */}
+      <div
+        className="absolute inset-0"
         style={{
-          background: "radial-gradient(circle, hsl(15 90% 50% / 0.35) 0%, transparent 70%)",
-          filter: "blur(80px)",
+          background: "linear-gradient(to bottom, hsl(230 20% 6% / 0.7) 0%, hsl(230 20% 6% / 0.5) 50%, hsl(230 20% 6% / 0.7) 100%)",
+        }}
+      />
+
+      {/* Animated gradient orbs */}
+      <motion.div
+        className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full"
+        style={{
+          background: "radial-gradient(circle, hsl(0 85% 50% / 0.25) 0%, transparent 60%)",
+          filter: "blur(100px)",
         }}
         animate={{
-          x: [0, -80, -40, 0],
-          y: [0, -60, -120, 0],
-          scale: [1, 0.9, 1.1, 1],
+          x: [0, 150, 75, 0],
+          y: [0, 75, 150, 0],
+          scale: [1, 1.3, 0.9, 1],
         }}
         transition={{
           duration: 25,
@@ -151,14 +157,64 @@ const AnimatedBackground = () => {
       />
 
       <motion.div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/3 h-1/3 rounded-full opacity-20"
+        className="absolute -bottom-1/4 -right-1/4 w-[50%] h-[50%] rounded-full"
         style={{
-          background: "radial-gradient(circle, hsl(270 60% 50% / 0.3) 0%, transparent 70%)",
+          background: "radial-gradient(circle, hsl(15 90% 50% / 0.2) 0%, transparent 60%)",
           filter: "blur(100px)",
         }}
         animate={{
-          scale: [1, 1.3, 1],
-          opacity: [0.2, 0.3, 0.2],
+          x: [0, -120, -60, 0],
+          y: [0, -80, -160, 0],
+          scale: [1, 0.8, 1.2, 1],
+        }}
+        transition={{
+          duration: 30,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+
+      <motion.div
+        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full"
+        style={{
+          background: "radial-gradient(circle, hsl(270 60% 50% / 0.15) 0%, transparent 60%)",
+          filter: "blur(120px)",
+        }}
+        animate={{
+          scale: [1, 1.4, 1],
+          opacity: [0.15, 0.25, 0.15],
+        }}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+
+      {/* Floating geometric shapes with glow */}
+      <motion.div
+        className="absolute top-1/4 right-1/4 w-40 h-40 border-2 border-primary/20 rounded-full"
+        style={{
+          boxShadow: "0 0 40px hsl(0 85% 55% / 0.2), inset 0 0 40px hsl(0 85% 55% / 0.1)",
+        }}
+        animate={{
+          rotate: 360,
+          scale: [1, 1.15, 1],
+        }}
+        transition={{
+          rotate: { duration: 40, repeat: Infinity, ease: "linear" },
+          scale: { duration: 10, repeat: Infinity, ease: "easeInOut" },
+        }}
+      />
+
+      <motion.div
+        className="absolute bottom-1/4 left-1/5 w-28 h-28 border-2 border-accent/15 rotate-45"
+        style={{
+          boxShadow: "0 0 30px hsl(15 90% 55% / 0.15)",
+        }}
+        animate={{
+          rotate: [45, 135, 225, 45],
+          y: [0, -30, 0],
         }}
         transition={{
           duration: 15,
@@ -167,27 +223,18 @@ const AnimatedBackground = () => {
         }}
       />
 
-      {/* Floating geometric shapes */}
       <motion.div
-        className="absolute top-1/4 right-1/4 w-32 h-32 border border-primary/10 rounded-full"
+        className="absolute top-2/3 right-1/3 w-20 h-20 border border-primary/10"
+        style={{
+          clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)",
+          boxShadow: "0 0 20px hsl(0 85% 55% / 0.1)",
+        }}
         animate={{
-          rotate: 360,
-          scale: [1, 1.1, 1],
+          rotate: [0, 120, 240, 360],
+          scale: [1, 0.8, 1],
         }}
         transition={{
-          rotate: { duration: 30, repeat: Infinity, ease: "linear" },
-          scale: { duration: 8, repeat: Infinity, ease: "easeInOut" },
-        }}
-      />
-
-      <motion.div
-        className="absolute bottom-1/3 left-1/4 w-24 h-24 border border-accent/10 rotate-45"
-        animate={{
-          rotate: [45, 135, 45],
-          y: [0, -20, 0],
-        }}
-        transition={{
-          duration: 12,
+          duration: 20,
           repeat: Infinity,
           ease: "easeInOut",
         }}
@@ -197,18 +244,26 @@ const AnimatedBackground = () => {
       <canvas
         ref={canvasRef}
         className="absolute inset-0 pointer-events-none"
-        style={{ opacity: 0.6 }}
+        style={{ opacity: 0.7 }}
       />
 
-      {/* Subtle grid pattern */}
+      {/* Enhanced grid pattern */}
       <div
-        className="absolute inset-0 opacity-[0.02]"
+        className="absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage: `
-            linear-gradient(hsl(var(--primary) / 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, hsl(var(--primary) / 0.3) 1px, transparent 1px)
+            linear-gradient(hsl(0 85% 55% / 0.5) 1px, transparent 1px),
+            linear-gradient(90deg, hsl(0 85% 55% / 0.5) 1px, transparent 1px)
           `,
-          backgroundSize: "60px 60px",
+          backgroundSize: "80px 80px",
+        }}
+      />
+
+      {/* Scanlines effect */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, hsl(0 0% 0% / 0.5) 2px, hsl(0 0% 0% / 0.5) 4px)",
         }}
       />
 
@@ -216,7 +271,7 @@ const AnimatedBackground = () => {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at center, transparent 0%, hsl(var(--background)) 80%)",
+          background: "radial-gradient(ellipse at center, transparent 0%, hsl(230 20% 6% / 0.6) 70%, hsl(230 20% 6% / 0.9) 100%)",
         }}
       />
     </div>

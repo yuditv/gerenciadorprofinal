@@ -315,24 +315,31 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen">
+      <header className="border-b border-primary/20 sticky top-0 z-10" style={{
+        background: "hsl(230 18% 8% / 0.7)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        boxShadow: "0 4px 30px rgba(0, 0, 0, 0.2), 0 0 40px hsl(0 75% 55% / 0.06)"
+      }}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="hover:bg-primary/10">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <BarChart3 className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">Dashboard</h1>
+              <div className="p-2 rounded-xl" style={{ background: "hsl(0 75% 55% / 0.15)", boxShadow: "0 0 20px hsl(0 75% 55% / 0.2)" }}>
+                <BarChart3 className="h-6 w-6 text-primary" />
+              </div>
+              <h1 className="text-xl font-bold text-gradient">Dashboard</h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleTestNotification}>
+            <Button variant="outline" size="sm" onClick={handleTestNotification} className="border-primary/30 hover:bg-primary/10" style={{ background: "hsl(230 18% 10% / 0.6)" }}>
               <Bell className="h-4 w-4 mr-2" />
               Testar Notificações
             </Button>
-            <Button variant="outline" size="sm" onClick={fetchDashboardData}>
+            <Button variant="outline" size="sm" onClick={fetchDashboardData} className="border-primary/30 hover:bg-primary/10" style={{ background: "hsl(230 18% 10% / 0.6)" }}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
@@ -342,10 +349,10 @@ export default function Dashboard() {
 
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Auto Notifications Info */}
-        <Card className="border-primary/30 bg-primary/5">
+        <Card className="border-primary/30" style={{ background: "hsl(0 75% 55% / 0.08)", backdropFilter: "blur(16px)" }}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-primary/10">
+              <div className="p-2 rounded-full" style={{ background: "hsl(0 75% 55% / 0.2)", boxShadow: "0 0 15px hsl(0 75% 55% / 0.3)" }}>
                 <Mail className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
@@ -354,7 +361,7 @@ export default function Dashboard() {
                   Emails são enviados automaticamente às 9h para clientes com planos vencendo em 7, 3 e 1 dia(s).
                 </p>
               </div>
-              <Badge variant="outline" className="border-green-500 text-green-500">
+              <Badge variant="outline" className="border-green-500/50 text-green-400" style={{ background: "hsl(142 70% 45% / 0.15)" }}>
                 <CheckCircle className="h-3 w-3 mr-1" />
                 Ativo
               </Badge>
