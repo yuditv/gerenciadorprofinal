@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Bot, Settings } from "lucide-react";
+import { Send, Bot, Settings, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,8 +18,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { motion, AnimatePresence } from "framer-motion";
 import type { CustomerMessage } from "@/hooks/useCustomerMessages";
 import type { CustomerConversationView } from "@/hooks/useCustomerConversations";
+import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 
 type AIAgent = {
   id: string;
@@ -54,6 +56,7 @@ export function CustomerChatPanel({
 }: Props) {
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { isEnabled, setIsEnabled } = useSystemNotifications();
 
   useEffect(() => {
     if (!scrollRef.current) return;
@@ -81,54 +84,67 @@ export function CustomerChatPanel({
           )}
         </div>
 
-        {showAIControls && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">IA</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72">
-              <div className="space-y-4">
-                <div className="font-medium text-sm">Configurações de IA</div>
-                
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="ai-toggle" className="text-sm">Ativar Agente IA</Label>
-                  <Switch
-                    id="ai-toggle"
-                    checked={conversation.ai_enabled}
-                    onCheckedChange={(checked) => {
-                      const agentId = checked && activeAgents.length > 0 ? activeAgents[0].id : null;
-                      onToggleAI(checked, agentId);
-                    }}
-                  />
-                </div>
+        <div className="flex items-center gap-2">
+          {/* Sound toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsEnabled(!isEnabled)}
+            className="h-8 w-8"
+            title={isEnabled ? "Desativar som" : "Ativar som"}
+          >
+            {isEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+          </Button>
 
-                {conversation.ai_enabled && (
-                  <div className="space-y-2">
-                    <Label className="text-sm">Agente</Label>
-                    <Select
-                      value={conversation.active_agent_id || ""}
-                      onValueChange={(value) => onSetAgent?.(value || null)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um agente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeAgents.map((agent) => (
-                          <SelectItem key={agent.id} value={agent.id}>
-                            {agent.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+          {showAIControls && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">IA</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72">
+                <div className="space-y-4">
+                  <div className="font-medium text-sm">Configurações de IA</div>
+                  
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="ai-toggle" className="text-sm">Ativar Agente IA</Label>
+                    <Switch
+                      id="ai-toggle"
+                      checked={conversation.ai_enabled}
+                      onCheckedChange={(checked) => {
+                        const agentId = checked && activeAgents.length > 0 ? activeAgents[0].id : null;
+                        onToggleAI(checked, agentId);
+                      }}
+                    />
                   </div>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-        )}
+
+                  {conversation.ai_enabled && (
+                    <div className="space-y-2">
+                      <Label className="text-sm">Agente</Label>
+                      <Select
+                        value={conversation.active_agent_id || ""}
+                        onValueChange={(value) => onSetAgent?.(value || null)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um agente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {activeAgents.map((agent) => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
       </header>
 
       <div className="flex-1 min-h-0">
@@ -143,26 +159,53 @@ export function CustomerChatPanel({
             ) : messages.length === 0 ? (
               <div className="text-sm text-muted-foreground text-center py-12">Nenhuma mensagem ainda.</div>
             ) : (
-              messages.map((m) => {
-                const mine = m.sender_type === viewer;
-                return (
-                  <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")}>
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-2 text-sm border",
-                        mine
-                          ? "bg-primary/10 border-primary/20 text-foreground"
-                          : "bg-card/40 border-border/30 text-foreground"
-                      )}
+              <AnimatePresence mode="popLayout">
+                {messages.map((m) => {
+                  const mine = m.sender_type === viewer;
+                  const isNewMessage = m.isNew;
+                  
+                  return (
+                    <motion.div 
+                      key={m.id} 
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      className={cn("flex", mine ? "justify-end" : "justify-start")}
                     >
-                      <div className="whitespace-pre-wrap break-words">{m.content}</div>
-                      <div className="text-[10px] text-muted-foreground mt-1">
-                        {new Date(m.created_at).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+                      <motion.div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-4 py-2 text-sm border relative overflow-hidden",
+                          mine
+                            ? "bg-primary/10 border-primary/20 text-foreground"
+                            : "bg-card/40 border-border/30 text-foreground"
+                        )}
+                        animate={isNewMessage && !mine ? {
+                          boxShadow: [
+                            "0 0 0px hsl(var(--primary) / 0)",
+                            "0 0 20px hsl(var(--primary) / 0.5)",
+                            "0 0 0px hsl(var(--primary) / 0)"
+                          ]
+                        } : {}}
+                        transition={{ duration: 0.8 }}
+                      >
+                        {/* Glow overlay for new messages */}
+                        {isNewMessage && !mine && (
+                          <motion.div
+                            className="absolute inset-0 bg-primary/20"
+                            initial={{ opacity: 1 }}
+                            animate={{ opacity: 0 }}
+                            transition={{ duration: 1 }}
+                          />
+                        )}
+                        <div className="whitespace-pre-wrap break-words relative z-10">{m.content}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1 relative z-10">
+                          {new Date(m.created_at).toLocaleString()}
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             )}
           </div>
         </ScrollArea>

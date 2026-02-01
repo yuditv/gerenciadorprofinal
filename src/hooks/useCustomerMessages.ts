@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useSystemNotifications } from "./useSystemNotifications";
 
 export type CustomerMessage = {
   id: string;
@@ -11,6 +12,7 @@ export type CustomerMessage = {
   created_at: string;
   is_read_by_owner: boolean;
   is_read_by_customer: boolean;
+  isNew?: boolean; // Flag for animation
 };
 
 type Viewer = "owner" | "customer";
@@ -24,6 +26,8 @@ export function useCustomerMessages(conversationId: string | null, viewer: Viewe
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const initialLoadDone = useRef(false);
+  const { showNotification, playSound } = useSystemNotifications();
 
   const refetch = useCallback(async () => {
     if (!conversationId) {
@@ -42,6 +46,7 @@ export function useCustomerMessages(conversationId: string | null, viewer: Viewe
         .order("created_at", { ascending: true });
       if (error) throw error;
       setMessages((data as CustomerMessage[]) ?? []);
+      initialLoadDone.current = true;
     } catch (e) {
       console.error("[useCustomerMessages] refetch failed", e);
       setMessages([]);
@@ -74,6 +79,7 @@ export function useCustomerMessages(conversationId: string | null, viewer: Viewe
   }, [conversationId, viewer]);
 
   useEffect(() => {
+    initialLoadDone.current = false;
     refetch();
   }, [refetch]);
 
@@ -86,14 +92,41 @@ export function useCustomerMessages(conversationId: string | null, viewer: Viewe
         { event: "INSERT", schema: "public", table: "customer_messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
           const msg = payload.new as CustomerMessage;
-          setMessages((prev) => [...prev, msg]);
+          
+          // Only notify/play sound for messages from the other party
+          const isFromOther = msg.sender_type !== viewer;
+          
+          if (isFromOther && initialLoadDone.current) {
+            // Play notification sound
+            playSound('message');
+            
+            // Show browser notification
+            showNotification({
+              title: '💬 Nova Mensagem',
+              body: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
+              soundType: 'message',
+              silent: true, // We already played the sound
+            });
+            
+            // Add with animation flag
+            setMessages((prev) => [...prev, { ...msg, isNew: true }]);
+            
+            // Remove animation flag after animation completes
+            setTimeout(() => {
+              setMessages((prev) => 
+                prev.map((m) => m.id === msg.id ? { ...m, isNew: false } : m)
+              );
+            }, 1000);
+          } else {
+            setMessages((prev) => [...prev, msg]);
+          }
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, viewer, playSound, showNotification]);
 
   // Mark as read when conversation opens / changes
   useEffect(() => {

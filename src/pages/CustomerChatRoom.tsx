@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useCustomerMessages } from "@/hooks/useCustomerMessages";
-import { Send, Wifi, Shield, Globe, Tv } from "lucide-react";
+import { Send, Wifi, Shield, Globe, Tv, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import customerChatBg from "@/assets/customer-chat-bg.jpg";
+import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 
 type LinkInfo = {
   owner_id: string;
@@ -22,6 +23,8 @@ export default function CustomerChatRoom() {
   const safeToken = useMemo(() => (token ?? "").trim(), [token]);
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { isEnabled, setIsEnabled, requestPermission, permission } = useSystemNotifications();
 
   const [info, setInfo] = useState<LinkInfo | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -33,6 +36,18 @@ export default function CustomerChatRoom() {
     "customer",
     info && user ? { owner_id: info.owner_id, customer_user_id: user.id } : null
   );
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (permission === 'default') {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -103,6 +118,30 @@ export default function CustomerChatRoom() {
       {/* Overlay for better readability */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       
+      {/* Animated particles overlay */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute h-1 w-1 rounded-full bg-cyan-400/30"
+            initial={{ 
+              x: Math.random() * window.innerWidth,
+              y: Math.random() * window.innerHeight,
+              scale: Math.random() * 0.5 + 0.5
+            }}
+            animate={{ 
+              y: [null, -20, 20],
+              opacity: [0.3, 0.6, 0.3]
+            }}
+            transition={{ 
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+        ))}
+      </div>
+      
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full">
         {/* Futuristic Header */}
@@ -114,10 +153,18 @@ export default function CustomerChatRoom() {
           <div className="px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center">
+                <motion.div 
+                  className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-400 to-purple-500 flex items-center justify-center"
+                  animate={{ boxShadow: ["0 0 10px rgba(34, 211, 238, 0.5)", "0 0 20px rgba(168, 85, 247, 0.5)", "0 0 10px rgba(34, 211, 238, 0.5)"] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
                   <Tv className="h-5 w-5 text-white" />
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-400 border-2 border-black animate-pulse" />
+                </motion.div>
+                <motion.div 
+                  className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-400 border-2 border-black"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
               </div>
               <div>
                 <h1 className="font-bold text-white text-lg">
@@ -131,6 +178,16 @@ export default function CustomerChatRoom() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Sound toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsEnabled(!isEnabled)}
+                className="h-8 w-8 text-cyan-400 hover:bg-cyan-500/20"
+              >
+                {isEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+              
               <div className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full border border-purple-500/30">
                 <Wifi className="h-3 w-3" />
                 VPN
@@ -164,43 +221,79 @@ export default function CustomerChatRoom() {
                 animate={{ scale: 1, opacity: 1 }}
                 className="text-center py-16"
               >
-                <div className="h-20 w-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30">
+                <motion.div 
+                  className="h-20 w-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-cyan-500/30"
+                  animate={{ 
+                    boxShadow: ["0 0 20px rgba(34, 211, 238, 0.2)", "0 0 40px rgba(168, 85, 247, 0.3)", "0 0 20px rgba(34, 211, 238, 0.2)"]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
                   <Tv className="h-10 w-10 text-cyan-400" />
-                </div>
+                </motion.div>
                 <p className="text-white/60 text-sm">Inicie uma conversa</p>
                 <p className="text-cyan-400/60 text-xs mt-1">Internet Ilimitada • VPN Premium</p>
               </motion.div>
             ) : (
-              messages.map((m, index) => {
-                const mine = m.sender_type === "customer";
-                return (
-                  <motion.div 
-                    key={m.id} 
-                    initial={{ opacity: 0, x: mine ? 20 : -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={cn("flex", mine ? "justify-end" : "justify-start")}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm backdrop-blur-sm",
-                        mine
-                          ? "bg-gradient-to-r from-cyan-500/80 to-purple-500/80 text-white border border-cyan-400/30"
-                          : "bg-white/10 text-white border border-white/20"
-                      )}
+              <AnimatePresence mode="popLayout">
+                {messages.map((m) => {
+                  const mine = m.sender_type === "customer";
+                  const isNewMessage = m.isNew;
+                  
+                  return (
+                    <motion.div 
+                      key={m.id} 
+                      initial={{ opacity: 0, scale: 0.8, x: mine ? 50 : -50 }}
+                      animate={{ 
+                        opacity: 1, 
+                        scale: 1, 
+                        x: 0,
+                      }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 30
+                      }}
+                      className={cn("flex", mine ? "justify-end" : "justify-start")}
                     >
-                      <div className="whitespace-pre-wrap break-words">{m.content}</div>
-                      <div className={cn(
-                        "text-[10px] mt-1",
-                        mine ? "text-cyan-200/70" : "text-white/50"
-                      )}>
-                        {new Date(m.created_at).toLocaleString()}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })
+                      <motion.div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm backdrop-blur-sm relative overflow-hidden",
+                          mine
+                            ? "bg-gradient-to-r from-cyan-500/80 to-purple-500/80 text-white border border-cyan-400/30"
+                            : "bg-white/10 text-white border border-white/20"
+                        )}
+                        animate={isNewMessage ? {
+                          boxShadow: [
+                            "0 0 0px rgba(34, 211, 238, 0)",
+                            "0 0 30px rgba(34, 211, 238, 0.8)",
+                            "0 0 0px rgba(34, 211, 238, 0)"
+                          ]
+                        } : {}}
+                        transition={{ duration: 0.8 }}
+                      >
+                        {/* Glow effect for new messages */}
+                        {isNewMessage && !mine && (
+                          <motion.div
+                            className="absolute inset-0 bg-gradient-to-r from-cyan-500/30 to-purple-500/30"
+                            initial={{ opacity: 1 }}
+                            animate={{ opacity: 0 }}
+                            transition={{ duration: 1 }}
+                          />
+                        )}
+                        <div className="whitespace-pre-wrap break-words relative z-10">{m.content}</div>
+                        <div className={cn(
+                          "text-[10px] mt-1 relative z-10",
+                          mine ? "text-cyan-200/70" : "text-white/50"
+                        )}>
+                          {new Date(m.created_at).toLocaleString()}
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             )}
+            <div ref={messagesEndRef} />
           </div>
         </div>
 
