@@ -76,25 +76,23 @@ export default function CustomerChatInvite() {
     setIsSubmitting(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { full_name: name.trim() },
-            emailRedirectTo: window.location.origin,
+        // Customer-chat ONLY: create user already confirmed (no email confirmation) via edge function
+        const { error: signupFnError } = await supabase.functions.invoke("customer-chat-signup", {
+          body: {
+            token: safeToken,
+            email: email.trim(),
+            password,
+            customer_name: name.trim(),
           },
         });
-        if (error) throw error;
+        if (signupFnError) throw signupFnError;
 
-        // After signup user might still be logged in immediately (email confirmation depends on settings).
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData.session) {
-          toast({
-            title: "Verifique seu e-mail",
-            description: "Confirme o cadastro para entrar no chat.",
-          });
-          return;
-        }
+        // Now login normally
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (signInError) throw signInError;
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -103,7 +101,7 @@ export default function CustomerChatInvite() {
         if (error) throw error;
       }
 
-      const customerName = mode === "signup" ? name.trim() : name.trim();
+      const customerName = name.trim();
       if (!customerName) {
         toast({ title: "Informe seu nome" });
         return;
