@@ -294,7 +294,7 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
             </div>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2">
             <Label htmlFor="service" className="text-xs font-medium">
               Serviço
             </Label>
@@ -305,6 +305,7 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
                   setIsAddingService(true);
                 } else {
                   setService(v);
+                  setIsAddingService(false);
                 }
               }}>
                 <SelectTrigger className="pl-8 h-9 text-sm">
@@ -325,20 +326,28 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
-              {/* Add new service popover */}
-              <Popover open={isAddingService} onOpenChange={setIsAddingService}>
-                <PopoverTrigger asChild>
-                  <span className="sr-only">Adicionar serviço</span>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-3 bg-background border shadow-lg z-50" align="start">
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium">Nome do serviço</Label>
+            {/* Inline add new service form */}
+            <AnimatePresence>
+              {isAddingService && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-primary">
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Novo serviço</span>
+                    </div>
+                    <div className="space-y-2">
                       <Input
                         value={newServiceName}
                         onChange={(e) => setNewServiceName(e.target.value)}
-                        placeholder="Ex: Streaming, P2P..."
+                        placeholder="Digite o nome do serviço..."
                         className="h-8 text-sm"
                         autoFocus
                         onKeyDown={(e) => {
@@ -353,48 +362,51 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
                             } else if (newServiceName.trim()) {
                               toast.error('Este serviço já existe');
                             }
+                          } else if (e.key === 'Escape') {
+                            setNewServiceName('');
+                            setIsAddingService(false);
                           }
                         }}
                       />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="flex-1 h-7"
-                        onClick={() => {
-                          setNewServiceName('');
-                          setIsAddingService(false);
-                        }}
-                      >
-                        <X className="h-3.5 w-3.5 mr-1" />
-                        Cancelar
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="flex-1 h-7"
-                        onClick={() => {
-                          const result = addService(newServiceName);
-                          if (result) {
-                            setService(result.name);
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1 h-7"
+                          onClick={() => {
                             setNewServiceName('');
                             setIsAddingService(false);
-                            toast.success(`Serviço "${result.name}" adicionado!`);
-                          } else if (newServiceName.trim()) {
-                            toast.error('Este serviço já existe');
-                          }
-                        }}
-                      >
-                        <Check className="h-3.5 w-3.5 mr-1" />
-                        Adicionar
-                      </Button>
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="flex-1 h-7"
+                          onClick={() => {
+                            const result = addService(newServiceName);
+                            if (result) {
+                              setService(result.name);
+                              setNewServiceName('');
+                              setIsAddingService(false);
+                              toast.success(`Serviço "${result.name}" adicionado!`);
+                            } else if (newServiceName.trim()) {
+                              toast.error('Este serviço já existe');
+                            }
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1" />
+                          Adicionar
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Service Credentials Section */}
