@@ -16,12 +16,19 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from '@/components/ui/select';
-import { User, Phone, Mail, CreditCard, CalendarDays, DollarSign, Tv, StickyNote, KeyRound, Smartphone, AppWindow } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { User, Phone, Mail, CreditCard, CalendarDays, DollarSign, Tv, StickyNote, KeyRound, Smartphone, AppWindow, Plus, X, Check } from 'lucide-react';
 import { addMonths, format } from 'date-fns';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useCustomServices } from '@/hooks/useCustomServices';
 
 // Security: Input validation schemas
 const clientSchema = z.object({
@@ -83,7 +90,7 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [email, setEmail] = useState('');
-  const [service, setService] = useState<ServiceType>('IPTV');
+  const [service, setService] = useState<string>('IPTV');
   const [plan, setPlan] = useState<PlanType>('monthly');
   const [price, setPrice] = useState('');
   const [notes, setNotes] = useState('');
@@ -96,6 +103,11 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
   // IPTV specific
   const [appName, setAppName] = useState('');
   const [device, setDevice] = useState('');
+
+  // Custom services
+  const { getAllServices, addService } = useCustomServices();
+  const [isAddingService, setIsAddingService] = useState(false);
+  const [newServiceName, setNewServiceName] = useState('');
 
   // Helper function to format phone number for form (remove 55 prefix, format as (DD) 9XXXX-XXXX)
   const formatPhoneForForm = (phone: string): string => {
@@ -208,7 +220,7 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
       name: sanitizedName, 
       whatsapp, 
       email: email.trim(),
-      service,
+      service: service as ServiceType,
       plan,
       price: price ? parseFloat(price) : null,
       notes: sanitizedNotes,
@@ -288,18 +300,100 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
             </Label>
             <div className="relative">
               <Tv className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground z-10" />
-              <Select value={service} onValueChange={(v) => setService(v as ServiceType)}>
+              <Select value={service} onValueChange={(v) => {
+                if (v === '__add_new__') {
+                  setIsAddingService(true);
+                } else {
+                  setService(v);
+                }
+              }}>
                 <SelectTrigger className="pl-8 h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(serviceLabels) as [ServiceType, string][]).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  {getAllServices().map((svc) => (
+                    <SelectItem key={svc.id} value={svc.id}>
+                      {svc.name}
                     </SelectItem>
                   ))}
+                  <SelectSeparator />
+                  <SelectItem value="__add_new__" className="text-primary font-medium">
+                    <span className="flex items-center gap-2">
+                      <Plus className="h-3.5 w-3.5" />
+                      Adicionar novo serviço
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Add new service popover */}
+              <Popover open={isAddingService} onOpenChange={setIsAddingService}>
+                <PopoverTrigger asChild>
+                  <span className="sr-only">Adicionar serviço</span>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3 bg-background border shadow-lg z-50" align="start">
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Nome do serviço</Label>
+                      <Input
+                        value={newServiceName}
+                        onChange={(e) => setNewServiceName(e.target.value)}
+                        placeholder="Ex: Streaming, P2P..."
+                        className="h-8 text-sm"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const result = addService(newServiceName);
+                            if (result) {
+                              setService(result.name);
+                              setNewServiceName('');
+                              setIsAddingService(false);
+                              toast.success(`Serviço "${result.name}" adicionado!`);
+                            } else if (newServiceName.trim()) {
+                              toast.error('Este serviço já existe');
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="flex-1 h-7"
+                        onClick={() => {
+                          setNewServiceName('');
+                          setIsAddingService(false);
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="flex-1 h-7"
+                        onClick={() => {
+                          const result = addService(newServiceName);
+                          if (result) {
+                            setService(result.name);
+                            setNewServiceName('');
+                            setIsAddingService(false);
+                            toast.success(`Serviço "${result.name}" adicionado!`);
+                          } else if (newServiceName.trim()) {
+                            toast.error('Este serviço já existe');
+                          }
+                        }}
+                      >
+                        <Check className="h-3.5 w-3.5 mr-1" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
