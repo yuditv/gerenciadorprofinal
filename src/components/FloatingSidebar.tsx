@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Bot, Flame, Crown, Headset, Search, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp, Wallet } from "lucide-react";
+import { Users, Bot, Flame, Crown, Headset, Search, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp, Wallet, LayoutGrid } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import logoFuturistic from "@/assets/logo-red-futuristic.png";
@@ -27,7 +27,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export type AppSection = "clients" | "whatsapp" | "filter-numbers" | "ai-agent" | "warm-chips" | "revenda" | "iptv" | "admin" | "atendimento" | "engajamento";
+export type AppSection = "clients" | "whatsapp" | "filter-numbers" | "ai-agent" | "warm-chips" | "revenda" | "iptv" | "admin" | "atendimento" | "engajamento" | "crm-kanban";
 
 type PermissionKey = 
   | 'can_view_clients'
@@ -102,6 +102,13 @@ const menuItems: MenuItem[] = [
     icon: TrendingUp,
     color: "text-emerald-500",
     bgColor: "bg-emerald-500",
+  },
+  {
+    id: "crm-kanban",
+    title: "CRM Kanban",
+    icon: LayoutGrid,
+    color: "text-pink-500",
+    bgColor: "bg-pink-500",
   },
 ];
 
