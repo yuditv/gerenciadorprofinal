@@ -1507,13 +1507,107 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_lead_activities: {
+        Row: {
+          activity_type: string
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          lead_id: string
+          metadata: Json | null
+          scheduled_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          scheduled_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          scheduled_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_lead_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          lead_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          lead_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          lead_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_lead_attachments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_lead_data: {
         Row: {
+          assigned_to: string | null
           closed_at: string | null
+          company_industry: string | null
+          company_name: string | null
+          company_size: string | null
           conversation_id: string | null
           created_at: string | null
           custom_fields: Json | null
           deal_value: number | null
+          expected_close_date: string | null
+          follow_up_date: string | null
           id: string
           instance_id: string | null
           is_ticket_open: boolean | null
@@ -1523,19 +1617,30 @@ export type Database = {
           lead_name: string | null
           lead_notes: string | null
           lead_personal_id: string | null
+          lead_source: string | null
           lead_status: string | null
           lost_reason: string | null
           phone: string
+          priority: string | null
+          products_interested: string[] | null
           synced_at: string | null
+          temperature: string | null
           updated_at: string | null
           user_id: string
+          won_reason: string | null
         }
         Insert: {
+          assigned_to?: string | null
           closed_at?: string | null
+          company_industry?: string | null
+          company_name?: string | null
+          company_size?: string | null
           conversation_id?: string | null
           created_at?: string | null
           custom_fields?: Json | null
           deal_value?: number | null
+          expected_close_date?: string | null
+          follow_up_date?: string | null
           id?: string
           instance_id?: string | null
           is_ticket_open?: boolean | null
@@ -1545,19 +1650,30 @@ export type Database = {
           lead_name?: string | null
           lead_notes?: string | null
           lead_personal_id?: string | null
+          lead_source?: string | null
           lead_status?: string | null
           lost_reason?: string | null
           phone: string
+          priority?: string | null
+          products_interested?: string[] | null
           synced_at?: string | null
+          temperature?: string | null
           updated_at?: string | null
           user_id: string
+          won_reason?: string | null
         }
         Update: {
+          assigned_to?: string | null
           closed_at?: string | null
+          company_industry?: string | null
+          company_name?: string | null
+          company_size?: string | null
           conversation_id?: string | null
           created_at?: string | null
           custom_fields?: Json | null
           deal_value?: number | null
+          expected_close_date?: string | null
+          follow_up_date?: string | null
           id?: string
           instance_id?: string | null
           is_ticket_open?: boolean | null
@@ -1567,11 +1683,76 @@ export type Database = {
           lead_name?: string | null
           lead_notes?: string | null
           lead_personal_id?: string | null
+          lead_source?: string | null
           lead_status?: string | null
           lost_reason?: string | null
           phone?: string
+          priority?: string | null
+          products_interested?: string[] | null
           synced_at?: string | null
+          temperature?: string | null
           updated_at?: string | null
+          user_id?: string
+          won_reason?: string | null
+        }
+        Relationships: []
+      }
+      crm_lead_tag_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          tag_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          tag_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_lead_tag_assignments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_lead_tag_assignments_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "crm_lead_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_lead_tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
           user_id?: string
         }
         Relationships: []

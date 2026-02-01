@@ -1,18 +1,53 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Plus, RefreshCw, Filter, LayoutGrid } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  RefreshCw,
+  Filter,
+  LayoutGrid,
+  Table,
+  List,
+  Download,
+  BarChart3,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KanbanBoard } from '@/components/CRMKanban/KanbanBoard';
 import { KanbanStats } from '@/components/CRMKanban/KanbanStats';
+import { KanbanTableView } from '@/components/CRMKanban/KanbanTableView';
+import { KanbanFiltersPanel } from '@/components/CRMKanban/KanbanFiltersPanel';
+import { KanbanExportDialog } from '@/components/CRMKanban/KanbanExportDialog';
 import { LeadDetailsDialog } from '@/components/CRMKanban/LeadDetailsDialog';
 import { CreateLeadDialog } from '@/components/CRMKanban/CreateLeadDialog';
 import { useKanbanLeads, KanbanLead } from '@/hooks/useKanbanLeads';
+import { cn } from '@/lib/utils';
 
 export default function CRMKanban() {
-  const { searchTerm, setSearchTerm, fetchLeads, isLoading } = useKanbanLeads();
+  const {
+    leads,
+    allLeads,
+    tags,
+    searchTerm,
+    setSearchTerm,
+    filters,
+    setFilters,
+    resetFilters,
+    hasActiveFilters,
+    viewMode,
+    setViewMode,
+    fetchLeads,
+    bulkDelete,
+    isLoading,
+    stats,
+  } = useKanbanLeads();
+
   const [selectedLead, setSelectedLead] = useState<KanbanLead | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const handleLeadClick = (lead: KanbanLead) => {
     setSelectedLead(lead);
@@ -37,7 +72,7 @@ export default function CRMKanban() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* Search */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -49,6 +84,40 @@ export default function CRMKanban() {
               />
             </div>
 
+            {/* View Mode Toggle */}
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)}>
+              <TabsList className="h-9">
+                <TabsTrigger value="kanban" className="px-3">
+                  <LayoutGrid className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="table" className="px-3">
+                  <Table className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Filters */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowFiltersPanel(true)}
+              className="relative"
+            >
+              <Filter className="h-4 w-4" />
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
+              )}
+            </Button>
+
+            {/* Export */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowExportDialog(true)}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+
             {/* Refresh */}
             <Button
               variant="outline"
@@ -56,7 +125,7 @@ export default function CRMKanban() {
               onClick={fetchLeads}
               disabled={isLoading}
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
             </Button>
 
             {/* Create Lead */}
@@ -67,12 +136,65 @@ export default function CRMKanban() {
           </div>
         </div>
 
+        {/* Active Filters Display */}
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <span className="text-sm text-muted-foreground">Filtros ativos:</span>
+            {filters.status.length > 0 && (
+              <Badge variant="secondary">
+                Status: {filters.status.length}
+              </Badge>
+            )}
+            {filters.priority.length > 0 && (
+              <Badge variant="secondary">
+                Prioridade: {filters.priority.length}
+              </Badge>
+            )}
+            {filters.temperature.length > 0 && (
+              <Badge variant="secondary">
+                Temperatura: {filters.temperature.length}
+              </Badge>
+            )}
+            {filters.source.length > 0 && (
+              <Badge variant="secondary">
+                Origem: {filters.source.length}
+              </Badge>
+            )}
+            {filters.tags.length > 0 && (
+              <Badge variant="secondary">
+                Tags: {filters.tags.length}
+              </Badge>
+            )}
+            {filters.hasFollowUp !== null && (
+              <Badge variant="secondary">
+                {filters.hasFollowUp ? 'Com follow-up' : 'Sem follow-up'}
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={resetFilters}
+              className="text-muted-foreground h-6"
+            >
+              Limpar
+            </Button>
+          </div>
+        )}
+
         {/* Stats */}
         <KanbanStats />
 
-        {/* Kanban Board */}
+        {/* Content */}
         <div className="bg-card/30 rounded-xl border border-border/50 p-4">
-          <KanbanBoard onLeadClick={handleLeadClick} />
+          {viewMode === 'kanban' ? (
+            <KanbanBoard onLeadClick={handleLeadClick} />
+          ) : (
+            <KanbanTableView
+              leads={leads}
+              onLeadClick={handleLeadClick}
+              onBulkDelete={bulkDelete}
+            />
+          )}
         </div>
       </motion.div>
 
@@ -87,6 +209,24 @@ export default function CRMKanban() {
       <CreateLeadDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
+      />
+
+      {/* Filters Panel */}
+      <KanbanFiltersPanel
+        open={showFiltersPanel}
+        onOpenChange={setShowFiltersPanel}
+        filters={filters}
+        setFilters={setFilters}
+        resetFilters={resetFilters}
+        hasActiveFilters={hasActiveFilters}
+        tags={tags}
+      />
+
+      {/* Export Dialog */}
+      <KanbanExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        leads={allLeads}
       />
     </div>
   );
