@@ -5,6 +5,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
+import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 
 // Lazy load heavy components
 const Index = lazy(() => import("@/pages/Index"));
@@ -71,6 +72,9 @@ export function MainLayout() {
     }
   };
   return <div className="min-h-screen flex flex-col w-full relative">
+      {/* Notification Permission Banner */}
+      <NotificationPermissionBanner />
+      
       {/* Subscription Expiration Banner */}
       <SubscriptionBanner />
       
