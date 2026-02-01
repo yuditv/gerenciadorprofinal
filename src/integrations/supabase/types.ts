@@ -3042,6 +3042,122 @@ export type Database = {
         }
         Relationships: []
       }
+      warming_logs: {
+        Row: {
+          ai_generated: boolean
+          created_at: string
+          error_message: string | null
+          from_instance_id: string
+          id: string
+          message: string
+          session_id: string
+          status: string
+          to_instance_id: string
+        }
+        Insert: {
+          ai_generated?: boolean
+          created_at?: string
+          error_message?: string | null
+          from_instance_id: string
+          id?: string
+          message: string
+          session_id: string
+          status?: string
+          to_instance_id: string
+        }
+        Update: {
+          ai_generated?: boolean
+          created_at?: string
+          error_message?: string | null
+          from_instance_id?: string
+          id?: string
+          message?: string
+          session_id?: string
+          status?: string
+          to_instance_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warming_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "warming_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warming_sessions: {
+        Row: {
+          balancing_mode: string
+          completed_at: string | null
+          conversation_speed: string
+          created_at: string
+          daily_limit: number
+          id: string
+          messages_received: number
+          messages_sent: number
+          name: string
+          progress: number
+          schedule_days: number[] | null
+          schedule_enabled: boolean
+          schedule_recurrence: string | null
+          scheduled_start_time: string | null
+          selected_instances: string[]
+          started_at: string | null
+          status: string
+          templates: string[]
+          updated_at: string
+          use_ai: boolean
+          user_id: string
+        }
+        Insert: {
+          balancing_mode?: string
+          completed_at?: string | null
+          conversation_speed?: string
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          messages_received?: number
+          messages_sent?: number
+          name?: string
+          progress?: number
+          schedule_days?: number[] | null
+          schedule_enabled?: boolean
+          schedule_recurrence?: string | null
+          scheduled_start_time?: string | null
+          selected_instances?: string[]
+          started_at?: string | null
+          status?: string
+          templates?: string[]
+          updated_at?: string
+          use_ai?: boolean
+          user_id: string
+        }
+        Update: {
+          balancing_mode?: string
+          completed_at?: string | null
+          conversation_speed?: string
+          created_at?: string
+          daily_limit?: number
+          id?: string
+          messages_received?: number
+          messages_sent?: number
+          name?: string
+          progress?: number
+          schedule_days?: number[] | null
+          schedule_enabled?: boolean
+          schedule_recurrence?: string | null
+          scheduled_start_time?: string | null
+          selected_instances?: string[]
+          started_at?: string | null
+          status?: string
+          templates?: string[]
+          updated_at?: string
+          use_ai?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_agent_routing: {
         Row: {
           agent_id: string
