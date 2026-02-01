@@ -153,10 +153,13 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
     <TooltipProvider delayDuration={0}>
       <motion.header
         className={cn(
-          "w-full border-b border-border/50 bg-card/80 backdrop-blur-xl shrink-0 z-50",
+          "w-full border-b border-primary/20 shrink-0 z-50",
         )}
         style={{
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08), 0 0 30px hsl(0 85% 55% / 0.05)"
+          background: "hsl(230 18% 8% / 0.7)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.25), 0 0 60px hsl(0 75% 55% / 0.08), inset 0 1px 0 hsl(0 75% 55% / 0.1)"
         }}
         initial={{ y: -60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -270,7 +273,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                   <ChevronDown className="h-4 w-4 text-muted-foreground hidden lg:block" />
                 </motion.button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={8} className="glass-card border-border/50 w-56">
+              <DropdownMenuContent align="end" sideOffset={8} className="glass-card border-primary/20 w-56" style={{ background: "hsl(230 18% 10% / 0.9)", backdropFilter: "blur(24px)" }}>
                 <div className="px-3 py-2 text-sm text-muted-foreground border-b border-border/50 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} alt="Avatar" />

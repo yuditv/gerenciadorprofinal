@@ -57,14 +57,14 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="hover:bg-primary/10">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Configurações</h1>
+            <h1 className="text-2xl font-bold text-gradient">Configurações</h1>
             <p className="text-muted-foreground">Personalize o sistema conforme suas necessidades</p>
           </div>
         </div>

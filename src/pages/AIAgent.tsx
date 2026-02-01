@@ -44,9 +44,9 @@ export default function AIAgent() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="page-header-icon" style={{
+        <div className="p-3 rounded-2xl" style={{
           background: 'linear-gradient(135deg, hsl(260 85% 60%) 0%, hsl(280 80% 55%) 100%)',
-          boxShadow: '0 8px 32px hsl(260 85% 60% / 0.35), 0 0 0 1px hsl(260 85% 60% / 0.2)'
+          boxShadow: '0 8px 32px hsl(260 85% 60% / 0.35), 0 0 60px hsl(260 85% 60% / 0.15)'
         }}>
           <Bot className="h-7 w-7 text-white" />
         </div>

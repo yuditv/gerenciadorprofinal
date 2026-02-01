@@ -54,7 +54,7 @@ export default function CRMKanban() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95 p-6">
+    <div className="min-h-screen p-6">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -62,14 +62,21 @@ export default function CRMKanban() {
       >
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gradient flex items-center gap-3">
-              <LayoutGrid className="h-8 w-8 text-primary" />
-              CRM Kanban
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie seus leads e oportunidades de vendas
-            </p>
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl" style={{
+              background: "linear-gradient(135deg, hsl(330 85% 55%) 0%, hsl(350 80% 50%) 100%)",
+              boxShadow: "0 8px 32px hsl(330 85% 55% / 0.35), 0 0 60px hsl(330 85% 55% / 0.15)"
+            }}>
+              <LayoutGrid className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gradient">
+                CRM Kanban
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Gerencie seus leads e oportunidades de vendas
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">

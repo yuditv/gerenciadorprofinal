@@ -370,8 +370,11 @@ export default function WhatsApp() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="page-header-icon">
-          <Send />
+        <div className="p-3 rounded-2xl" style={{
+          background: "linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(160 70% 40%) 100%)",
+          boxShadow: "0 8px 32px hsl(142 70% 45% / 0.35), 0 0 0 1px hsl(142 70% 45% / 0.2)"
+        }}>
+          <Send className="h-7 w-7 text-white" />
         </div>
         <div>
           <h1 className="text-3xl font-bold text-gradient">WhatsApp</h1>

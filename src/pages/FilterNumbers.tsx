@@ -13,8 +13,11 @@ export default function FilterNumbers() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="page-header-icon">
-          <Search />
+        <div className="p-3 rounded-2xl" style={{
+          background: "linear-gradient(135deg, hsl(200 85% 55%) 0%, hsl(220 80% 50%) 100%)",
+          boxShadow: "0 8px 32px hsl(200 85% 55% / 0.35), 0 0 60px hsl(200 85% 55% / 0.15)"
+        }}>
+          <Search className="h-7 w-7 text-white" />
         </div>
         <div>
           <h1 className="text-3xl font-bold text-gradient">Filtrar Números Ativos</h1>
