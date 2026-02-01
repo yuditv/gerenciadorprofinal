@@ -22,6 +22,10 @@ const InboxSettings = lazy(() => import("./pages/InboxSettings"));
 const Atendimento = lazy(() => import("./pages/Atendimento"));
   const AttendantAuth = lazy(() => import("./pages/AttendantAuth"));
 
+// Customer chat pages
+const CustomerChatInvite = lazy(() => import("./pages/CustomerChatInvite"));
+const CustomerChatRoom = lazy(() => import("./pages/CustomerChatRoom"));
+
 const Install = lazy(() => import("./pages/Install"));
 const ResellerDashboard = lazy(() => import("./pages/ResellerDashboard"));
 const ResellerArea = lazy(() => import("./pages/ResellerArea"));
@@ -115,6 +119,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 const AppRoutes = () => (
   <Suspense fallback={<PageLoader />}>
     <Routes>
+      <Route path="/c/:token" element={<CustomerChatInvite />} />
+      <Route path="/c/:token/chat" element={<CustomerChatRoom />} />
       <Route path="/auth" element={
         <PublicRoute>
           <Auth />

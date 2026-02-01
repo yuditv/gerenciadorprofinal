@@ -29,20 +29,48 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import { useAccountContext } from "@/hooks/useAccountContext";
+import { useCustomerChatLinks } from "@/hooks/useCustomerChatLinks";
+import { useCustomerConversations } from "@/hooks/useCustomerConversations";
+import { useCustomerMessages } from "@/hooks/useCustomerMessages";
+import { CreateCustomerChatLinkDialog } from "@/components/CustomerChat/CreateCustomerChatLinkDialog";
+import { CustomerChatList } from "@/components/CustomerChat/CustomerChatList";
+import { CustomerChatPanel } from "@/components/CustomerChat/CustomerChatPanel";
 
 export default function Atendimento() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { permissions: accountPerms } = useAccountContext();
+  const { permissions: accountPerms, isMember, ownerId } = useAccountContext();
   
-  const [activeTab, setActiveTab] = useState<'conversations' | 'dashboard'>('conversations');
+  const [activeTab, setActiveTab] = useState<'conversations' | 'customer-chat' | 'dashboard'>('conversations');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedCustomerConversationId, setSelectedCustomerConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastProcessedMessageId, setLastProcessedMessageId] = useState<string | null>(null);
   const [showPlans, setShowPlans] = useState(false);
   const [showClientForm, setShowClientForm] = useState(false);
   const [newClientData, setNewClientData] = useState<{ phone: string; name?: string } | null>(null);
   const [defaultAgentId, setDefaultAgentId] = useState<string | null>(null);
+
+  const [showCreateCustomerLink, setShowCreateCustomerLink] = useState(false);
+
+  const { links, createLink, deactivateLink, getInviteUrl } = useCustomerChatLinks(!isMember ? ownerId : null);
+  const {
+    conversations: customerConversations,
+    unreadTotal: customerUnreadTotal,
+    isLoading: isCustomerConversationsLoading,
+  } = useCustomerConversations(!isMember ? ownerId : null);
+
+  const selectedCustomerConversation = customerConversations.find((c) => c.id === selectedCustomerConversationId) ?? null;
+  const {
+    messages: customerMessages,
+    isLoading: customerMessagesLoading,
+    isSending: isCustomerSending,
+    sendMessage: sendCustomerMessage,
+  } = useCustomerMessages(selectedCustomerConversationId, "owner",
+    selectedCustomerConversation
+      ? { owner_id: selectedCustomerConversation.owner_id, customer_user_id: selectedCustomerConversation.customer_user_id }
+      : null
+  );
 
   const { instances } = useWhatsAppInstances();
   const { isActive, isOnTrial, getRemainingDays, isLoading: isSubscriptionLoading } = useSubscription();
@@ -609,6 +637,8 @@ export default function Atendimento() {
           metrics={metrics}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          showCustomerChatTab={!isMember}
+          customerUnread={customerUnreadTotal}
         />
 
         {/* Content Area */}
@@ -619,6 +649,51 @@ export default function Atendimento() {
               agents={agents}
               metrics={metrics}
             />
+          ) : activeTab === 'customer-chat' ? (
+            <div className="flex-1 flex overflow-hidden min-h-0">
+              <div className="w-80 border-r border-border/50 flex flex-col bg-inbox-sidebar">
+                <div className="p-3 border-b border-border/50 flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">Links</div>
+                  <Button size="sm" onClick={() => setShowCreateCustomerLink(true)}>
+                    Criar link
+                  </Button>
+                </div>
+                <div className="p-2 space-y-2 overflow-auto">
+                  {links.slice(0, 6).map((l) => (
+                    <div key={l.id} className="rounded-xl border border-border/30 bg-card/25 p-3">
+                      <div className="text-xs text-muted-foreground truncate">{getInviteUrl(l.token)}</div>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="text-xs">
+                          {l.is_active ? "Ativo" : "Inativo"}
+                          {l.customer_name ? ` • ${l.customer_name}` : ""}
+                        </div>
+                        {l.is_active && (
+                          <Button variant="outline" size="sm" onClick={() => deactivateLink(l.id)}>
+                            Desativar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <CustomerChatList
+                conversations={customerConversations}
+                selectedId={selectedCustomerConversationId}
+                onSelect={(c) => setSelectedCustomerConversationId(c.id)}
+                isLoading={isCustomerConversationsLoading}
+              />
+
+              <CustomerChatPanel
+                title={selectedCustomerConversation ? selectedCustomerConversation.customer_name ?? "Cliente" : "Selecione um chat"}
+                messages={customerMessages}
+                isLoading={customerMessagesLoading}
+                isSending={isCustomerSending}
+                onSend={sendCustomerMessage}
+                viewer="owner"
+              />
+            </div>
           ) : (
             <>
               {/* Conversation List */}
@@ -661,6 +736,13 @@ export default function Atendimento() {
           )}
         </div>
       </div>
+
+      <CreateCustomerChatLinkDialog
+        open={showCreateCustomerLink}
+        onOpenChange={setShowCreateCustomerLink}
+        onCreate={createLink}
+        getInviteUrl={getInviteUrl}
+      />
 
       {/* Subscription Plans Dialog */}
       <SubscriptionPlansDialog open={showPlans} onOpenChange={setShowPlans} />
