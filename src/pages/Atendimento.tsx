@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ArrowLeft, RefreshCw, Circle, Lock, AlertTriangle, Zap, Settings, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useSoundEffects } from "@/hooks/useSoundEffects";
+import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 import { InboxSidebar } from "@/components/Inbox/InboxSidebar";
 import { ConversationList } from "@/components/Inbox/ConversationList";
 import { ChatPanel } from "@/components/Inbox/ChatPanel";
@@ -31,7 +32,7 @@ import { motion } from "framer-motion";
 import { useAccountContext } from "@/hooks/useAccountContext";
 import { useCustomerChatLinks } from "@/hooks/useCustomerChatLinks";
 import { useCustomerConversations } from "@/hooks/useCustomerConversations";
-import { useCustomerMessages } from "@/hooks/useCustomerMessages";
+import { useCustomerMessages, CustomerMessage } from "@/hooks/useCustomerMessages";
 import { CreateCustomerChatLinkDialog, QuickCopyLinkButton } from "@/components/CustomerChat/CreateCustomerChatLinkDialog";
 import { CustomerChatList } from "@/components/CustomerChat/CustomerChatList";
 import { CustomerChatPanel } from "@/components/CustomerChat/CustomerChatPanel";
@@ -52,6 +53,7 @@ export default function Atendimento() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { permissions: accountPerms, isMember, ownerId } = useAccountContext();
+  const { showNotification, playSound } = useSystemNotifications();
   
   const [activeTab, setActiveTab] = useState<'conversations' | 'customer-chat' | 'dashboard'>('conversations');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -79,16 +81,34 @@ export default function Atendimento() {
   const { agents: aiAgents } = useAIAgents();
   const [isDeletingCustomerConv, setIsDeletingCustomerConv] = useState(false);
 
+  // Callback for new message notifications
+  const handleNewCustomerMessage = useCallback((message: CustomerMessage) => {
+    playSound('message');
+    showNotification({
+      title: '💬 Nova Mensagem',
+      body: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''),
+      soundType: 'message',
+      silent: true,
+    });
+  }, [playSound, showNotification]);
+
+  const notificationCallbacks = useMemo(() => ({
+    onNewMessage: handleNewCustomerMessage,
+  }), [handleNewCustomerMessage]);
+
   const selectedCustomerConversation = customerConversations.find((c) => c.id === selectedCustomerConversationId) ?? null;
   const {
     messages: customerMessages,
     isLoading: customerMessagesLoading,
     isSending: isCustomerSending,
     sendMessage: sendCustomerMessage,
-  } = useCustomerMessages(selectedCustomerConversationId, "owner",
+  } = useCustomerMessages(
+    selectedCustomerConversationId, 
+    "owner",
     selectedCustomerConversation
       ? { owner_id: selectedCustomerConversation.owner_id, customer_user_id: selectedCustomerConversation.customer_user_id }
-      : null
+      : null,
+    notificationCallbacks
   );
 
   const { instances } = useWhatsAppInstances();
