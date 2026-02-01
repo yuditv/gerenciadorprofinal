@@ -768,7 +768,11 @@ export function ChatPanel({
 
               <DropdownMenuItem onClick={async () => {
                 if (conversation) {
-                  const avatarUrl = await fetchAvatar(conversation.id, conversation.phone);
+                  const avatarUrl = await fetchAvatar(
+                    conversation.id, 
+                    conversation.phone,
+                    conversation.instance_id
+                  );
                   if (avatarUrl) {
                     setContactAvatarUrl(avatarUrl);
                   }
