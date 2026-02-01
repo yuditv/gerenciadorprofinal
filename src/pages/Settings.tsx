@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, DollarSign, Save, Bell, CreditCard, BellRing } from 'lucide-react';
+import { ArrowLeft, DollarSign, Save, Bell, CreditCard, BellRing, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,9 @@ import { usePlanSettings, PlanSetting } from '@/hooks/usePlanSettings';
 import { RenewalReminderSettings } from '@/components/RenewalReminderSettings';
 import { SubscriptionReminderSettings } from '@/components/SubscriptionReminderSettings';
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
- import { CredentialsSettings } from '@/components/CredentialsSettings';
- import { Key } from 'lucide-react';
+import { CredentialsSettings } from '@/components/CredentialsSettings';
+import { NotificationSettingsCard } from '@/components/NotificationSettingsCard';
+import { Key } from 'lucide-react';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="plans" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="plans" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               <span className="hidden sm:inline">Planos</span>
@@ -85,6 +86,10 @@ export default function Settings() {
             <TabsTrigger value="owner-notifications" className="flex items-center gap-2">
               <BellRing className="h-4 w-4" />
               <span className="hidden sm:inline">Alertas</span>
+            </TabsTrigger>
+            <TabsTrigger value="system-notifications" className="flex items-center gap-2">
+              <Volume2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Sons</span>
             </TabsTrigger>
             <TabsTrigger value="credentials" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
@@ -169,6 +174,11 @@ export default function Settings() {
           {/* Owner Notifications Tab */}
           <TabsContent value="owner-notifications" className="space-y-6">
             <OwnerNotificationSettings />
+          </TabsContent>
+
+          {/* System Notifications Tab */}
+          <TabsContent value="system-notifications" className="space-y-6">
+            <NotificationSettingsCard />
           </TabsContent>
 
           {/* Credentials Tab */}
