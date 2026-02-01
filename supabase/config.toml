@@ -1,7 +1,1 @@
 project_id = "tlanmmbgyyxuqvezudir"
-
-[functions.customer-chat-link-info]
-verify_jwt = false
-
-[functions.customer-chat-signup]
-verify_jwt = false
