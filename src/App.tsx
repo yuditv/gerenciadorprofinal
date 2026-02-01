@@ -9,6 +9,7 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BulkDispatchProvider } from "@/contexts/BulkDispatchContext";
 import { FloatingDispatchPanel } from "@/components/BulkDispatcher/FloatingDispatchPanel";
+import AnimatedBackground from "@/components/AnimatedBackground";
 
 // Lazy load pages for code-splitting
 const MainLayout = lazy(() => import("./layouts/MainLayout").then(m => ({ default: m.MainLayout })));
@@ -226,6 +227,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="dark" storageKey="client-manager-theme">
       <TooltipProvider>
+        <AnimatedBackground />
         <Toaster />
         <Sonner />
         <BrowserRouter>
