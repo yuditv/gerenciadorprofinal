@@ -12,21 +12,25 @@ import {
   Video,
   FileText,
   MapPin,
-  Sticker
+  Sticker,
+  Camera,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Conversation } from "@/hooks/useInboxConversations";
+import { useContactAvatar } from "@/hooks/useContactAvatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Country code to flag emoji and name mapping
@@ -115,6 +119,7 @@ export function ConversationList({
   defaultAgentId
 }: ConversationListProps) {
   const [sortBy, setSortBy] = useState<'recent' | 'unread'>('recent');
+  const { fetchAvatarsBatch, isLoading: isFetchingAvatars } = useContactAvatar();
 
   const sortedConversations = [...conversations].sort((a, b) => {
     if (sortBy === 'unread') {
@@ -155,22 +160,56 @@ export function ConversationList({
           <span className="text-xs text-muted-foreground">
             {conversations.length} conversas
           </span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 text-xs">
-                <Filter className="h-3 w-3 mr-1" />
-                {sortBy === 'recent' ? 'Recentes' : 'Não lidas'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border border-border">
-              <DropdownMenuItem onClick={() => setSortBy('recent')}>
-                Mais recentes
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy('unread')}>
-                Não lidas primeiro
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-1">
+            {/* Fetch Avatars Button */}
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    disabled={isFetchingAvatars || conversations.length === 0}
+                    onClick={async () => {
+                      const convs = conversations.map(c => ({
+                        id: c.id,
+                        phone: c.phone,
+                        instance_id: c.instance_id,
+                        contact_avatar: c.contact_avatar
+                      }));
+                      await fetchAvatarsBatch(convs);
+                    }}
+                  >
+                    {isFetchingAvatars ? (
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Camera className="h-3 w-3" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Atualizar fotos de perfil
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 text-xs">
+                  <Filter className="h-3 w-3 mr-1" />
+                  {sortBy === 'recent' ? 'Recentes' : 'Não lidas'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover border border-border">
+                <DropdownMenuItem onClick={() => setSortBy('recent')}>
+                  Mais recentes
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSortBy('unread')}>
+                  Não lidas primeiro
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
