@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useSystemNotifications } from "./useSystemNotifications";
 
 export type CustomerMessage = {
   id: string;
@@ -22,12 +21,20 @@ type ConversationMeta = {
   customer_user_id: string;
 } | null;
 
-export function useCustomerMessages(conversationId: string | null, viewer: Viewer, meta: ConversationMeta) {
+type NotificationCallbacks = {
+  onNewMessage?: (message: CustomerMessage) => void;
+};
+
+export function useCustomerMessages(
+  conversationId: string | null, 
+  viewer: Viewer, 
+  meta: ConversationMeta,
+  callbacks?: NotificationCallbacks
+) {
   const [messages, setMessages] = useState<CustomerMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const initialLoadDone = useRef(false);
-  const { showNotification, playSound } = useSystemNotifications();
 
   const refetch = useCallback(async () => {
     if (!conversationId) {
@@ -93,20 +100,12 @@ export function useCustomerMessages(conversationId: string | null, viewer: Viewe
         (payload) => {
           const msg = payload.new as CustomerMessage;
           
-          // Only notify/play sound for messages from the other party
+          // Only notify for messages from the other party
           const isFromOther = msg.sender_type !== viewer;
           
           if (isFromOther && initialLoadDone.current) {
-            // Play notification sound
-            playSound('message');
-            
-            // Show browser notification
-            showNotification({
-              title: '💬 Nova Mensagem',
-              body: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''),
-              soundType: 'message',
-              silent: true, // We already played the sound
-            });
+            // Trigger callback for notification handling
+            callbacks?.onNewMessage?.(msg);
             
             // Add with animation flag
             setMessages((prev) => [...prev, { ...msg, isNew: true }]);
@@ -126,13 +125,12 @@ export function useCustomerMessages(conversationId: string | null, viewer: Viewe
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, viewer, playSound, showNotification]);
+  }, [conversationId, viewer, callbacks]);
 
   // Mark as read when conversation opens / changes
   useEffect(() => {
     if (!conversationId) return;
     markRead();
-    // best-effort; do not refetch to avoid loops
   }, [conversationId, markRead]);
 
   const sendMessage = useCallback(

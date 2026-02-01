@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,17 +24,33 @@ export default function CustomerChatRoom() {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { isEnabled, setIsEnabled, requestPermission, permission } = useSystemNotifications();
+  const { isEnabled, setIsEnabled, requestPermission, permission, playSound, showNotification } = useSystemNotifications();
 
   const [info, setInfo] = useState<LinkInfo | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isCustomer, setIsCustomer] = useState<boolean | null>(null);
   const [text, setText] = useState("");
 
+  // Callback for new message notifications
+  const handleNewMessage = useCallback((message: any) => {
+    playSound('message');
+    showNotification({
+      title: '💬 Nova Mensagem',
+      body: message.content?.substring(0, 100) + (message.content?.length > 100 ? '...' : ''),
+      soundType: 'message',
+      silent: true,
+    });
+  }, [playSound, showNotification]);
+
+  const notificationCallbacks = useMemo(() => ({
+    onNewMessage: handleNewMessage,
+  }), [handleNewMessage]);
+
   const { messages, isLoading, isSending, sendMessage } = useCustomerMessages(
     conversationId,
     "customer",
-    info && user ? { owner_id: info.owner_id, customer_user_id: user.id } : null
+    info && user ? { owner_id: info.owner_id, customer_user_id: user.id } : null,
+    notificationCallbacks
   );
 
   // Auto-scroll to bottom when new messages arrive
