@@ -26,7 +26,6 @@ interface InstanceInfo {
   instance_key: string;
   instance_name: string;
   phone_connected: string;
-  instance_token: string;
 }
 
 // Get delay based on conversation speed
@@ -147,7 +146,7 @@ Use linguagem informal, gírias. Exemplos: "e aí, beleza?", "tudo certo?", "opa
 
 // Send WhatsApp message via UAZAPI
 async function sendWhatsAppMessage(
-  instanceToken: string,
+  instanceKey: string,
   instanceName: string,
   phone: string,
   message: string
@@ -162,12 +161,15 @@ async function sendWhatsAppMessage(
     // Format phone number with international support
     const formattedPhone = formatPhoneNumber(phone);
 
-    // UAZAPI format: /send/text with token header and { number, text }
-    const response = await fetch(`${UAZAPI_URL}/send/text`, {
+    // Get UAZAPI token from secrets
+    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+
+    // UAZAPI format: /instance/{key}/send/text with token header and { number, text }
+    const response = await fetch(`${UAZAPI_URL}/instance/${instanceKey}/send/text`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "token": instanceToken,
+        "token": UAZAPI_TOKEN || "",
       },
       body: JSON.stringify({
         number: formattedPhone,
@@ -216,14 +218,29 @@ serve(async (req) => {
       }
 
       // Get instance details
+      console.log("Session selected_instances:", session.selected_instances);
+      
       const { data: instances, error: instancesError } = await supabase
         .from('whatsapp_instances')
-        .select('id, instance_key, instance_name, phone_connected, instance_token')
+        .select('id, instance_key, instance_name, phone_connected')
         .in('id', session.selected_instances)
         .eq('status', 'connected');
 
-      if (instancesError || !instances || instances.length < 2) {
-        return new Response(JSON.stringify({ error: "Need at least 2 connected instances" }), {
+      console.log("Instances query result:", { instances, error: instancesError });
+
+      if (instancesError) {
+        return new Response(JSON.stringify({ error: `DB error: ${instancesError.message}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!instances || instances.length < 2) {
+        return new Response(JSON.stringify({ 
+          error: "Need at least 2 connected instances",
+          found: instances?.length || 0,
+          selected: session.selected_instances
+        }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -283,7 +300,7 @@ serve(async (req) => {
 
           // Send message
           const result = await sendWhatsAppMessage(
-            fromInstance.instance_token,
+            fromInstance.instance_key,
             fromInstance.instance_name,
             toInstance.phone_connected,
             message
