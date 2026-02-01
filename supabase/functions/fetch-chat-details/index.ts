@@ -110,7 +110,7 @@ serve(async (req) => {
     // Get instance details
     const { data: instance, error: instanceError } = await supabase
       .from("whatsapp_instances")
-      .select("instance_key, instance_token")
+      .select("instance_key")
       .eq("id", instanceId)
       .single();
 
@@ -122,8 +122,8 @@ serve(async (req) => {
       );
     }
 
-    // Use instance token or global token
-    const token = instance.instance_token || UAZAPI_TOKEN;
+    // Use global UAZAPI token
+    const token = UAZAPI_TOKEN;
     
     if (!token) {
       return new Response(
