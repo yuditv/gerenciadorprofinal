@@ -1,12 +1,18 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Mail, Phone, DollarSign, MessageCircle, GripVertical } from 'lucide-react';
-import { KanbanLead } from '@/hooks/useKanbanLeads';
-import { cn } from '@/lib/utils';
+import {
+  DollarSign,
+  Clock,
+  AlertCircle,
+  GripVertical,
+  Building,
+} from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { KanbanLead, LEAD_PRIORITIES, LEAD_TEMPERATURES } from '@/hooks/useKanbanLeads';
+import { cn } from '@/lib/utils';
 
 interface KanbanCardProps {
   lead: KanbanLead;
@@ -14,7 +20,7 @@ interface KanbanCardProps {
   onClick: () => void;
 }
 
-export function KanbanCard({ lead, isDragging, onClick }: KanbanCardProps) {
+export function KanbanCard({ lead, isDragging = false, onClick }: KanbanCardProps) {
   const {
     attributes,
     listeners,
@@ -37,80 +43,128 @@ export function KanbanCard({ lead, isDragging, onClick }: KanbanCardProps) {
     .join('')
     .toUpperCase() || '?';
 
+  const priority = LEAD_PRIORITIES.find(p => p.id === (lead.priority || 'medium'));
+  const temperature = LEAD_TEMPERATURES.find(t => t.id === (lead.temperature || 'warm'));
+
+  const isOverdue = lead.follow_up_date && new Date(lead.follow_up_date) < new Date();
+  const hasFollowUpSoon = lead.follow_up_date && !isOverdue && 
+    new Date(lead.follow_up_date) <= new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group bg-card border border-border/50 rounded-lg p-3 cursor-pointer",
-        "hover:border-primary/50 hover:shadow-md transition-all duration-200",
-        (isDragging || isSortableDragging) && "opacity-50 shadow-xl rotate-2 scale-105"
+        "bg-card border border-border/50 rounded-lg p-3 cursor-pointer",
+        "hover:border-primary/50 hover:shadow-md transition-all group",
+        (isDragging || isSortableDragging) && "opacity-50 shadow-lg rotate-2",
+        isOverdue && "border-l-4 border-l-red-500",
+        hasFollowUpSoon && "border-l-4 border-l-amber-500"
       )}
       onClick={onClick}
     >
-      {/* Drag Handle + Avatar + Name */}
-      <div className="flex items-start gap-3 mb-3">
-        <button
-          className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing mt-1"
+      {/* Header with avatar and name */}
+      <div className="flex items-start gap-2 mb-2">
+        {/* Drag handle */}
+        <div
+          className="opacity-0 group-hover:opacity-50 hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
           {...attributes}
           {...listeners}
         >
           <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </button>
+        </div>
 
-        <Avatar className="h-10 w-10 flex-shrink-0">
+        <Avatar className="h-8 w-8 shrink-0">
           <AvatarImage src={lead.contact_avatar || undefined} />
-          <AvatarFallback className="bg-primary/10 text-primary text-sm">
+          <AvatarFallback className="text-xs bg-primary/10 text-primary">
             {initials}
           </AvatarFallback>
         </Avatar>
-
+        
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-foreground truncate">
-            {displayName}
-          </h4>
-          {lead.lead_email && (
-            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-              <Mail className="h-3 w-3" />
-              {lead.lead_email}
+          <p className="font-medium text-sm truncate">{displayName}</p>
+          {lead.company_name && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Building className="h-3 w-3" />
+              {lead.company_name}
             </p>
           )}
         </div>
+
+        {/* Temperature */}
+        <span className="text-lg" title={temperature?.label}>
+          {temperature?.icon}
+        </span>
       </div>
 
-      {/* Deal Value */}
-      {lead.deal_value && lead.deal_value > 0 && (
-        <div className="flex items-center gap-1.5 mb-2">
-          <DollarSign className="h-4 w-4 text-green-500" />
-          <span className="text-sm font-medium text-green-500">
-            R$ {lead.deal_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+      {/* Tags */}
+      {lead.tags && lead.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {lead.tags.slice(0, 3).map(tag => (
+            <Badge
+              key={tag.id}
+              className="text-[10px] px-1.5 py-0"
+              style={{ backgroundColor: tag.color }}
+            >
+              <span className="text-white">{tag.name}</span>
+            </Badge>
+          ))}
+          {lead.tags.length > 3 && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              +{lead.tags.length - 3}
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {/* Info row */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        {/* Value */}
+        {lead.deal_value ? (
+          <div className="flex items-center gap-1 text-green-500 font-medium">
+            <DollarSign className="h-3 w-3" />
+            R$ {lead.deal_value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+          </div>
+        ) : (
+          <span>-</span>
+        )}
+
+        {/* Priority badge */}
+        <Badge
+          variant="outline"
+          className={cn("text-[10px] h-5", priority?.textColor)}
+        >
+          {priority?.label}
+        </Badge>
+      </div>
+
+      {/* Follow-up date */}
+      {lead.follow_up_date && (
+        <div
+          className={cn(
+            "flex items-center gap-1 mt-2 text-xs",
+            isOverdue && "text-red-500",
+            hasFollowUpSoon && !isOverdue && "text-amber-500",
+            !isOverdue && !hasFollowUpSoon && "text-muted-foreground"
+          )}
+        >
+          {isOverdue ? (
+            <AlertCircle className="h-3 w-3" />
+          ) : (
+            <Clock className="h-3 w-3" />
+          )}
+          <span>
+            {isOverdue ? 'Atrasado: ' : 'Follow-up: '}
+            {format(new Date(lead.follow_up_date), "dd/MM 'às' HH:mm", { locale: ptBR })}
           </span>
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Phone className="h-3 w-3 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">{lead.phone}</span>
-        </div>
-
-        {lead.last_message_at && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <MessageCircle className="h-3 w-3" />
-            {formatDistanceToNow(new Date(lead.last_message_at), {
-              addSuffix: true,
-              locale: ptBR,
-            })}
-          </span>
-        )}
-      </div>
-
-      {/* Ticket Badge */}
-      {lead.is_ticket_open && (
-        <Badge variant="secondary" className="mt-2 text-xs">
-          Ticket Aberto
-        </Badge>
+      {/* Last activity */}
+      {lead.last_message_at && (
+        <p className="text-[10px] text-muted-foreground mt-1">
+          Última msg: {format(new Date(lead.last_message_at), 'dd/MM HH:mm', { locale: ptBR })}
+        </p>
       )}
     </div>
   );
