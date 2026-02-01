@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FloatingSidebar, AppSection } from "@/components/FloatingSidebar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 // Lazy load heavy components
 const Index = lazy(() => import("@/pages/Index"));
@@ -24,7 +25,7 @@ const ContentLoader = () => <div className="flex items-center justify-center h-f
     </div>
   </div>;
 export function MainLayout() {
-  const [activeSection, setActiveSection] = useState<AppSection>("clients");
+  const [activeSection, setActiveSection] = usePersistedState<AppSection>("app-active-section", "clients");
   const [searchParams] = useSearchParams();
   const {
     toast
