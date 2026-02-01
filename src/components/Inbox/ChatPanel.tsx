@@ -44,6 +44,7 @@ import { MediaGallery } from "./MediaGallery";
 // QuickMessagesPanel removed - management moved to Inbox Settings
 import { EmojiPickerButton } from "./EmojiPickerButton";
 import { AudioPlayer } from "./AudioPlayer";
+import { AttachmentRenderer } from "./AttachmentRenderer";
 import { MessageSearchDialog } from "./MessageSearchDialog";
 import { SyncOptionsDialog } from "./SyncOptionsDialog";
 import { DeleteMessageDialog } from "./DeleteMessageDialog";
@@ -975,9 +976,12 @@ export function ChatPanel({
                                     {(msg.metadata as any)?.transcription?.text}
                                   </p>
                                 </div>}
-                            </div> : <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="text-sm underline flex items-center gap-1">
-                              📎 Anexo
-                            </a>}
+                            </div> : <AttachmentRenderer 
+                                  url={msg.media_url} 
+                                  mediaType={msg.media_type} 
+                                  isOutgoing={isOutgoing}
+                                  onImageClick={() => openMediaGallery(msg.id)}
+                                />}
                         </div>}
 
                       {/* Content */}
