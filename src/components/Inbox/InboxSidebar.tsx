@@ -46,8 +46,10 @@ interface InboxSidebarProps {
     unread: number;
     mine: number;
   };
-  activeTab: 'conversations' | 'dashboard';
-  onTabChange: (tab: 'conversations' | 'dashboard') => void;
+  activeTab: 'conversations' | 'customer-chat' | 'dashboard';
+  onTabChange: (tab: 'conversations' | 'customer-chat' | 'dashboard') => void;
+  showCustomerChatTab?: boolean;
+  customerUnread?: number;
 }
 
 export function InboxSidebar({
@@ -57,7 +59,9 @@ export function InboxSidebar({
   onFilterChange,
   metrics,
   activeTab,
-  onTabChange
+  onTabChange,
+  showCustomerChatTab = false,
+  customerUnread = 0,
 }: InboxSidebarProps) {
   const filterItems = [
     { 
@@ -136,6 +140,24 @@ export function InboxSidebar({
               </Badge>
             )}
           </Button>
+
+          {showCustomerChatTab && (
+            <Button
+              variant={activeTab === 'customer-chat' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 gap-1.5"
+              onClick={() => onTabChange('customer-chat')}
+            >
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline">Chat do Cliente</span>
+              {customerUnread > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 h-4 ml-1">
+                  {customerUnread}
+                </Badge>
+              )}
+            </Button>
+          )}
+
           <Button
             variant={activeTab === 'dashboard' ? 'secondary' : 'ghost'}
             size="sm"
@@ -149,168 +171,174 @@ export function InboxSidebar({
 
         <div className="h-5 w-px bg-border/50 mx-1 shrink-0" />
 
-        {/* Filter Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5">
-              <Inbox className="h-4 w-4" />
-              <span className="hidden sm:inline">{currentFilterLabel}</span>
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48 bg-popover border border-border">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Filtrar por</DropdownMenuLabel>
-            {filterItems.map((item) => (
-              <DropdownMenuItem
-                key={item.id}
-                onClick={() => onFilterChange(item.filter)}
-                className={cn(
-                  "gap-2",
-                  isActiveFilter(item.filter) && "bg-primary/10 text-primary"
-                )}
-              >
-                <item.icon className={cn("h-4 w-4", item.iconClass)} />
-                <span className="flex-1">{item.label}</span>
-                {item.count > 0 && (
-                  <span className="text-xs text-muted-foreground tabular-nums">{item.count}</span>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Instance Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant={filter.instanceId ? "secondary" : "outline"} 
-              size="sm" 
-              className="h-8 gap-1.5"
-            >
-              <Mail className="h-4 w-4" />
-              <span className="hidden sm:inline max-w-24 truncate">
-                {selectedInstance?.instance_name || 'Instância'}
-              </span>
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 bg-popover border border-border">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Instâncias</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => onFilterChange({ ...filter, instanceId: undefined })}
-              className={cn(!filter.instanceId && "bg-primary/10 text-primary")}
-            >
-              Todas as instâncias
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {instances.length === 0 ? (
-              <DropdownMenuItem disabled className="text-muted-foreground text-xs">
-                Nenhuma instância
-              </DropdownMenuItem>
-            ) : (
-              instances.map((instance) => (
-                <DropdownMenuItem
-                  key={instance.id}
-                  onClick={() => onFilterChange({ ...filter, instanceId: instance.id })}
-                  className={cn(
-                    "gap-2",
-                    filter.instanceId === instance.id && "bg-primary/10 text-primary"
-                  )}
-                >
-                  <Circle className={cn(
-                    "h-2.5 w-2.5 shrink-0",
-                    instance.status === 'connected' ? "fill-green-500 text-green-500" : "fill-red-500 text-red-500"
-                  )} />
-                  <span className="truncate">{instance.instance_name}</span>
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Labels Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant={filter.labelId ? "secondary" : "outline"} 
-              size="sm" 
-              className="h-8 gap-1.5"
-            >
-              <Tag className="h-4 w-4" />
-              <span className="hidden sm:inline max-w-24 truncate">
-                {selectedLabel?.name || 'Etiqueta'}
-              </span>
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 bg-popover border border-border">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Etiquetas</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => onFilterChange({ ...filter, labelId: undefined })}
-              className={cn(!filter.labelId && "bg-primary/10 text-primary")}
-            >
-              Todas as etiquetas
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {labels.length === 0 ? (
-              <DropdownMenuItem disabled className="text-muted-foreground text-xs">
-                Nenhuma etiqueta
-              </DropdownMenuItem>
-            ) : (
-              labels.map((label) => (
-                <DropdownMenuItem
-                  key={label.id}
-                  onClick={() => onFilterChange({ ...filter, labelId: label.id })}
-                  className={cn(
-                    "gap-2",
-                    filter.labelId === label.id && "bg-primary/10 text-primary"
-                  )}
-                >
-                  <div 
-                    className="h-2.5 w-2.5 rounded-sm shrink-0" 
-                    style={{ backgroundColor: label.color }}
-                  />
-                  <span className="truncate">{label.name}</span>
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Active Filters Pills */}
-        {(filter.instanceId || filter.labelId) && (
+        {activeTab === 'conversations' && (
           <>
-            <div className="h-5 w-px bg-border/50 mx-1 shrink-0" />
-            <div className="flex items-center gap-1 shrink-0">
-              {filter.instanceId && selectedInstance && (
-                <Badge 
-                  variant="secondary" 
-                  className="h-6 gap-1 cursor-pointer hover:bg-destructive/20"
+            {/* Filter Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                  <Inbox className="h-4 w-4" />
+                  <span className="hidden sm:inline">{currentFilterLabel}</span>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 bg-popover border border-border">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Filtrar por</DropdownMenuLabel>
+                {filterItems.map((item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    onClick={() => onFilterChange(item.filter)}
+                    className={cn(
+                      "gap-2",
+                      isActiveFilter(item.filter) && "bg-primary/10 text-primary"
+                    )}
+                  >
+                    <item.icon className={cn("h-4 w-4", item.iconClass)} />
+                    <span className="flex-1">{item.label}</span>
+                    {item.count > 0 && (
+                      <span className="text-xs text-muted-foreground tabular-nums">{item.count}</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Instance Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={filter.instanceId ? "secondary" : "outline"}
+                  size="sm"
+                  className="h-8 gap-1.5"
+                >
+                  <Mail className="h-4 w-4" />
+                  <span className="hidden sm:inline max-w-24 truncate">
+                    {selectedInstance?.instance_name || 'Instância'}
+                  </span>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 bg-popover border border-border">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Instâncias</DropdownMenuLabel>
+                <DropdownMenuItem
                   onClick={() => onFilterChange({ ...filter, instanceId: undefined })}
+                  className={cn(!filter.instanceId && "bg-primary/10 text-primary")}
                 >
-                  <Circle className={cn(
-                    "h-2 w-2",
-                    selectedInstance.status === 'connected' ? "fill-green-500 text-green-500" : "fill-red-500 text-red-500"
-                  )} />
-                  <span className="max-w-20 truncate text-xs">{selectedInstance.instance_name}</span>
-                  <span className="text-muted-foreground">×</span>
-                </Badge>
-              )}
-              {filter.labelId && selectedLabel && (
-                <Badge 
-                  variant="secondary" 
-                  className="h-6 gap-1 cursor-pointer hover:bg-destructive/20"
+                  Todas as instâncias
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {instances.length === 0 ? (
+                  <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                    Nenhuma instância
+                  </DropdownMenuItem>
+                ) : (
+                  instances.map((instance) => (
+                    <DropdownMenuItem
+                      key={instance.id}
+                      onClick={() => onFilterChange({ ...filter, instanceId: instance.id })}
+                      className={cn(
+                        "gap-2",
+                        filter.instanceId === instance.id && "bg-primary/10 text-primary"
+                      )}
+                    >
+                      <Circle
+                        className={cn(
+                          "h-2.5 w-2.5 shrink-0",
+                          instance.status === 'connected'
+                            ? "fill-green-500 text-green-500"
+                            : "fill-red-500 text-red-500"
+                        )}
+                      />
+                      <span className="truncate">{instance.instance_name}</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Labels Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={filter.labelId ? "secondary" : "outline"}
+                  size="sm"
+                  className="h-8 gap-1.5"
+                >
+                  <Tag className="h-4 w-4" />
+                  <span className="hidden sm:inline max-w-24 truncate">
+                    {selectedLabel?.name || 'Etiqueta'}
+                  </span>
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 bg-popover border border-border">
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Etiquetas</DropdownMenuLabel>
+                <DropdownMenuItem
                   onClick={() => onFilterChange({ ...filter, labelId: undefined })}
+                  className={cn(!filter.labelId && "bg-primary/10 text-primary")}
                 >
-                  <div 
-                    className="h-2 w-2 rounded-sm" 
-                    style={{ backgroundColor: selectedLabel.color }}
-                  />
-                  <span className="max-w-20 truncate text-xs">{selectedLabel.name}</span>
-                  <span className="text-muted-foreground">×</span>
-                </Badge>
-              )}
-            </div>
+                  Todas as etiquetas
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {labels.length === 0 ? (
+                  <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                    Nenhuma etiqueta
+                  </DropdownMenuItem>
+                ) : (
+                  labels.map((label) => (
+                    <DropdownMenuItem
+                      key={label.id}
+                      onClick={() => onFilterChange({ ...filter, labelId: label.id })}
+                      className={cn(
+                        "gap-2",
+                        filter.labelId === label.id && "bg-primary/10 text-primary"
+                      )}
+                    >
+                      <div className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: label.color }} />
+                      <span className="truncate">{label.name}</span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Active Filters Pills */}
+            {(filter.instanceId || filter.labelId) && (
+              <>
+                <div className="h-5 w-px bg-border/50 mx-1 shrink-0" />
+                <div className="flex items-center gap-1 shrink-0">
+                  {filter.instanceId && selectedInstance && (
+                    <Badge
+                      variant="secondary"
+                      className="h-6 gap-1 cursor-pointer hover:bg-destructive/20"
+                      onClick={() => onFilterChange({ ...filter, instanceId: undefined })}
+                    >
+                      <Circle
+                        className={cn(
+                          "h-2 w-2",
+                          selectedInstance.status === 'connected'
+                            ? "fill-green-500 text-green-500"
+                            : "fill-red-500 text-red-500"
+                        )}
+                      />
+                      <span className="max-w-20 truncate text-xs">{selectedInstance.instance_name}</span>
+                      <span className="text-muted-foreground">×</span>
+                    </Badge>
+                  )}
+                  {filter.labelId && selectedLabel && (
+                    <Badge
+                      variant="secondary"
+                      className="h-6 gap-1 cursor-pointer hover:bg-destructive/20"
+                      onClick={() => onFilterChange({ ...filter, labelId: undefined })}
+                    >
+                      <div className="h-2 w-2 rounded-sm" style={{ backgroundColor: selectedLabel.color }} />
+                      <span className="max-w-20 truncate text-xs">{selectedLabel.name}</span>
+                      <span className="text-muted-foreground">×</span>
+                    </Badge>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
