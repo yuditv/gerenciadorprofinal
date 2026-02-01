@@ -104,22 +104,31 @@ export function useCustomerConversations(ownerId: string | null) {
   );
 
   const deleteConversation = useCallback(async (conversationId: string) => {
+    if (!ownerId) return false;
     try {
-      // First delete all messages in the conversation
+      // First delete all messages in the conversation - use owner_id to bypass RLS
       const { error: messagesError } = await supabase
         .from("customer_messages")
         .delete()
-        .eq("conversation_id", conversationId);
+        .eq("conversation_id", conversationId)
+        .eq("owner_id", ownerId);
 
-      if (messagesError) throw messagesError;
+      if (messagesError) {
+        console.error("[useCustomerConversations] delete messages failed", messagesError);
+        throw messagesError;
+      }
 
-      // Then delete the conversation itself
+      // Then delete the conversation itself - use owner_id to bypass RLS
       const { error: convError } = await supabase
         .from("customer_conversations")
         .delete()
-        .eq("id", conversationId);
+        .eq("id", conversationId)
+        .eq("owner_id", ownerId);
 
-      if (convError) throw convError;
+      if (convError) {
+        console.error("[useCustomerConversations] delete conversation failed", convError);
+        throw convError;
+      }
 
       await refetch();
       return true;
@@ -127,7 +136,7 @@ export function useCustomerConversations(ownerId: string | null) {
       console.error("[useCustomerConversations] deleteConversation failed", e);
       return false;
     }
-  }, [refetch]);
+  }, [refetch, ownerId]);
 
   const toggleAI = useCallback(async (conversationId: string, enabled: boolean, agentId?: string | null) => {
     try {
