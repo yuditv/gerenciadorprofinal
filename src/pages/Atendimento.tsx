@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowLeft, RefreshCw, Circle, Lock, AlertTriangle, Zap, Settings } from "lucide-react";
+import { ArrowLeft, RefreshCw, Circle, Lock, AlertTriangle, Zap, Settings, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,17 @@ import { useCustomerMessages } from "@/hooks/useCustomerMessages";
 import { CreateCustomerChatLinkDialog } from "@/components/CustomerChat/CreateCustomerChatLinkDialog";
 import { CustomerChatList } from "@/components/CustomerChat/CustomerChatList";
 import { CustomerChatPanel } from "@/components/CustomerChat/CustomerChatPanel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Atendimento() {
   const navigate = useNavigate();
@@ -53,7 +64,8 @@ export default function Atendimento() {
 
   const [showCreateCustomerLink, setShowCreateCustomerLink] = useState(false);
 
-  const { links, createLink, deactivateLink, getInviteUrl } = useCustomerChatLinks(!isMember ? ownerId : null);
+  const { links, createLink, setLinkActive, deleteLink, getInviteUrl, isMutating: isCustomerLinksMutating } =
+    useCustomerChatLinks(!isMember ? ownerId : null);
   const {
     conversations: customerConversations,
     unreadTotal: customerUnreadTotal,
@@ -667,11 +679,38 @@ export default function Atendimento() {
                           {l.is_active ? "Ativo" : "Inativo"}
                           {l.customer_name ? ` • ${l.customer_name}` : ""}
                         </div>
-                        {l.is_active && (
-                          <Button variant="outline" size="sm" onClick={() => deactivateLink(l.id)}>
-                            Desativar
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isCustomerLinksMutating}
+                            onClick={() => setLinkActive(l.id, !l.is_active)}
+                          >
+                            {l.is_active ? "Desativar" : "Ativar"}
                           </Button>
-                        )}
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" disabled={isCustomerLinksMutating}>
+                                <Trash2 className="h-4 w-4" />
+                                Excluir
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir link?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Isso remove o link permanentemente. Se alguém já tiver usado esse link, a conversa já
+                                  criada continuará existindo.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteLink(l.id)}>Excluir</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     </div>
                   ))}
