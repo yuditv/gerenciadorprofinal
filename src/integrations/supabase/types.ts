@@ -1757,6 +1757,122 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_chat_links: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          customer_user_id: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          owner_id: string
+          redeemed_at: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          customer_user_id?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          owner_id: string
+          redeemed_at?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          customer_user_id?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          owner_id?: string
+          redeemed_at?: string | null
+          token?: string
+        }
+        Relationships: []
+      }
+      customer_conversations: {
+        Row: {
+          created_at: string
+          customer_user_id: string
+          id: string
+          last_message_at: string | null
+          link_id: string | null
+          owner_id: string
+          unread_customer_count: number
+          unread_owner_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_user_id: string
+          id?: string
+          last_message_at?: string | null
+          link_id?: string | null
+          owner_id: string
+          unread_customer_count?: number
+          unread_owner_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_user_id?: string
+          id?: string
+          last_message_at?: string | null
+          link_id?: string | null
+          owner_id?: string
+          unread_customer_count?: number
+          unread_owner_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customer_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          customer_user_id: string
+          id: string
+          is_read_by_customer: boolean
+          is_read_by_owner: boolean
+          owner_id: string
+          sender_type: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          customer_user_id: string
+          id?: string
+          is_read_by_customer?: boolean
+          is_read_by_owner?: boolean
+          owner_id: string
+          sender_type: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          customer_user_id?: string
+          id?: string
+          is_read_by_customer?: boolean
+          is_read_by_owner?: boolean
+          owner_id?: string
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "customer_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dispatch_configs: {
         Row: {
           ai_personalization: boolean | null
