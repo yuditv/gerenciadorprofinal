@@ -1795,6 +1795,8 @@ export type Database = {
       }
       customer_conversations: {
         Row: {
+          active_agent_id: string | null
+          ai_enabled: boolean | null
           created_at: string
           customer_user_id: string
           id: string
@@ -1806,6 +1808,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_agent_id?: string | null
+          ai_enabled?: boolean | null
           created_at?: string
           customer_user_id: string
           id?: string
@@ -1817,6 +1821,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_agent_id?: string | null
+          ai_enabled?: boolean | null
           created_at?: string
           customer_user_id?: string
           id?: string
@@ -1827,7 +1833,15 @@ export type Database = {
           unread_owner_count?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_conversations_active_agent_id_fkey"
+            columns: ["active_agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_messages: {
         Row: {

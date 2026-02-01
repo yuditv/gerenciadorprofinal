@@ -1,20 +1,34 @@
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Bot, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import type { CustomerConversationView } from "@/hooks/useCustomerConversations";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Props = {
   conversations: CustomerConversationView[];
   selectedId: string | null;
   onSelect: (c: CustomerConversationView) => void;
+  onDelete: (id: string) => Promise<boolean>;
   isLoading: boolean;
+  isDeleting?: boolean;
 };
 
-export function CustomerChatList({ conversations, selectedId, onSelect, isLoading }: Props) {
+export function CustomerChatList({ conversations, selectedId, onSelect, onDelete, isLoading, isDeleting }: Props) {
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -52,25 +66,65 @@ export function CustomerChatList({ conversations, selectedId, onSelect, isLoadin
               const selected = selectedId === c.id;
               const lastAt = c.last_message_at ?? c.updated_at;
               return (
-                <button
+                <div
                   key={c.id}
-                  onClick={() => onSelect(c)}
                   className={cn(
-                    "w-full p-3 rounded-xl border text-left transition-all",
+                    "w-full p-3 rounded-xl border text-left transition-all relative group",
                     "bg-card/25 border-border/30 hover:bg-card/40",
                     selected && "bg-card/60 border-primary/25 ring-1 ring-primary/30"
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-medium truncate">{c.customer_name ?? "Cliente"}</div>
-                    <div className="text-xs text-muted-foreground shrink-0">
-                      {formatDistanceToNow(new Date(lastAt), { addSuffix: false, locale: ptBR })}
+                  <button
+                    onClick={() => onSelect(c)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium truncate">{c.customer_name ?? "Cliente"}</div>
+                        {c.ai_enabled && (
+                          <Bot className="h-3.5 w-3.5 text-primary shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground shrink-0">
+                        {formatDistanceToNow(new Date(lastAt), { addSuffix: false, locale: ptBR })}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {c.unread_owner_count > 0 ? `${c.unread_owner_count} não lidas` : "Sem pendências"}
-                  </div>
-                </button>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {c.unread_owner_count > 0 ? `${c.unread_owner_count} não lidas` : "Sem pendências"}
+                    </div>
+                  </button>
+
+                  {/* Delete button - visible on hover */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir conversa?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Isso vai excluir permanentemente a conversa com "{c.customer_name ?? "Cliente"}" e todas as mensagens. Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => onDelete(c.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               );
             })}
           </div>
