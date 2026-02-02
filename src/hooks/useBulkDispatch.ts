@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { processMessage } from '@/lib/spintaxParser';
@@ -65,6 +65,24 @@ export interface DispatchProgress {
   }>;
 }
 
+// Persisted state for resuming dispatch after browser close
+interface PersistedDispatchState {
+  contacts: DispatchContact[];
+  config: DispatchConfig;
+  currentIndex: number;
+  sent: number;
+  failed: number;
+  archived: number;
+  historyRecordId?: string;
+  logs: Array<{
+    time: string; // ISO string for serialization
+    type: 'success' | 'error' | 'info' | 'warning';
+    message: string;
+  }>;
+}
+
+const DISPATCH_STORAGE_KEY = 'bulk_dispatch_state';
+
 const DEFAULT_CONFIG: DispatchConfig = {
   instanceIds: [],
   balancingMode: 'automatic',
@@ -86,6 +104,30 @@ const DEFAULT_CONFIG: DispatchConfig = {
   attentionCallDelay: 2,
 };
 
+function loadPersistedState(): PersistedDispatchState | null {
+  try {
+    const stored = localStorage.getItem(DISPATCH_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored) as PersistedDispatchState;
+    }
+  } catch (error) {
+    console.warn('Failed to load persisted dispatch state:', error);
+  }
+  return null;
+}
+
+function savePersistedState(state: PersistedDispatchState | null) {
+  try {
+    if (state) {
+      localStorage.setItem(DISPATCH_STORAGE_KEY, JSON.stringify(state));
+    } else {
+      localStorage.removeItem(DISPATCH_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn('Failed to save dispatch state:', error);
+  }
+}
+
 export function useBulkDispatch() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -103,9 +145,55 @@ export function useBulkDispatch() {
     logs: [],
   });
   
+  // Track if we have a pending resume from persisted state
+  const [hasPendingResume, setHasPendingResume] = useState(false);
+  const persistedStateRef = useRef<PersistedDispatchState | null>(null);
+  
   const abortControllerRef = useRef<AbortController | null>(null);
   const pausedRef = useRef(false);
   const instanceIndexRef = useRef(0);
+  const currentIndexRef = useRef(0);
+  const historyRecordIdRef = useRef<string | null>(null);
+
+  // Load persisted state on mount
+  useEffect(() => {
+    const persisted = loadPersistedState();
+    if (persisted && persisted.contacts.length > 0 && persisted.currentIndex < persisted.contacts.length) {
+      persistedStateRef.current = persisted;
+      setContacts(persisted.contacts);
+      setConfig(persisted.config);
+      setHasPendingResume(true);
+      
+      // Restore progress as paused
+      const restoredLogs = persisted.logs.map(log => ({
+        ...log,
+        time: new Date(log.time)
+      }));
+      
+      setProgress({
+        total: persisted.contacts.length,
+        sent: persisted.sent,
+        failed: persisted.failed,
+        pending: persisted.contacts.length - persisted.sent - persisted.failed,
+        archived: persisted.archived,
+        isPaused: true,
+        isRunning: true, // Mark as running but paused
+        logs: [
+          { time: new Date(), type: 'warning', message: '⚠️ Disparo restaurado - pausado automaticamente' },
+          ...restoredLogs
+        ],
+      });
+      
+      pausedRef.current = true;
+      currentIndexRef.current = persisted.currentIndex;
+      historyRecordIdRef.current = persisted.historyRecordId || null;
+      
+      toast({
+        title: '📋 Disparo Restaurado',
+        description: `Encontramos um disparo pendente (${persisted.sent}/${persisted.contacts.length}). Clique em Retomar para continuar.`,
+      });
+    }
+  }, []);
 
   const addLog = useCallback((type: DispatchProgress['logs'][0]['type'], message: string) => {
     setProgress(prev => ({
@@ -255,7 +343,40 @@ export function useBulkDispatch() {
     return { menuType, text, choices, footerText };
   };
 
-  const startDispatch = useCallback(async (instancesData: any[]) => {
+  // Save state to localStorage for recovery
+  const persistCurrentState = useCallback((
+    contactsList: DispatchContact[],
+    configData: DispatchConfig,
+    currentIdx: number,
+    sent: number,
+    failed: number,
+    archived: number,
+    historyId?: string,
+    logs?: DispatchProgress['logs']
+  ) => {
+    const state: PersistedDispatchState = {
+      contacts: contactsList,
+      config: configData,
+      currentIndex: currentIdx,
+      sent,
+      failed,
+      archived,
+      historyRecordId: historyId,
+      logs: (logs || []).slice(0, 50).map(log => ({
+        ...log,
+        time: log.time.toISOString()
+      }))
+    };
+    savePersistedState(state);
+  }, []);
+
+  const clearPersistedState = useCallback(() => {
+    savePersistedState(null);
+    persistedStateRef.current = null;
+    setHasPendingResume(false);
+  }, []);
+
+  const startDispatch = useCallback(async (instancesData: any[], resumeFromIndex?: number) => {
     if (!user) {
       toast({ title: 'Erro', description: 'Usuário não autenticado', variant: 'destructive' });
       return;
@@ -284,40 +405,72 @@ export function useBulkDispatch() {
     pausedRef.current = false;
     instanceIndexRef.current = 0;
 
-    setProgress({
-      total: contacts.length,
-      sent: 0,
-      failed: 0,
-      pending: contacts.length,
-      archived: 0,
-      isPaused: false,
-      isRunning: true,
-      logs: [],
-    });
+    const startIndex = resumeFromIndex ?? 0;
+    const isResuming = startIndex > 0;
+    
+    let sentCount = isResuming ? progress.sent : 0;
+    let failedCount = isResuming ? progress.failed : 0;
+    let archivedCount = isResuming ? progress.archived : 0;
+    let historyRecordId = historyRecordIdRef.current;
 
-    addLog('info', `Iniciando disparo para ${contacts.length} contatos`);
-    addLog('info', `${selectedInstances.length} instância(s) selecionada(s)`);
+    if (!isResuming) {
+      setProgress({
+        total: contacts.length,
+        sent: 0,
+        failed: 0,
+        pending: contacts.length,
+        archived: 0,
+        isPaused: false,
+        isRunning: true,
+        logs: [],
+      });
 
-    // Create dispatch history record
-    const { data: historyRecord } = await supabase
-      .from('bulk_dispatch_history')
-      .insert({
-        user_id: user.id,
-        dispatch_type: 'whatsapp',
-        target_type: 'contacts',
-        total_recipients: contacts.length,
-        status: 'running',
-        message_content: config.messages[0]?.content || ''
-      })
-      .select()
-      .single();
+      addLog('info', `Iniciando disparo para ${contacts.length} contatos`);
+      addLog('info', `${selectedInstances.length} instância(s) selecionada(s)`);
 
-    let sentCount = 0;
-    let failedCount = 0;
-    let archivedCount = 0;
+      // Create dispatch history record
+      const { data: historyRecord } = await supabase
+        .from('bulk_dispatch_history')
+        .insert({
+          user_id: user.id,
+          dispatch_type: 'whatsapp',
+          target_type: 'contacts',
+          total_recipients: contacts.length,
+          status: 'running',
+          message_content: config.messages[0]?.content || ''
+        })
+        .select()
+        .single();
+
+      historyRecordId = historyRecord?.id || null;
+      historyRecordIdRef.current = historyRecordId;
+    } else {
+      setProgress(prev => ({
+        ...prev,
+        isPaused: false,
+        isRunning: true,
+      }));
+      addLog('info', `Retomando disparo do contato ${startIndex + 1}/${contacts.length}`);
+    }
+
+    setHasPendingResume(false);
     let messagesSinceLastPause = 0;
 
-    for (let i = 0; i < contacts.length; i++) {
+    for (let i = startIndex; i < contacts.length; i++) {
+      currentIndexRef.current = i;
+      
+      // Persist state for recovery
+      persistCurrentState(
+        contacts,
+        config,
+        i,
+        sentCount,
+        failedCount,
+        archivedCount,
+        historyRecordId || undefined,
+        progress.logs
+      );
+
       // Check if aborted
       if (abortControllerRef.current?.signal.aborted) {
         addLog('warning', 'Disparo cancelado pelo usuário');
@@ -346,6 +499,16 @@ export function useBulkDispatch() {
       if (!instance) {
         addLog('error', 'Nenhuma instância disponível');
         failedCount++;
+        
+        // Auto-pause on failure
+        pausedRef.current = true;
+        setProgress(prev => ({ ...prev, isPaused: true, failed: failedCount }));
+        addLog('warning', '⚠️ Disparo pausado automaticamente devido a falha');
+        toast({
+          title: '⚠️ Disparo Pausado',
+          description: 'O disparo foi pausado devido a uma falha. Verifique e clique em Retomar.',
+          variant: 'destructive',
+        });
         continue;
       }
 
@@ -450,7 +613,7 @@ export function useBulkDispatch() {
               phone: phone,
               email: contact.email || null,
               original_contact_id: contact.originalId,
-              dispatch_history_id: historyRecord?.id || null,
+              dispatch_history_id: historyRecordId || null,
               sent_at: new Date().toISOString(),
             });
 
@@ -476,6 +639,44 @@ export function useBulkDispatch() {
       } catch (err: any) {
         failedCount++;
         addLog('error', `✗ ${contact.name || phone}: ${err.message}`);
+        
+        // AUTO-PAUSE ON FAILURE: Pause immediately when a message fails
+        pausedRef.current = true;
+        setProgress(prev => ({ 
+          ...prev, 
+          isPaused: true,
+          sent: sentCount,
+          failed: failedCount,
+          pending: contacts.length - sentCount - failedCount,
+          archived: archivedCount,
+        }));
+        addLog('warning', '⚠️ Disparo pausado automaticamente devido a falha no envio');
+        toast({
+          title: '⚠️ Disparo Pausado',
+          description: `Falha ao enviar para ${contact.name || phone}. Verifique a instância e clique em Retomar.`,
+          variant: 'destructive',
+        });
+        
+        // Persist state immediately after failure
+        persistCurrentState(
+          contacts,
+          config,
+          i + 1, // Next contact to try
+          sentCount,
+          failedCount,
+          archivedCount,
+          historyRecordId || undefined,
+          progress.logs
+        );
+        
+        // Wait for resume
+        while (pausedRef.current) {
+          await sleep(1000);
+          if (abortControllerRef.current?.signal.aborted) break;
+        }
+        
+        if (abortControllerRef.current?.signal.aborted) break;
+        continue;
       }
 
       setProgress(prev => ({
@@ -511,8 +712,11 @@ export function useBulkDispatch() {
       }
     }
 
+    // Clear persisted state on completion
+    clearPersistedState();
+
     // Update history record
-    if (historyRecord) {
+    if (historyRecordId) {
       await supabase
         .from('bulk_dispatch_history')
         .update({
@@ -521,7 +725,7 @@ export function useBulkDispatch() {
           status: 'completed',
           completed_at: new Date().toISOString()
         })
-        .eq('id', historyRecord.id);
+        .eq('id', historyRecordId);
     }
 
     setProgress(prev => ({
@@ -541,19 +745,37 @@ export function useBulkDispatch() {
       title: '🎉 Disparo Concluído!',
       description: `✅ ${sentCount} enviados\n❌ ${failedCount} falharam${archivedInfo}`,
     });
-  }, [user, contacts, config, toast, addLog, getNextInstance, selectRandomMessage, isWithinBusinessHours, getRandomDelay]);
+  }, [user, contacts, config, progress, toast, addLog, getNextInstance, selectRandomMessage, isWithinBusinessHours, getRandomDelay, persistCurrentState, clearPersistedState]);
 
   const pauseDispatch = useCallback(() => {
     pausedRef.current = true;
     setProgress(prev => ({ ...prev, isPaused: true }));
     addLog('info', 'Disparo pausado');
-  }, [addLog]);
+    
+    // Persist state when manually paused
+    persistCurrentState(
+      contacts,
+      config,
+      currentIndexRef.current,
+      progress.sent,
+      progress.failed,
+      progress.archived,
+      historyRecordIdRef.current || undefined,
+      progress.logs
+    );
+  }, [addLog, contacts, config, progress, persistCurrentState]);
 
-  const resumeDispatch = useCallback(() => {
+  const resumeDispatch = useCallback(async (instancesData?: any[]) => {
     pausedRef.current = false;
     setProgress(prev => ({ ...prev, isPaused: false }));
     addLog('info', 'Disparo retomado');
-  }, [addLog]);
+    
+    // If resuming from persisted state with instances data, restart the dispatch loop
+    if (hasPendingResume && instancesData) {
+      setHasPendingResume(false);
+      await startDispatch(instancesData, currentIndexRef.current);
+    }
+  }, [addLog, hasPendingResume, startDispatch]);
 
   const cancelDispatch = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -563,7 +785,10 @@ export function useBulkDispatch() {
       isPaused: false,
     }));
     addLog('warning', 'Disparo cancelado');
-  }, [addLog]);
+    
+    // Clear persisted state on cancel
+    clearPersistedState();
+  }, [addLog, clearPersistedState]);
 
   const updateConfig = useCallback((updates: Partial<DispatchConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
@@ -586,12 +811,14 @@ export function useBulkDispatch() {
       isRunning: false,
       logs: [],
     });
-  }, []);
+    clearPersistedState();
+  }, [clearPersistedState]);
 
   return {
     config,
     contacts,
     progress,
+    hasPendingResume,
     setContacts,
     updateConfig,
     loadConfig,
