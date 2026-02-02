@@ -257,10 +257,10 @@ serve(async (req: Request) => {
       });
     }
 
-    // Fetch sub-agents if any
+    // Fetch sub-agents if any (filter by owner's agents)
     const { data: subAgentLinks } = await supabaseAdmin
       .from('ai_sub_agent_links')
-      .select('sub_agent_id, priority, sub_agent:ai_agents(*)')
+      .select('sub_agent_id, priority, sub_agent:ai_agents!ai_sub_agent_links_sub_agent_id_fkey(*)')
       .eq('principal_agent_id', agentId)
       .eq('is_active', true)
       .order('priority', { ascending: true });
