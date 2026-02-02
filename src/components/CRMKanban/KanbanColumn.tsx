@@ -1,3 +1,4 @@
+import { memo, useMemo, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { KanbanCard } from './KanbanCard';
@@ -11,12 +12,25 @@ interface KanbanColumnProps {
   onLeadClick: (lead: KanbanLead) => void;
 }
 
-export function KanbanColumn({ column, isOver, onLeadClick }: KanbanColumnProps) {
+export const KanbanColumn = memo(function KanbanColumn({ column, isOver, onLeadClick }: KanbanColumnProps) {
   const { setNodeRef, isOver: isOverColumn } = useDroppable({
     id: column.id,
   });
 
-  const totalValue = column.leads.reduce((sum, lead) => sum + (lead.deal_value || 0), 0);
+  // Memoize total value calculation
+  const totalValue = useMemo(() => 
+    column.leads.reduce((sum, lead) => sum + (lead.deal_value || 0), 0),
+  [column.leads]);
+
+  // Memoize lead IDs for SortableContext
+  const leadIds = useMemo(() => 
+    column.leads.map(l => l.id),
+  [column.leads]);
+
+  // Stable callback
+  const handleLeadClick = useCallback((lead: KanbanLead) => {
+    onLeadClick(lead);
+  }, [onLeadClick]);
 
   return (
     <div
@@ -47,7 +61,7 @@ export function KanbanColumn({ column, isOver, onLeadClick }: KanbanColumnProps)
       {/* Cards */}
       <ScrollArea className="flex-1 p-2">
         <SortableContext
-          items={column.leads.map(l => l.id)}
+          items={leadIds}
           strategy={verticalListSortingStrategy}
         >
           <div className="space-y-2 min-h-[100px]">
@@ -60,7 +74,7 @@ export function KanbanColumn({ column, isOver, onLeadClick }: KanbanColumnProps)
                 <KanbanCard
                   key={lead.id}
                   lead={lead}
-                  onClick={() => onLeadClick(lead)}
+                  onClick={() => handleLeadClick(lead)}
                 />
               ))
             )}
@@ -69,4 +83,12 @@ export function KanbanColumn({ column, isOver, onLeadClick }: KanbanColumnProps)
       </ScrollArea>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.isOver === nextProps.isOver &&
+    prevProps.column.id === nextProps.column.id &&
+    prevProps.column.title === nextProps.column.title &&
+    prevProps.column.leads.length === nextProps.column.leads.length &&
+    prevProps.column.leads.every((lead, i) => lead.id === nextProps.column.leads[i]?.id)
+  );
+});

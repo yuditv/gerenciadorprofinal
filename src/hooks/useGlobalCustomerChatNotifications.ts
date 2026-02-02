@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useSystemNotifications } from '@/hooks/useSystemNotifications';
@@ -8,6 +8,9 @@ interface CustomerChatNotificationState {
   hasNewMessage: boolean;
   lastMessageTime: Date | null;
 }
+
+// Cache for customer names to avoid repeated DB queries
+const customerNameCache = new Map<string, string>();
 
 export function useGlobalCustomerChatNotifications() {
   const { user } = useAuth();
@@ -19,24 +22,36 @@ export function useGlobalCustomerChatNotifications() {
   });
   const processedMessagesRef = useRef<Set<string>>(new Set());
   const hasInteractedRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  // Fetch initial unread count
+  // Track mount state for cleanup
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Fetch initial unread count with optimized query
   const fetchUnreadCount = useCallback(async () => {
-    if (!user) return;
+    if (!user || !isMountedRef.current) return;
 
     try {
       const { data, error } = await supabase
         .from('customer_conversations')
         .select('unread_owner_count')
-        .eq('owner_id', user.id);
+        .eq('owner_id', user.id)
+        .gt('unread_owner_count', 0); // Only fetch non-zero counts
 
       if (error) {
         console.error('[GlobalCustomerChat] Error fetching unread count:', error);
         return;
       }
 
+      if (!isMountedRef.current) return;
+
       const total = (data || []).reduce((acc, conv) => acc + (conv.unread_owner_count || 0), 0);
-      setState(prev => ({ ...prev, unreadCount: total }));
+      setState(prev => prev.unreadCount !== total ? { ...prev, unreadCount: total } : prev);
     } catch (e) {
       console.error('[GlobalCustomerChat] Error:', e);
     }
@@ -87,7 +102,7 @@ export function useGlobalCustomerChatNotifications() {
 
           console.log('[GlobalCustomerChat] New customer message received:', msg.id);
 
-          // Update state
+          // Update state atomically
           setState(prev => ({
             unreadCount: prev.unreadCount + 1,
             hasNewMessage: true,
@@ -95,32 +110,41 @@ export function useGlobalCustomerChatNotifications() {
           }));
 
           // Clear new message indicator after a few seconds
-          setTimeout(() => {
-            setState(prev => ({ ...prev, hasNewMessage: false }));
+          const timeoutId = setTimeout(() => {
+            if (isMountedRef.current) {
+              setState(prev => ({ ...prev, hasNewMessage: false }));
+            }
           }, 5000);
 
-          // Get customer name from conversation
+          // Get customer name - check cache first
           let customerName = 'Cliente';
-          try {
-            const { data: convData } = await supabase
-              .from('customer_conversations')
-              .select('customer_user_id')
-              .eq('id', msg.conversation_id)
-              .maybeSingle();
-
-            if (convData?.customer_user_id) {
-              const { data: linkData } = await supabase
-                .from('customer_chat_links')
-                .select('customer_name')
-                .eq('customer_user_id', convData.customer_user_id)
+          const cacheKey = msg.conversation_id;
+          
+          if (customerNameCache.has(cacheKey)) {
+            customerName = customerNameCache.get(cacheKey)!;
+          } else {
+            try {
+              const { data: convData } = await supabase
+                .from('customer_conversations')
+                .select('customer_user_id')
+                .eq('id', msg.conversation_id)
                 .maybeSingle();
 
-              if (linkData?.customer_name) {
-                customerName = linkData.customer_name;
+              if (convData?.customer_user_id) {
+                const { data: linkData } = await supabase
+                  .from('customer_chat_links')
+                  .select('customer_name')
+                  .eq('customer_user_id', convData.customer_user_id)
+                  .maybeSingle();
+
+                if (linkData?.customer_name) {
+                  customerName = linkData.customer_name;
+                  customerNameCache.set(cacheKey, customerName);
+                }
               }
+            } catch (e) {
+              console.error('[GlobalCustomerChat] Error fetching customer name:', e);
             }
-          } catch (e) {
-            console.error('[GlobalCustomerChat] Error fetching customer name:', e);
           }
 
           // Prepare notification body

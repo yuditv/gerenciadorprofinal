@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
@@ -20,7 +21,7 @@ interface KanbanCardProps {
   onClick: () => void;
 }
 
-export function KanbanCard({ lead, isDragging = false, onClick }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ lead, isDragging = false, onClick }: KanbanCardProps) {
   const {
     attributes,
     listeners,
@@ -30,25 +31,40 @@ export function KanbanCard({ lead, isDragging = false, onClick }: KanbanCardProp
     isDragging: isSortableDragging,
   } = useSortable({ id: lead.id });
 
-  const style = {
+  const style = useMemo(() => ({
     transform: CSS.Transform.toString(transform),
     transition,
-  };
+  }), [transform, transition]);
 
-  const displayName = lead.lead_name || lead.lead_full_name || lead.phone;
-  const initials = displayName
-    ?.split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || '?';
+  const displayName = useMemo(() => 
+    lead.lead_name || lead.lead_full_name || lead.phone,
+  [lead.lead_name, lead.lead_full_name, lead.phone]);
 
-  const priority = LEAD_PRIORITIES.find(p => p.id === (lead.priority || 'medium'));
-  const temperature = LEAD_TEMPERATURES.find(t => t.id === (lead.temperature || 'warm'));
+  const initials = useMemo(() => 
+    displayName
+      ?.split(' ')
+      .map(n => n[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '?',
+  [displayName]);
 
-  const isOverdue = lead.follow_up_date && new Date(lead.follow_up_date) < new Date();
-  const hasFollowUpSoon = lead.follow_up_date && !isOverdue && 
-    new Date(lead.follow_up_date) <= new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const priority = useMemo(() => 
+    LEAD_PRIORITIES.find(p => p.id === (lead.priority || 'medium')),
+  [lead.priority]);
+
+  const temperature = useMemo(() => 
+    LEAD_TEMPERATURES.find(t => t.id === (lead.temperature || 'warm')),
+  [lead.temperature]);
+
+  const isOverdue = useMemo(() => 
+    lead.follow_up_date && new Date(lead.follow_up_date) < new Date(),
+  [lead.follow_up_date]);
+
+  const hasFollowUpSoon = useMemo(() => 
+    lead.follow_up_date && !isOverdue && 
+    new Date(lead.follow_up_date) <= new Date(Date.now() + 24 * 60 * 60 * 1000),
+  [lead.follow_up_date, isOverdue]);
 
   return (
     <div
@@ -168,4 +184,21 @@ export function KanbanCard({ lead, isDragging = false, onClick }: KanbanCardProp
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for optimal re-rendering
+  return (
+    prevProps.isDragging === nextProps.isDragging &&
+    prevProps.lead.id === nextProps.lead.id &&
+    prevProps.lead.lead_name === nextProps.lead.lead_name &&
+    prevProps.lead.lead_full_name === nextProps.lead.lead_full_name &&
+    prevProps.lead.phone === nextProps.lead.phone &&
+    prevProps.lead.company_name === nextProps.lead.company_name &&
+    prevProps.lead.priority === nextProps.lead.priority &&
+    prevProps.lead.temperature === nextProps.lead.temperature &&
+    prevProps.lead.deal_value === nextProps.lead.deal_value &&
+    prevProps.lead.follow_up_date === nextProps.lead.follow_up_date &&
+    prevProps.lead.last_message_at === nextProps.lead.last_message_at &&
+    prevProps.lead.contact_avatar === nextProps.lead.contact_avatar &&
+    JSON.stringify(prevProps.lead.tags) === JSON.stringify(nextProps.lead.tags)
+  );
+});
