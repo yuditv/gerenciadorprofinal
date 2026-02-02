@@ -1845,7 +1845,7 @@ export type Database = {
       }
       customer_messages: {
         Row: {
-          content: string
+          content: string | null
           conversation_id: string
           created_at: string
           customer_user_id: string
@@ -1859,7 +1859,7 @@ export type Database = {
           sender_type: string
         }
         Insert: {
-          content: string
+          content?: string | null
           conversation_id: string
           created_at?: string
           customer_user_id: string
@@ -1873,7 +1873,7 @@ export type Database = {
           sender_type: string
         }
         Update: {
-          content?: string
+          content?: string | null
           conversation_id?: string
           created_at?: string
           customer_user_id?: string

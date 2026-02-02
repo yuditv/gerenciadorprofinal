@@ -279,7 +279,9 @@ export function useCustomerMessages(
         }
 
         const sender_type = viewer;
-        const { error } = await supabase.from("customer_messages").insert({
+        
+        // Insert message - content can be null if we have media
+        const { data: insertedMessage, error } = await supabase.from("customer_messages").insert({
           conversation_id: conversationId,
           owner_id: meta.owner_id,
           customer_user_id: meta.customer_user_id,
@@ -288,8 +290,30 @@ export function useCustomerMessages(
           media_url,
           media_type,
           file_name,
-        });
+        }).select('id').single();
+        
         if (error) throw error;
+        
+        // If message was from customer, trigger AI response
+        if (sender_type === 'customer' && insertedMessage?.id) {
+          console.log('[useCustomerMessages] Customer message sent, triggering AI...');
+          try {
+            const { error: aiError } = await supabase.functions.invoke('customer-chat-ai', {
+              body: {
+                conversationId,
+                messageId: insertedMessage.id,
+              },
+            });
+            if (aiError) {
+              console.error('[useCustomerMessages] AI call failed:', aiError);
+            } else {
+              console.log('[useCustomerMessages] AI call successful');
+            }
+          } catch (aiEx) {
+            console.error('[useCustomerMessages] AI call exception:', aiEx);
+          }
+        }
+        
         return true;
       } catch (e) {
         console.error("[useCustomerMessages] sendMessage failed", e);
