@@ -22,6 +22,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { CustomerMessage } from "@/hooks/useCustomerMessages";
 import type { CustomerConversationView } from "@/hooks/useCustomerConversations";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
+import { MediaMessage } from "./MediaMessage";
+import { ChatMediaUploader, MediaPreview } from "./ChatMediaUploader";
 
 type AIAgent = {
   id: string;
@@ -34,7 +36,7 @@ type Props = {
   messages: CustomerMessage[];
   isLoading: boolean;
   isSending: boolean;
-  onSend: (content: string) => Promise<boolean>;
+  onSend: (content: string, mediaFile?: File) => Promise<boolean>;
   viewer: "owner" | "customer";
   conversation?: CustomerConversationView | null;
   agents?: AIAgent[];
@@ -55,6 +57,7 @@ export function CustomerChatPanel({
   onSetAgent,
 }: Props) {
   const [text, setText] = useState("");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { isEnabled, setIsEnabled } = useSystemNotifications();
 
@@ -66,9 +69,11 @@ export function CustomerChatPanel({
 
   const handleSend = async () => {
     const content = text.trim();
-    if (!content) return;
+    if (!content && !mediaFile) return;
     setText("");
-    await onSend(content);
+    const file = mediaFile;
+    setMediaFile(null);
+    await onSend(content, file || undefined);
   };
 
   const activeAgents = agents.filter((a) => a.is_active);
@@ -197,7 +202,20 @@ export function CustomerChatPanel({
                             transition={{ duration: 1 }}
                           />
                         )}
-                        <div className="whitespace-pre-wrap break-words relative z-10">{m.content}</div>
+                        {/* Media content */}
+                        {m.media_url && (
+                          <div className="mb-2 relative z-10">
+                            <MediaMessage
+                              mediaUrl={m.media_url}
+                              mediaType={m.media_type}
+                              fileName={m.file_name}
+                              mine={mine}
+                            />
+                          </div>
+                        )}
+                        {m.content && (
+                          <div className="whitespace-pre-wrap break-words relative z-10">{m.content}</div>
+                        )}
                         <div className="text-[10px] text-muted-foreground mt-1 relative z-10">
                           {new Date(m.created_at).toLocaleString()}
                         </div>
@@ -212,7 +230,19 @@ export function CustomerChatPanel({
       </div>
 
       <div className="border-t border-border/50 bg-inbox-header p-3">
+        {/* Media preview */}
+        {mediaFile && (
+          <MediaPreview 
+            file={mediaFile} 
+            onRemove={() => setMediaFile(null)} 
+          />
+        )}
+        
         <div className="flex gap-2 items-end">
+          <ChatMediaUploader 
+            onFileSelect={setMediaFile} 
+            disabled={isSending}
+          />
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -228,7 +258,7 @@ export function CustomerChatPanel({
           <Button
             type="button"
             onClick={handleSend}
-            disabled={isSending || !text.trim()}
+            disabled={isSending || (!text.trim() && !mediaFile)}
             className="h-10 shrink-0"
           >
             <Send className="h-4 w-4" />

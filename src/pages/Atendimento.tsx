@@ -84,9 +84,12 @@ export default function Atendimento() {
   // Callback for new message notifications
   const handleNewCustomerMessage = useCallback((message: CustomerMessage) => {
     playSound('message');
+    const bodyText = message.content 
+      ? (message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''))
+      : (message.media_type ? `📎 ${message.file_name || 'Mídia'}` : 'Nova mensagem');
     showNotification({
       title: '💬 Nova Mensagem',
-      body: message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''),
+      body: bodyText,
       soundType: 'message',
       silent: true,
     });
