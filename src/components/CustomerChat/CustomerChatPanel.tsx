@@ -1,35 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Bot, Settings, Volume2, VolumeX } from "lucide-react";
+import { Send, Bot, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { motion, AnimatePresence } from "framer-motion";
 import type { CustomerMessage } from "@/hooks/useCustomerMessages";
 import type { CustomerConversationView } from "@/hooks/useCustomerConversations";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
 import { MediaMessage } from "./MediaMessage";
 import { ChatMediaUploader, MediaPreview } from "./ChatMediaUploader";
-
-type AIAgent = {
-  id: string;
-  name: string;
-  is_active: boolean | null;
-};
 
 type Props = {
   title: string;
@@ -39,9 +19,6 @@ type Props = {
   onSend: (content: string, mediaFile?: File) => Promise<boolean>;
   viewer: "owner" | "customer";
   conversation?: CustomerConversationView | null;
-  agents?: AIAgent[];
-  onToggleAI?: (enabled: boolean, agentId?: string | null) => Promise<boolean>;
-  onSetAgent?: (agentId: string | null) => Promise<boolean>;
 };
 
 export function CustomerChatPanel({
@@ -52,9 +29,6 @@ export function CustomerChatPanel({
   onSend,
   viewer,
   conversation,
-  agents = [],
-  onToggleAI,
-  onSetAgent,
 }: Props) {
   const [text, setText] = useState("");
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -75,9 +49,6 @@ export function CustomerChatPanel({
     setMediaFile(null);
     await onSend(content, file || undefined);
   };
-
-  const activeAgents = agents.filter((a) => a.is_active);
-  const showAIControls = viewer === "owner" && conversation && onToggleAI;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-inbox">
@@ -100,55 +71,6 @@ export function CustomerChatPanel({
           >
             {isEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
           </Button>
-
-          {showAIControls && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">IA</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72">
-                <div className="space-y-4">
-                  <div className="font-medium text-sm">Configurações de IA</div>
-                  
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="ai-toggle" className="text-sm">Ativar Agente IA</Label>
-                    <Switch
-                      id="ai-toggle"
-                      checked={conversation.ai_enabled}
-                      onCheckedChange={(checked) => {
-                        const agentId = checked && activeAgents.length > 0 ? activeAgents[0].id : null;
-                        onToggleAI(checked, agentId);
-                      }}
-                    />
-                  </div>
-
-                  {conversation.ai_enabled && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">Agente</Label>
-                      <Select
-                        value={conversation.active_agent_id || ""}
-                        onValueChange={(value) => onSetAgent?.(value || null)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um agente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {activeAgents.map((agent) => (
-                            <SelectItem key={agent.id} value={agent.id}>
-                              {agent.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
         </div>
       </header>
 

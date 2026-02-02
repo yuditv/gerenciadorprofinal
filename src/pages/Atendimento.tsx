@@ -802,15 +802,6 @@ export default function Atendimento() {
                 onSend={sendCustomerMessage}
                 viewer="owner"
                 conversation={selectedCustomerConversation}
-                agents={aiAgents}
-                onToggleAI={async (enabled, agentId) => {
-                  if (!selectedCustomerConversationId) return false;
-                  return toggleCustomerAI(selectedCustomerConversationId, enabled, agentId);
-                }}
-                onSetAgent={async (agentId) => {
-                  if (!selectedCustomerConversationId) return false;
-                  return setCustomerActiveAgent(selectedCustomerConversationId, agentId);
-                }}
               />
             </div>
           ) : (
