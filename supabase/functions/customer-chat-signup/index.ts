@@ -12,9 +12,8 @@ type RequestBody = {
   email?: string;
   password?: string;
   customer_name?: string;
+  whatsapp?: string;
 };
-
-const isValidEmail = (email: string) => /\S+@\S+\.[A-Za-z]{2,}/.test(email);
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -26,7 +25,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { token, email, password, customer_name }: RequestBody = await req
+    const { token, email, password, customer_name, whatsapp }: RequestBody = await req
       .json()
       .catch(() => ({}));
 
@@ -34,6 +33,7 @@ serve(async (req) => {
     const safeEmail = (email ?? "").trim().toLowerCase();
     const safePassword = (password ?? "").trim();
     const safeName = (customer_name ?? "").trim();
+    const safeWhatsapp = (whatsapp ?? "").replace(/\D/g, "");
 
     if (!safeToken) {
       return new Response(JSON.stringify({ error: "token is required" }), {
@@ -41,8 +41,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!safeEmail || !isValidEmail(safeEmail)) {
-      return new Response(JSON.stringify({ error: "email inválido" }), {
+    if (!safeWhatsapp || safeWhatsapp.length < 10) {
+      return new Response(JSON.stringify({ error: "WhatsApp inválido" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -112,6 +112,7 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         full_name: safeName,
+        whatsapp: safeWhatsapp,
       },
     });
 
