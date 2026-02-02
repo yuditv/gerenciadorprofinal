@@ -209,13 +209,15 @@ export function useCustomerConversations(ownerId: string | null, callbacks?: Not
         throw convError;
       }
 
-      await refetch();
+      // Immediately remove from local state for instant UI update
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
       return true;
     } catch (e) {
       console.error("[useCustomerConversations] deleteConversation failed", e);
       return false;
     }
-  }, [refetch, ownerId]);
+  }, [ownerId]);
 
   const toggleAI = useCallback(async (conversationId: string, enabled: boolean, agentId?: string | null) => {
     try {
