@@ -2518,6 +2518,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // SEND MEDIA CAROUSEL - Rich carousel with images and structured buttons
+    // Docs: https://docs.uazapi.com/endpoint/post/send~carousel
     if (action === "send_carousel") {
       const phone = body.phone as string;
       const instanceKey = body.instanceKey as string;
@@ -2537,13 +2538,14 @@ serve(async (req: Request): Promise<Response> => {
       const delay = body.delay as number | undefined;
 
       if (!phone || !instanceKey || !text || !carousel?.length) {
+        console.error(`[Send Carousel] Missing required fields: phone=${!!phone}, instanceKey=${!!instanceKey}, text=${!!text}, carousel=${carousel?.length || 0}`);
         return new Response(
-          JSON.stringify({ error: "phone, instanceKey, text e carousel são obrigatórios" }),
+          JSON.stringify({ success: false, error: "phone, instanceKey, text e carousel são obrigatórios" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log(`[Send Carousel] phone: ${phone}, cards: ${carousel.length}`);
+      console.log(`[Send Carousel] phone: ${phone}, cards: ${carousel.length}, instanceKey present: ${!!instanceKey}`);
 
       const formattedPhone = formatPhoneNumber(phone);
       
@@ -2556,6 +2558,8 @@ serve(async (req: Request): Promise<Response> => {
 
       if (delay) requestBody.delay = delay;
 
+      console.log(`[Send Carousel] Request body:`, JSON.stringify(requestBody));
+
       try {
         const response = await fetch(`${uazapiUrl}/send/carousel`, {
           method: "POST",
@@ -2566,30 +2570,38 @@ serve(async (req: Request): Promise<Response> => {
           body: JSON.stringify(requestBody),
         });
 
+        console.log(`[Send Carousel] Response status: ${response.status}`);
         const data = await response.json();
-        console.log(`[Send Carousel] Response:`, JSON.stringify(data));
+        console.log(`[Send Carousel] Response body:`, JSON.stringify(data));
 
-        if (!response.ok) {
+        // UAZAPI may return error in different formats
+        const errorMessage = data.error || data.message || data.msg;
+        const isSuccess = response.ok && !errorMessage;
+
+        if (!isSuccess) {
+          console.error(`[Send Carousel] API Error: ${errorMessage || 'Unknown error'}`);
           return new Response(
-            JSON.stringify({ success: false, error: data.error || "Erro ao enviar carrossel", data }),
-            { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ success: false, error: errorMessage || "Erro ao enviar carrossel", data }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
+        console.log(`[Send Carousel] ✓ Carousel sent successfully`);
         return new Response(
           JSON.stringify({ success: true, data }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } catch (e) {
-        console.error("[Send Carousel] Error:", e);
+        console.error("[Send Carousel] Exception:", e);
         return new Response(
-          JSON.stringify({ success: false, error: String(e) }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: `Erro de conexão: ${String(e)}` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
 
     // SEND INTERACTIVE MENU - Buttons, List, Poll, Carousel
+    // Docs: https://docs.uazapi.com/endpoint/post/send~menu
     if (action === "send_menu") {
       const phone = body.phone as string;
       const instanceKey = body.instanceKey as string;
@@ -2602,27 +2614,34 @@ serve(async (req: Request): Promise<Response> => {
       const imageButton = body.imageButton as string | undefined;
 
       if (!phone || !instanceKey || !menuType || !text || !choices?.length) {
+        console.error(`[Send Menu] Missing required fields: phone=${!!phone}, instanceKey=${!!instanceKey}, menuType=${!!menuType}, text=${!!text}, choices=${choices?.length || 0}`);
         return new Response(
-          JSON.stringify({ error: "phone, instanceKey, menuType, text e choices são obrigatórios" }),
+          JSON.stringify({ success: false, error: "phone, instanceKey, menuType, text e choices são obrigatórios" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log(`[Send Menu] type: ${menuType}, phone: ${phone}, choices: ${choices.length}`);
+      console.log(`[Send Menu] type: ${menuType}, phone: ${phone}, choices: ${choices.length}, instanceKey present: ${!!instanceKey}`);
 
       const formattedPhone = formatPhoneNumber(phone);
       
+      // Build request body according to UAZAPI format
+      // The API expects: number, type, text, choices, and optional footer/listButton/selectableCount/imageButton
       const requestBody: Record<string, unknown> = {
         number: formattedPhone,
         type: menuType,
         text: text,
-        choices: choices
+        choices: choices,
+        readchat: true  // Mark chat as read
       };
 
+      // Add optional fields
       if (footerText) requestBody.footerText = footerText;
       if (listButton && menuType === "list") requestBody.listButton = listButton;
-      if (selectableCount && menuType === "poll") requestBody.selectableCount = selectableCount;
+      if (typeof selectableCount === "number" && menuType === "poll") requestBody.selectableCount = selectableCount;
       if (imageButton) requestBody.imageButton = imageButton;
+
+      console.log(`[Send Menu] Request body:`, JSON.stringify(requestBody));
 
       try {
         const response = await fetch(`${uazapiUrl}/send/menu`, {
@@ -2634,25 +2653,32 @@ serve(async (req: Request): Promise<Response> => {
           body: JSON.stringify(requestBody),
         });
 
+        console.log(`[Send Menu] Response status: ${response.status}`);
         const data = await response.json();
-        console.log(`[Send Menu] Response:`, JSON.stringify(data));
+        console.log(`[Send Menu] Response body:`, JSON.stringify(data));
 
-        if (!response.ok) {
+        // UAZAPI may return error in different formats
+        const errorMessage = data.error || data.message || data.msg;
+        const isSuccess = response.ok && !errorMessage;
+
+        if (!isSuccess) {
+          console.error(`[Send Menu] API Error: ${errorMessage || 'Unknown error'}`);
           return new Response(
-            JSON.stringify({ success: false, error: data.error || "Erro ao enviar menu", data }),
-            { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ success: false, error: errorMessage || "Erro ao enviar menu interativo", data }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
+        console.log(`[Send Menu] ✓ Menu sent successfully`);
         return new Response(
           JSON.stringify({ success: true, data }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } catch (e) {
-        console.error("[Send Menu] Error:", e);
+        console.error("[Send Menu] Exception:", e);
         return new Response(
-          JSON.stringify({ success: false, error: String(e) }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ success: false, error: `Erro de conexão: ${String(e)}` }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
