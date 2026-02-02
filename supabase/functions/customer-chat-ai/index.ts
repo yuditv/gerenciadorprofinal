@@ -360,44 +360,70 @@ serve(async (req: Request) => {
 
     console.log(`[${VERSION}] Calling AI with ${messages.length} messages`);
 
-    // Call the AI with tools
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: agent.ai_model || DEFAULT_MODEL,
-        messages,
-        tools: AI_TOOLS,
-        max_completion_tokens: 2000,
-      }),
-    });
+    // Call the AI with tools - implement tool loop
+    let responseText = '';
+    let currentMessages = [...messages];
+    let maxLoops = 3; // Prevent infinite loops
+    
+    for (let loop = 0; loop < maxLoops; loop++) {
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: agent.ai_model || DEFAULT_MODEL,
+          messages: currentMessages,
+          tools: AI_TOOLS,
+          max_completion_tokens: 2000,
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      throw new Error(`AI API error: ${aiResponse.status} ${errorText}`);
-    }
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        throw new Error(`AI API error: ${aiResponse.status} ${errorText}`);
+      }
 
-    const aiData = await aiResponse.json();
-    const choice = aiData?.choices?.[0];
-    let responseText = choice?.message?.content || '';
-    const toolCalls = choice?.message?.tool_calls;
+      const aiData = await aiResponse.json();
+      const choice = aiData?.choices?.[0];
+      const messageContent = choice?.message?.content || '';
+      const toolCalls = choice?.message?.tool_calls;
+      const finishReason = choice?.finish_reason;
 
-    // Process tool calls if any
-    if (toolCalls && toolCalls.length > 0) {
-      console.log(`[${VERSION}] Processing ${toolCalls.length} tool calls`);
+      // If we got text content, accumulate it
+      if (messageContent) {
+        responseText += messageContent;
+      }
+
+      // If no tool calls, we're done
+      if (!toolCalls || toolCalls.length === 0) {
+        console.log(`[${VERSION}] No more tool calls, finish_reason: ${finishReason}`);
+        break;
+      }
+
+      console.log(`[${VERSION}] Processing ${toolCalls.length} tool calls (loop ${loop + 1})`);
+      
+      // Add assistant message with tool calls to context
+      currentMessages.push({
+        role: 'assistant',
+        content: messageContent || null,
+        tool_calls: toolCalls
+      } as any);
+
+      // Process each tool call and collect results
+      const toolResults: Array<{role: string; tool_call_id: string; content: string}> = [];
       
       for (const toolCall of toolCalls) {
         const functionName = toolCall.function?.name;
+        const toolCallId = toolCall.id;
         const args = JSON.parse(toolCall.function?.arguments || '{}');
         
         console.log(`[${VERSION}] Tool call: ${functionName}`, args);
+        let toolResult = 'OK';
         
         switch (functionName) {
           case 'notify_owner':
-            // Send notification to owner
             try {
               await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-owner-notification`, {
                 method: 'POST',
@@ -415,14 +441,15 @@ serve(async (req: Request) => {
                   conversationId: conversationId
                 })
               });
+              toolResult = `Notificação enviada ao proprietário: ${args.summary}`;
               console.log(`[${VERSION}] Owner notification sent`);
             } catch (e) {
+              toolResult = `Erro ao notificar: ${e}`;
               console.error(`[${VERSION}] Failed to notify owner:`, e);
             }
             break;
             
           case 'save_customer_info':
-            // Save to customer memory
             try {
               const updates: Record<string, any> = { updated_at: new Date().toISOString() };
               switch (args.info_type) {
@@ -430,7 +457,6 @@ serve(async (req: Request) => {
                 case 'plan': updates.plan_name = args.value; break;
                 case 'device': updates.device = args.value; break;
                 default: 
-                  // Store in custom_memories JSON
                   const customMemories = customerMemory?.custom_memories || {};
                   customMemories[args.info_type] = args.value;
                   updates.custom_memories = customMemories;
@@ -444,14 +470,15 @@ serve(async (req: Request) => {
                   ...updates
                 }, { onConflict: 'user_id,phone' });
                 
+              toolResult = `Informação salva: ${args.info_type} = ${args.value}`;
               console.log(`[${VERSION}] Customer info saved: ${args.info_type}`);
             } catch (e) {
+              toolResult = `Erro ao salvar: ${e}`;
               console.error(`[${VERSION}] Failed to save customer info:`, e);
             }
             break;
             
           case 'generate_pix':
-            // Generate PIX payment
             try {
               const pixResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-pago-pix`, {
                 method: 'POST',
@@ -473,17 +500,23 @@ serve(async (req: Request) => {
               if (pixResponse.ok) {
                 const pixData = await pixResponse.json();
                 if (pixData.pix_code) {
+                  toolResult = `PIX gerado com sucesso! Código: ${pixData.pix_code}`;
+                  // Append PIX info to response
                   responseText += `\n\n💰 *PIX Gerado!*\n\nValor: R$ ${args.amount.toFixed(2)}\nDescrição: ${args.description}\n\n\`\`\`\n${pixData.pix_code}\n\`\`\`\n\n_Copie o código acima e cole no seu banco para pagar._`;
+                } else {
+                  toolResult = 'Erro: PIX não retornou código';
                 }
+              } else {
+                toolResult = 'Erro ao gerar PIX';
               }
               console.log(`[${VERSION}] PIX generated`);
             } catch (e) {
+              toolResult = `Erro ao gerar PIX: ${e}`;
               console.error(`[${VERSION}] Failed to generate PIX:`, e);
             }
             break;
             
           case 'transfer_to_agent':
-            // Transfer to sub-agent
             try {
               await supabaseAdmin
                 .from('customer_conversations')
@@ -500,15 +533,33 @@ serve(async (req: Request) => {
                 .single();
                 
               if (newAgent) {
+                toolResult = `Transferido para ${newAgent.name}`;
                 responseText = `*Transferindo para ${newAgent.name}...*\n\n${args.reason}`;
               }
               console.log(`[${VERSION}] Transferred to agent: ${args.agent_id}`);
             } catch (e) {
+              toolResult = `Erro ao transferir: ${e}`;
               console.error(`[${VERSION}] Failed to transfer:`, e);
             }
             break;
+            
+          case 'analyze_image':
+            toolResult = `Imagem analisada: ${args.analysis_type}`;
+            break;
+            
+          default:
+            toolResult = 'Ferramenta não reconhecida';
         }
+        
+        toolResults.push({
+          role: 'tool',
+          tool_call_id: toolCallId,
+          content: toolResult
+        });
       }
+      
+      // Add tool results to messages for next iteration
+      currentMessages.push(...toolResults);
     }
 
     // Apply formatting limits
