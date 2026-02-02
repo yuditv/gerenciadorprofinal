@@ -26,9 +26,14 @@ export default function CustomerChatInvite() {
   const [info, setInfo] = useState<LinkInfo | null>(null);
   const [infoLoading, setInfoLoading] = useState(true);
   const [mode, setMode] = useState<"signin" | "signup">("signup");
-  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+
+  const formatWhatsappToEmail = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, "");
+    return `${cleaned}@whatsapp.customer`;
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -64,8 +69,13 @@ export default function CustomerChatInvite() {
 
   const handleSubmit = async () => {
     if (!safeToken) return;
-    if (!email.trim() || !password.trim()) {
-      toast({ title: "Preencha e-mail e senha" });
+    const cleanedWhatsapp = whatsapp.replace(/\D/g, "");
+    if (!cleanedWhatsapp || cleanedWhatsapp.length < 10) {
+      toast({ title: "WhatsApp inválido" });
+      return;
+    }
+    if (!password.trim() || password.length < 6) {
+      toast({ title: "Senha deve ter pelo menos 6 caracteres" });
       return;
     }
     if (mode === "signup" && !name.trim()) {
@@ -74,28 +84,30 @@ export default function CustomerChatInvite() {
     }
 
     setIsSubmitting(true);
+    const fakeEmail = formatWhatsappToEmail(cleanedWhatsapp);
     try {
       if (mode === "signup") {
         // Customer-chat ONLY: create user already confirmed (no email confirmation) via edge function
         const { error: signupFnError } = await supabase.functions.invoke("customer-chat-signup", {
           body: {
             token: safeToken,
-            email: email.trim(),
+            email: fakeEmail,
             password,
             customer_name: name.trim(),
+            whatsapp: cleanedWhatsapp,
           },
         });
         if (signupFnError) throw signupFnError;
 
         // Now login normally
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: fakeEmail,
           password,
         });
         if (signInError) throw signInError;
       } else {
         const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
+          email: fakeEmail,
           password,
         });
         if (error) throw error;
@@ -162,15 +174,15 @@ export default function CustomerChatInvite() {
                     </TabsList>
 
                     <TabsContent value="signup" className="space-y-3">
-                      <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
+                      <Input placeholder="Seu nome *" value={name} onChange={(e) => setName(e.target.value)} />
                       <Input
-                        placeholder="Seu e-mail"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        type="email"
+                        placeholder="Seu WhatsApp *"
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(e.target.value)}
+                        type="tel"
                       />
                       <Input
-                        placeholder="Senha"
+                        placeholder="Senha *"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         type="password"
@@ -181,12 +193,11 @@ export default function CustomerChatInvite() {
                     </TabsContent>
 
                     <TabsContent value="signin" className="space-y-3">
-                      <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
                       <Input
-                        placeholder="Seu e-mail"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        type="email"
+                        placeholder="Seu WhatsApp"
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(e.target.value)}
+                        type="tel"
                       />
                       <Input
                         placeholder="Senha"
