@@ -47,7 +47,28 @@ export function useInteractiveMessage() {
   const sendInteractiveMenu = async (options: InteractiveMenuOptions): Promise<boolean> => {
     setIsSending(true);
     
+    // Validate required fields
+    if (!options.phone || !options.instanceKey) {
+      console.error("[useInteractiveMessage] Missing phone or instanceKey", { 
+        phone: !!options.phone, 
+        instanceKey: !!options.instanceKey 
+      });
+      toast({
+        title: "Erro ao enviar menu",
+        description: "Telefone ou instância não configurados",
+        variant: "destructive"
+      });
+      setIsSending(false);
+      return false;
+    }
+
     try {
+      console.log("[useInteractiveMessage] Sending menu:", {
+        phone: options.phone,
+        menuType: options.menuType,
+        choicesCount: options.choices?.length || 0
+      });
+
       const { data, error } = await supabase.functions.invoke("whatsapp-instances", {
         body: { 
           action: "send_menu", 
@@ -64,13 +85,17 @@ export function useInteractiveMessage() {
       });
 
       if (error) {
+        console.error("[useInteractiveMessage] Function error:", error);
         throw error;
       }
 
       if (!data?.success) {
-        throw new Error(data?.error || "Erro ao enviar menu interativo");
+        const errorMsg = data?.error || "Erro ao enviar menu interativo";
+        console.error("[useInteractiveMessage] API error:", errorMsg, data);
+        throw new Error(errorMsg);
       }
 
+      console.log("[useInteractiveMessage] Menu sent successfully:", data);
       toast({
         title: "Menu enviado!",
         description: `Menu ${getMenuTypeLabel(options.menuType)} enviado com sucesso`,
@@ -78,7 +103,7 @@ export function useInteractiveMessage() {
 
       return true;
     } catch (error) {
-      console.error("Error sending interactive menu:", error);
+      console.error("[useInteractiveMessage] Error sending interactive menu:", error);
       toast({
         title: "Erro ao enviar menu",
         description: error instanceof Error ? error.message : "Erro desconhecido",
@@ -93,7 +118,27 @@ export function useInteractiveMessage() {
   const sendMediaCarousel = async (options: MediaCarouselOptions): Promise<boolean> => {
     setIsSending(true);
     
+    // Validate required fields
+    if (!options.phone || !options.instanceKey) {
+      console.error("[useInteractiveMessage] Missing phone or instanceKey for carousel", { 
+        phone: !!options.phone, 
+        instanceKey: !!options.instanceKey 
+      });
+      toast({
+        title: "Erro ao enviar carrossel",
+        description: "Telefone ou instância não configurados",
+        variant: "destructive"
+      });
+      setIsSending(false);
+      return false;
+    }
+
     try {
+      console.log("[useInteractiveMessage] Sending carousel:", {
+        phone: options.phone,
+        cardsCount: options.carousel?.length || 0
+      });
+
       const { data, error } = await supabase.functions.invoke("whatsapp-instances", {
         body: { 
           action: "send_carousel", 
@@ -106,13 +151,17 @@ export function useInteractiveMessage() {
       });
 
       if (error) {
+        console.error("[useInteractiveMessage] Function error:", error);
         throw error;
       }
 
       if (!data?.success) {
-        throw new Error(data?.error || "Erro ao enviar carrossel de mídia");
+        const errorMsg = data?.error || "Erro ao enviar carrossel de mídia";
+        console.error("[useInteractiveMessage] API error:", errorMsg, data);
+        throw new Error(errorMsg);
       }
 
+      console.log("[useInteractiveMessage] Carousel sent successfully:", data);
       toast({
         title: "Carrossel enviado!",
         description: `Carrossel com ${options.carousel.length} cards enviado com sucesso`,
@@ -120,7 +169,7 @@ export function useInteractiveMessage() {
 
       return true;
     } catch (error) {
-      console.error("Error sending media carousel:", error);
+      console.error("[useInteractiveMessage] Error sending media carousel:", error);
       toast({
         title: "Erro ao enviar carrossel",
         description: error instanceof Error ? error.message : "Erro desconhecido",
