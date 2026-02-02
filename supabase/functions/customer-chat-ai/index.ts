@@ -371,7 +371,7 @@ serve(async (req: Request) => {
         model: agent.ai_model || DEFAULT_MODEL,
         messages,
         tools: AI_TOOLS,
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
       }),
     });
 
