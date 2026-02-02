@@ -332,7 +332,7 @@ export function ContactsManager({
     if (!onSaveContacts || unsavedContacts.length === 0) return;
     
     const toSave = unsavedContacts.map(c => ({
-      name: c.name || c.phone,
+      name: c.name || '',
       phone: c.phone,
       email: c.email
     }));

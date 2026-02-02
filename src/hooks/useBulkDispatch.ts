@@ -446,7 +446,7 @@ export function useBulkDispatch() {
             // Insert into sent_contacts
             await (supabase as any).from('sent_contacts').insert({
               user_id: user.id,
-              name: contact.name || phone,
+              name: contact.name || '',
               phone: phone,
               email: contact.email || null,
               original_contact_id: contact.originalId,
