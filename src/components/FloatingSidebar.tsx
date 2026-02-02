@@ -119,30 +119,20 @@ interface FloatingSidebarProps {
 }
 
 export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, onSectionChange }: FloatingSidebarProps) {
+  // All hooks MUST be called unconditionally and in the same order every render
   const navigate = useNavigate();
   const { permissions, isAdmin } = useUserPermissions();
   const { isMember } = useAccountContext();
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { ref: menuScrollRef, isDragging: isMenuDragging, handlers: menuDragHandlers } = useDragScroll<HTMLDivElement>();
-  const { unreadCount: customerChatUnread, hasNewMessage: hasNewCustomerMessage } = useGlobalCustomerChatNotifications();
+  
+  // Customer chat notifications - must always be called
+  const customerChatNotifications = useGlobalCustomerChatNotifications();
+  const customerChatUnread = customerChatNotifications.unreadCount;
+  const hasNewCustomerMessage = customerChatNotifications.hasNewMessage;
 
-  const handleClick = useCallback((item: MenuItem) => {
-    if (item.id === 'admin') {
-      navigate('/admin');
-    } else if (item.id === 'engajamento') {
-      navigate('/engajamento');
-    } else {
-      onSectionChange(item.id);
-    }
-  }, [navigate, onSectionChange]);
-
-  const handleSignOut = useCallback(async () => {
-    await signOut();
-    toast.success('Logout realizado com sucesso!');
-  }, [signOut]);
-
-  // Memoize filtered menu items
+  // Memoize filtered menu items - MUST be after all hook calls
   const visibleMenuItems = useMemo(() => {
     return menuItems.filter((item) => {
       // Attendants: Inbox only
@@ -158,6 +148,21 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
   const userInitial = useMemo(() => {
     return profile?.display_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'U';
   }, [profile?.display_name, user?.email]);
+
+  const handleClick = useCallback((item: MenuItem) => {
+    if (item.id === 'admin') {
+      navigate('/admin');
+    } else if (item.id === 'engajamento') {
+      navigate('/engajamento');
+    } else {
+      onSectionChange(item.id);
+    }
+  }, [navigate, onSectionChange]);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    toast.success('Logout realizado com sucesso!');
+  }, [signOut]);
 
   return (
     <TooltipProvider delayDuration={0}>
