@@ -9,8 +9,10 @@ import { useAccountContext } from "@/hooks/useAccountContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useDragScroll } from "@/hooks/useDragScroll";
+import { useGlobalCustomerChatNotifications } from "@/hooks/useGlobalCustomerChatNotifications";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -124,6 +126,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
   const { user, signOut } = useAuth();
   const { profile } = useProfile();
   const { ref: menuScrollRef, isDragging: isMenuDragging, handlers: menuDragHandlers } = useDragScroll<HTMLDivElement>();
+  const { unreadCount: customerChatUnread, hasNewMessage: hasNewCustomerMessage } = useGlobalCustomerChatNotifications();
 
   const handleClick = (item: MenuItem) => {
     if (item.id === 'admin') {
@@ -196,6 +199,10 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
             {visibleMenuItems.map((item) => {
               const isActive = activeSection === item.id;
               const Icon = item.icon;
+              
+              // Show notification badge for Atendimento when there are unread customer chat messages
+              const showNotificationBadge = item.id === 'atendimento' && customerChatUnread > 0;
+              const isPulsing = item.id === 'atendimento' && hasNewCustomerMessage;
 
               return (
                 <Tooltip key={item.id}>
@@ -225,10 +232,33 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                         />
                       )}
 
-                      <Icon className={cn(
-                        "h-5 w-5 shrink-0 transition-colors",
-                        isActive ? "text-current" : item.color
-                      )} />
+                      <div className="relative">
+                        <Icon className={cn(
+                          "h-5 w-5 shrink-0 transition-colors",
+                          isActive ? "text-current" : item.color
+                        )} />
+                        
+                        {/* Notification badge for customer chat */}
+                        {showNotificationBadge && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className={cn(
+                              "absolute -top-1.5 -right-1.5 flex items-center justify-center",
+                              "min-w-[18px] h-[18px] px-1 rounded-full",
+                              "bg-destructive text-destructive-foreground text-[10px] font-bold",
+                              isPulsing && "animate-pulse"
+                            )}
+                            style={{
+                              boxShadow: isPulsing 
+                                ? "0 0 10px hsl(var(--destructive)), 0 0 20px hsl(var(--destructive) / 0.5)" 
+                                : undefined
+                            }}
+                          >
+                            {customerChatUnread > 99 ? '99+' : customerChatUnread}
+                          </motion.div>
+                        )}
+                      </div>
 
                       <span className={cn(
                         "text-base font-medium whitespace-nowrap hidden md:inline",
@@ -240,6 +270,7 @@ export function FloatingSidebar({ activeSection, onSectionChange }: FloatingSide
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={8}>
                     {item.title}
+                    {showNotificationBadge && ` (${customerChatUnread} nova${customerChatUnread > 1 ? 's' : ''})`}
                   </TooltipContent>
                 </Tooltip>
               );
