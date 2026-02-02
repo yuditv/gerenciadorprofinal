@@ -48,11 +48,11 @@ export function useCustomerChatLinks(ownerId: string | null) {
   }, [refetch]);
 
   const createLink = useCallback(
-    async () => {
+    async (customSlug?: string) => {
       if (!ownerId) return null;
       setIsMutating(true);
       try {
-        const token = crypto.randomUUID();
+        const token = customSlug?.trim() || crypto.randomUUID();
         const { data, error } = await supabase
           .from("customer_chat_links")
           .insert({ owner_id: ownerId, token, is_active: true })
