@@ -28,6 +28,9 @@ type NotificationCallbacks = {
   onNewMessage?: (message: CustomerMessage) => void;
 };
 
+const BASE_POLL_INTERVAL = 3000;
+const MAX_POLL_INTERVAL = 30000;
+
 export function useCustomerMessages(
   conversationId: string | null, 
   viewer: Viewer, 
@@ -38,6 +41,53 @@ export function useCustomerMessages(
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const initialLoadDone = useRef(false);
+  const lastSyncTimestamp = useRef<string | null>(null);
+  const pollIntervalRef = useRef(BASE_POLL_INTERVAL);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const callbacksRef = useRef(callbacks);
+
+  // Keep callbacks ref updated
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
+
+  // Helper to add message with deduplication
+  const addMessageWithDedup = useCallback((msg: CustomerMessage, isFromOther: boolean) => {
+    setMessages((prev) => {
+      // Deduplication: skip if already exists
+      if (prev.some((m) => m.id === msg.id)) {
+        return prev;
+      }
+      
+      const newMsg = isFromOther && initialLoadDone.current 
+        ? { ...msg, isNew: true } 
+        : msg;
+      
+      const updated = [...prev, newMsg].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      
+      return updated;
+    });
+
+    // Update last sync timestamp
+    if (!lastSyncTimestamp.current || new Date(msg.created_at) > new Date(lastSyncTimestamp.current)) {
+      lastSyncTimestamp.current = msg.created_at;
+    }
+
+    // Trigger notification callback for messages from others
+    if (isFromOther && initialLoadDone.current) {
+      console.log('[useCustomerMessages] New message from other party, triggering notification');
+      callbacksRef.current?.onNewMessage?.(msg);
+      
+      // Remove animation flag after animation completes
+      setTimeout(() => {
+        setMessages((prev) => 
+          prev.map((m) => m.id === msg.id ? { ...m, isNew: false } : m)
+        );
+      }, 1000);
+    }
+  }, []);
 
   const refetch = useCallback(async () => {
     if (!conversationId) {
@@ -55,7 +105,14 @@ export function useCustomerMessages(
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      setMessages((data as CustomerMessage[]) ?? []);
+      const msgs = (data as CustomerMessage[]) ?? [];
+      setMessages(msgs);
+      
+      // Set last sync timestamp from the most recent message
+      if (msgs.length > 0) {
+        lastSyncTimestamp.current = msgs[msgs.length - 1].created_at;
+      }
+      
       initialLoadDone.current = true;
     } catch (e) {
       console.error("[useCustomerMessages] refetch failed", e);
@@ -90,45 +147,85 @@ export function useCustomerMessages(
 
   useEffect(() => {
     initialLoadDone.current = false;
+    lastSyncTimestamp.current = null;
+    pollIntervalRef.current = BASE_POLL_INTERVAL;
     refetch();
   }, [refetch]);
 
+  // Real-time subscription with fallback polling
   useEffect(() => {
     if (!conversationId) return;
+
+    // Polling function as fallback
+    const poll = async () => {
+      if (!conversationId || !lastSyncTimestamp.current) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("customer_messages")
+          .select(
+            "id, conversation_id, owner_id, customer_user_id, sender_type, content, media_url, media_type, file_name, created_at, is_read_by_owner, is_read_by_customer"
+          )
+          .eq("conversation_id", conversationId)
+          .gt("created_at", lastSyncTimestamp.current)
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          console.error("[useCustomerMessages] poll error", error);
+          pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, MAX_POLL_INTERVAL);
+        } else if (data && data.length > 0) {
+          console.log(`[useCustomerMessages] Poll found ${data.length} new messages`);
+          data.forEach((msg) => {
+            const isFromOther = (msg as CustomerMessage).sender_type !== viewer;
+            addMessageWithDedup(msg as CustomerMessage, isFromOther);
+          });
+          pollIntervalRef.current = BASE_POLL_INTERVAL; // Reset on new messages
+        } else {
+          // Backoff when no changes
+          pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, MAX_POLL_INTERVAL);
+        }
+      } catch (e) {
+        console.error("[useCustomerMessages] poll exception", e);
+        pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, MAX_POLL_INTERVAL);
+      }
+
+      // Schedule next poll
+      pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+    };
+
+    // Real-time subscription
     const channel = supabase
       .channel(`customer-messages-${conversationId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "customer_messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
+          console.log('[useCustomerMessages] Real-time INSERT received:', payload.new);
           const msg = payload.new as CustomerMessage;
-          
-          // Only notify for messages from the other party
           const isFromOther = msg.sender_type !== viewer;
-          
-          if (isFromOther && initialLoadDone.current) {
-            // Trigger callback for notification handling
-            callbacks?.onNewMessage?.(msg);
-            
-            // Add with animation flag
-            setMessages((prev) => [...prev, { ...msg, isNew: true }]);
-            
-            // Remove animation flag after animation completes
-            setTimeout(() => {
-              setMessages((prev) => 
-                prev.map((m) => m.id === msg.id ? { ...m, isNew: false } : m)
-              );
-            }, 1000);
-          } else {
-            setMessages((prev) => [...prev, msg]);
-          }
+          addMessageWithDedup(msg, isFromOther);
+          pollIntervalRef.current = BASE_POLL_INTERVAL; // Reset poll interval on real-time event
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[useCustomerMessages] Channel status:', status, err);
+        if (status === 'SUBSCRIBED') {
+          // Start polling as backup after successful subscription
+          pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[useCustomerMessages] Realtime channel error, relying on polling');
+          // Start polling immediately on error
+          pollTimeoutRef.current = setTimeout(poll, BASE_POLL_INTERVAL);
+        }
+      });
+
     return () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [conversationId, viewer, callbacks]);
+  }, [conversationId, viewer, addMessageWithDedup]);
 
   // Mark as read when conversation opens / changes
   useEffect(() => {

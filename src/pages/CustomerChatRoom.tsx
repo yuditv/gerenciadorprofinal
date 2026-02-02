@@ -36,12 +36,13 @@ export default function CustomerChatRoom() {
 
   // Callback for new message notifications
   const handleNewMessage = useCallback((message: any) => {
+    console.log('[CustomerChatRoom] New message received, playing sound and showing notification');
     playSound('message');
     showNotification({
       title: '💬 Nova Mensagem',
-      body: message.content?.substring(0, 100) || (message.media_type ? `📎 ${message.file_name || 'Mídia'}` : ''),
+      body: message.content?.substring(0, 100) || (message.media_type ? `📎 ${message.file_name || 'Mídia'}` : 'Nova mensagem'),
       soundType: 'message',
-      silent: true,
+      silent: true, // We already played the sound
     });
   }, [playSound, showNotification]);
 

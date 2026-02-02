@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type CustomerConversation = {
@@ -19,9 +19,20 @@ export type CustomerConversationView = CustomerConversation & {
   customer_name: string | null;
 };
 
-export function useCustomerConversations(ownerId: string | null) {
+type NotificationCallbacks = {
+  onNewMessage?: (conversationId: string, customerName: string, content: string | null, mediaType: string | null, fileName: string | null) => void;
+};
+
+export function useCustomerConversations(ownerId: string | null, callbacks?: NotificationCallbacks) {
   const [conversations, setConversations] = useState<CustomerConversationView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastUpdatedConversationId, setLastUpdatedConversationId] = useState<string | null>(null);
+  const callbacksRef = useRef(callbacks);
+  const processedMessagesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   const refetch = useCallback(async () => {
     if (!ownerId) {
@@ -75,8 +86,10 @@ export function useCustomerConversations(ownerId: string | null) {
     refetch();
   }, [refetch]);
 
+  // Real-time subscription for new messages
   useEffect(() => {
     if (!ownerId) return;
+    
     const channel = supabase
       .channel(`customer-conversations-${ownerId}`)
       .on(
@@ -87,16 +100,64 @@ export function useCustomerConversations(ownerId: string | null) {
           table: "customer_messages",
           filter: `owner_id=eq.${ownerId}`,
         },
-        () => {
+        (payload) => {
+          const msg = payload.new as { 
+            id: string; 
+            conversation_id: string; 
+            sender_type: string; 
+            content: string | null;
+            media_type: string | null;
+            file_name: string | null;
+          };
+          
+          console.log('[useCustomerConversations] New message received:', msg);
+          
+          // Skip if already processed
+          if (processedMessagesRef.current.has(msg.id)) {
+            return;
+          }
+          processedMessagesRef.current.add(msg.id);
+          
+          // Limit the size of processed messages set
+          if (processedMessagesRef.current.size > 100) {
+            const arr = Array.from(processedMessagesRef.current);
+            processedMessagesRef.current = new Set(arr.slice(-50));
+          }
+          
+          // Only notify for messages from customers
+          if (msg.sender_type === 'customer') {
+            setLastUpdatedConversationId(msg.conversation_id);
+            
+            // Find conversation to get customer name
+            const conv = conversations.find(c => c.id === msg.conversation_id);
+            const customerName = conv?.customer_name ?? 'Cliente';
+            
+            console.log('[useCustomerConversations] Triggering notification for:', customerName);
+            callbacksRef.current?.onNewMessage?.(
+              msg.conversation_id, 
+              customerName, 
+              msg.content,
+              msg.media_type,
+              msg.file_name
+            );
+            
+            // Clear highlight after animation
+            setTimeout(() => {
+              setLastUpdatedConversationId(null);
+            }, 3000);
+          }
+          
           refetch();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[useCustomerConversations] Channel status:', status, err);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [ownerId, refetch]);
+  }, [ownerId, refetch, conversations]);
 
   const unreadTotal = useMemo(
     () => conversations.reduce((acc, c) => acc + (c.unread_owner_count || 0), 0),
@@ -175,5 +236,14 @@ export function useCustomerConversations(ownerId: string | null) {
     }
   }, [refetch]);
 
-  return { conversations, unreadTotal, isLoading, refetch, deleteConversation, toggleAI, setActiveAgent };
+  return { 
+    conversations, 
+    unreadTotal, 
+    isLoading, 
+    refetch, 
+    deleteConversation, 
+    toggleAI, 
+    setActiveAgent,
+    lastUpdatedConversationId 
+  };
 }
