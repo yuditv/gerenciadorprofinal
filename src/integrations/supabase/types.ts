@@ -1849,9 +1849,12 @@ export type Database = {
           conversation_id: string
           created_at: string
           customer_user_id: string
+          file_name: string | null
           id: string
           is_read_by_customer: boolean
           is_read_by_owner: boolean
+          media_type: string | null
+          media_url: string | null
           owner_id: string
           sender_type: string
         }
@@ -1860,9 +1863,12 @@ export type Database = {
           conversation_id: string
           created_at?: string
           customer_user_id: string
+          file_name?: string | null
           id?: string
           is_read_by_customer?: boolean
           is_read_by_owner?: boolean
+          media_type?: string | null
+          media_url?: string | null
           owner_id: string
           sender_type: string
         }
@@ -1871,9 +1877,12 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           customer_user_id?: string
+          file_name?: string | null
           id?: string
           is_read_by_customer?: boolean
           is_read_by_owner?: boolean
+          media_type?: string | null
+          media_url?: string | null
           owner_id?: string
           sender_type?: string
         }
