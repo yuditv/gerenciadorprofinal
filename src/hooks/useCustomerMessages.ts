@@ -31,6 +31,9 @@ type NotificationCallbacks = {
 const BASE_POLL_INTERVAL = 3000;
 const MAX_POLL_INTERVAL = 30000;
 
+// Track in-flight AI calls to prevent duplicates
+const aiCallsInProgress = new Map<string, boolean>();
+
 export function useCustomerMessages(
   conversationId: string | null, 
   viewer: Viewer, 
@@ -294,23 +297,37 @@ export function useCustomerMessages(
         
         if (error) throw error;
         
-        // If message was from customer, trigger AI response
+        // If message was from customer, trigger AI response (with duplicate prevention)
         if (sender_type === 'customer' && insertedMessage?.id) {
-          console.log('[useCustomerMessages] Customer message sent, triggering AI...');
-          try {
-            const { error: aiError } = await supabase.functions.invoke('customer-chat-ai', {
-              body: {
-                conversationId,
-                messageId: insertedMessage.id,
-              },
-            });
-            if (aiError) {
-              console.error('[useCustomerMessages] AI call failed:', aiError);
-            } else {
-              console.log('[useCustomerMessages] AI call successful');
+          const callKey = `${conversationId}_${insertedMessage.id}`;
+          
+          // Check if AI call is already in progress for this conversation
+          if (aiCallsInProgress.get(conversationId)) {
+            console.log('[useCustomerMessages] AI call already in progress, skipping');
+          } else {
+            aiCallsInProgress.set(conversationId, true);
+            
+            console.log('[useCustomerMessages] Customer message sent, triggering AI...');
+            try {
+              const { error: aiError } = await supabase.functions.invoke('customer-chat-ai', {
+                body: {
+                  conversationId,
+                  messageId: insertedMessage.id,
+                },
+              });
+              if (aiError) {
+                console.error('[useCustomerMessages] AI call failed:', aiError);
+              } else {
+                console.log('[useCustomerMessages] AI call successful');
+              }
+            } catch (aiEx) {
+              console.error('[useCustomerMessages] AI call exception:', aiEx);
+            } finally {
+              // Clear the lock after a short delay to prevent rapid re-calls
+              setTimeout(() => {
+                aiCallsInProgress.delete(conversationId);
+              }, 3000);
             }
-          } catch (aiEx) {
-            console.error('[useCustomerMessages] AI call exception:', aiEx);
           }
         }
         
