@@ -43,8 +43,23 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
 
   const startRecording = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // CRITICAL: getUserMedia must be called directly in click handler for browser security
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      });
+      
+      // Check supported mimeType
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
+        ? 'audio/webm' 
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : 'audio/wav';
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -55,8 +70,9 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes('webm') ? 'webm' : mimeType.includes('mp4') ? 'm4a' : 'wav';
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.${ext}`, { type: mimeType });
         
         if (audioFile.size > MAX_FILE_SIZE) {
           alert('Áudio muito grande. Máximo 25MB.');
@@ -66,20 +82,25 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
         
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
-        setIsOpen(false);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       setRecordingTime(0);
+      setIsOpen(false); // Close popover when recording starts
       
       // Update recording time every second
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error starting recording:', error);
-      alert('Não foi possível acessar o microfone. Verifique as permissões.');
+      const errorName = error instanceof Error ? (error as DOMException).name : '';
+      if (errorName === 'NotAllowedError') {
+        alert('Acesso ao microfone negado. Verifique as permissões do navegador.');
+      } else {
+        alert('Não foi possível acessar o microfone. Verifique as permissões.');
+      }
     }
   }, [onFileSelect]);
 
@@ -224,10 +245,7 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
             type="button"
             variant="ghost"
             size="icon"
-            onClick={() => {
-              setIsOpen(false);
-              startRecording();
-            }}
+            onClick={startRecording}
             className={cn(
               "h-10 w-10",
               isDark 
