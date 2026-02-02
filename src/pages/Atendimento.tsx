@@ -69,6 +69,34 @@ export default function Atendimento() {
 
   const { links, createLink, setLinkActive, deleteLink, getInviteUrl, isMutating: isCustomerLinksMutating } =
     useCustomerChatLinks(!isMember ? ownerId : null);
+
+  // Callback for new customer chat messages (from conversations hook)
+  const handleNewCustomerChatMessage = useCallback((
+    conversationId: string, 
+    customerName: string, 
+    content: string | null,
+    mediaType: string | null,
+    fileName: string | null
+  ) => {
+    console.log('[Atendimento] New customer chat message from:', customerName);
+    playSound('message');
+    
+    const bodyText = content 
+      ? (content.substring(0, 100) + (content.length > 100 ? '...' : ''))
+      : (mediaType ? `📎 ${fileName || 'Mídia'}` : 'Nova mensagem');
+    
+    showNotification({
+      title: `💬 ${customerName}`,
+      body: bodyText,
+      soundType: 'message',
+      silent: true,
+    });
+  }, [playSound, showNotification]);
+
+  const customerConversationCallbacks = useMemo(() => ({
+    onNewMessage: handleNewCustomerChatMessage,
+  }), [handleNewCustomerChatMessage]);
+
   const {
     conversations: customerConversations,
     unreadTotal: customerUnreadTotal,
@@ -76,24 +104,20 @@ export default function Atendimento() {
     deleteConversation: deleteCustomerConversation,
     toggleAI: toggleCustomerAI,
     setActiveAgent: setCustomerActiveAgent,
-  } = useCustomerConversations(!isMember ? ownerId : null);
+    lastUpdatedConversationId: highlightedCustomerConversationId,
+  } = useCustomerConversations(!isMember ? ownerId : null, customerConversationCallbacks);
 
   const { agents: aiAgents } = useAIAgents();
   const [isDeletingCustomerConv, setIsDeletingCustomerConv] = useState(false);
 
-  // Callback for new message notifications
+  // Callback for new message notifications (from messages hook - when chat is open)
   const handleNewCustomerMessage = useCallback((message: CustomerMessage) => {
-    playSound('message');
-    const bodyText = message.content 
-      ? (message.content.substring(0, 100) + (message.content.length > 100 ? '...' : ''))
-      : (message.media_type ? `📎 ${message.file_name || 'Mídia'}` : 'Nova mensagem');
-    showNotification({
-      title: '💬 Nova Mensagem',
-      body: bodyText,
-      soundType: 'message',
-      silent: true,
-    });
-  }, [playSound, showNotification]);
+    // Only play sound if the message is from customer and not the currently selected conversation
+    // (the conversation hook already handles notifications for new messages in closed conversations)
+    if (message.sender_type === 'customer') {
+      playSound('message');
+    }
+  }, [playSound]);
 
   const notificationCallbacks = useMemo(() => ({
     onNewMessage: handleNewCustomerMessage,
@@ -767,6 +791,7 @@ export default function Atendimento() {
                 }}
                 isLoading={isCustomerConversationsLoading}
                 isDeleting={isDeletingCustomerConv}
+                highlightedConversationId={highlightedCustomerConversationId}
               />
 
               <CustomerChatPanel
