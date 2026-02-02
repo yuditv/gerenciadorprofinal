@@ -248,14 +248,24 @@ export function useCustomerMessages(
 
         // Upload media if provided
         if (mediaFile) {
+          // Get current user for the upload path (RLS requires user_id as first folder)
+          const { data: authData } = await supabase.auth.getUser();
+          const userId = authData.user?.id;
+          if (!userId) throw new Error('User not authenticated');
+          
           const ext = mediaFile.name.split('.').pop() || 'bin';
-          const filePath = `customer-chat/${conversationId}/${Date.now()}.${ext}`;
+          const filePath = `${userId}/customer-chat/${conversationId}/${Date.now()}.${ext}`;
+          
+          console.log('[useCustomerMessages] Uploading file to:', filePath);
           
           const { error: uploadError } = await supabase.storage
             .from('dispatch-media')
             .upload(filePath, mediaFile);
           
-          if (uploadError) throw uploadError;
+          if (uploadError) {
+            console.error('[useCustomerMessages] Upload error:', uploadError);
+            throw uploadError;
+          }
           
           const { data: urlData } = supabase.storage
             .from('dispatch-media')
@@ -264,6 +274,8 @@ export function useCustomerMessages(
           media_url = urlData.publicUrl;
           media_type = mediaFile.type.split('/')[0] || 'document'; // image, video, audio, document
           file_name = mediaFile.name;
+          
+          console.log('[useCustomerMessages] Upload successful:', media_url);
         }
 
         const sender_type = viewer;
