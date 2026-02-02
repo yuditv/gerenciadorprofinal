@@ -145,12 +145,23 @@ serve(async (req) => {
     let conversationId = existingConversation?.id as string | undefined;
 
     if (!conversationId) {
+      // Fetch owner's AI preferences to apply auto-start
+      const { data: prefs } = await supabaseAdmin
+        .from("ai_agent_preferences")
+        .select("customer_chat_agent_id, customer_chat_auto_start")
+        .eq("user_id", link.owner_id)
+        .maybeSingle();
+
+      const shouldAutoStart = prefs?.customer_chat_auto_start && prefs?.customer_chat_agent_id;
+
       const { data: createdConversation, error: createError } = await supabaseAdmin
         .from("customer_conversations")
         .insert({
           owner_id: link.owner_id,
           customer_user_id: user.id,
           link_id: link.id,
+          ai_enabled: shouldAutoStart,
+          active_agent_id: shouldAutoStart ? prefs.customer_chat_agent_id : null,
         })
         .select("id")
         .single();
@@ -163,6 +174,7 @@ serve(async (req) => {
         });
       }
       conversationId = createdConversation.id;
+      console.log(`[customer-chat-redeem-link] Created conversation ${conversationId}, AI auto-start: ${shouldAutoStart}`);
     }
 
     return new Response(

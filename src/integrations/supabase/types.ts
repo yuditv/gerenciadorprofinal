@@ -108,6 +108,8 @@ export type Database = {
         Row: {
           auto_start_ai: boolean
           created_at: string
+          customer_chat_agent_id: string | null
+          customer_chat_auto_start: boolean
           default_agent_id: string | null
           expired_client_agent_id: string | null
           updated_at: string
@@ -116,6 +118,8 @@ export type Database = {
         Insert: {
           auto_start_ai?: boolean
           created_at?: string
+          customer_chat_agent_id?: string | null
+          customer_chat_auto_start?: boolean
           default_agent_id?: string | null
           expired_client_agent_id?: string | null
           updated_at?: string
@@ -124,12 +128,22 @@ export type Database = {
         Update: {
           auto_start_ai?: boolean
           created_at?: string
+          customer_chat_agent_id?: string | null
+          customer_chat_auto_start?: boolean
           default_agent_id?: string | null
           expired_client_agent_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_preferences_customer_chat_agent_id_fkey"
+            columns: ["customer_chat_agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_agent_transfer_rules: {
         Row: {
