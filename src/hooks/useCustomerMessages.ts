@@ -7,7 +7,10 @@ export type CustomerMessage = {
   owner_id: string;
   customer_user_id: string;
   sender_type: "owner" | "customer";
-  content: string;
+  content: string | null;
+  media_url: string | null;
+  media_type: string | null;
+  file_name: string | null;
   created_at: string;
   is_read_by_owner: boolean;
   is_read_by_customer: boolean;
@@ -47,7 +50,7 @@ export function useCustomerMessages(
       const { data, error } = await supabase
         .from("customer_messages")
         .select(
-          "id, conversation_id, owner_id, customer_user_id, sender_type, content, created_at, is_read_by_owner, is_read_by_customer"
+          "id, conversation_id, owner_id, customer_user_id, sender_type, content, media_url, media_type, file_name, created_at, is_read_by_owner, is_read_by_customer"
         )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
@@ -134,20 +137,48 @@ export function useCustomerMessages(
   }, [conversationId, markRead]);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, mediaFile?: File) => {
       if (!conversationId) return false;
       if (!meta?.owner_id || !meta?.customer_user_id) return false;
       const text = content.trim();
-      if (!text) return false;
+      // Require either content or media
+      if (!text && !mediaFile) return false;
       setIsSending(true);
       try {
+        let media_url: string | null = null;
+        let media_type: string | null = null;
+        let file_name: string | null = null;
+
+        // Upload media if provided
+        if (mediaFile) {
+          const ext = mediaFile.name.split('.').pop() || 'bin';
+          const filePath = `customer-chat/${conversationId}/${Date.now()}.${ext}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('dispatch-media')
+            .upload(filePath, mediaFile);
+          
+          if (uploadError) throw uploadError;
+          
+          const { data: urlData } = supabase.storage
+            .from('dispatch-media')
+            .getPublicUrl(filePath);
+          
+          media_url = urlData.publicUrl;
+          media_type = mediaFile.type.split('/')[0] || 'document'; // image, video, audio, document
+          file_name = mediaFile.name;
+        }
+
         const sender_type = viewer;
         const { error } = await supabase.from("customer_messages").insert({
           conversation_id: conversationId,
           owner_id: meta.owner_id,
           customer_user_id: meta.customer_user_id,
           sender_type,
-          content: text,
+          content: text || null,
+          media_url,
+          media_type,
+          file_name,
         });
         if (error) throw error;
         return true;

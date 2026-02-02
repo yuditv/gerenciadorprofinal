@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import customerChatBg from "@/assets/customer-chat-bg.jpg";
 import { useSystemNotifications } from "@/hooks/useSystemNotifications";
+import { MediaMessage } from "@/components/CustomerChat/MediaMessage";
+import { ChatMediaUploader, MediaPreview } from "@/components/CustomerChat/ChatMediaUploader";
 
 type LinkInfo = {
   owner_id: string;
@@ -30,13 +32,14 @@ export default function CustomerChatRoom() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isCustomer, setIsCustomer] = useState<boolean | null>(null);
   const [text, setText] = useState("");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
 
   // Callback for new message notifications
   const handleNewMessage = useCallback((message: any) => {
     playSound('message');
     showNotification({
       title: '💬 Nova Mensagem',
-      body: message.content?.substring(0, 100) + (message.content?.length > 100 ? '...' : ''),
+      body: message.content?.substring(0, 100) || (message.media_type ? `📎 ${message.file_name || 'Mídia'}` : ''),
       soundType: 'message',
       silent: true,
     });
@@ -111,9 +114,11 @@ export default function CustomerChatRoom() {
 
   const handleSend = async () => {
     const content = text.trim();
-    if (!content) return;
+    if (!content && !mediaFile) return;
     setText("");
-    await sendMessage(content);
+    const file = mediaFile;
+    setMediaFile(null);
+    await sendMessage(content, file || undefined);
   };
 
   if (!safeToken) return null;
@@ -296,7 +301,20 @@ export default function CustomerChatRoom() {
                             transition={{ duration: 1 }}
                           />
                         )}
-                        <div className="whitespace-pre-wrap break-words relative z-10">{m.content}</div>
+                        {/* Media content */}
+                        {m.media_url && (
+                          <div className="mb-2 relative z-10">
+                            <MediaMessage
+                              mediaUrl={m.media_url}
+                              mediaType={m.media_type}
+                              fileName={m.file_name}
+                              mine={mine}
+                            />
+                          </div>
+                        )}
+                        {m.content && (
+                          <div className="whitespace-pre-wrap break-words relative z-10">{m.content}</div>
+                        )}
                         <div className={cn(
                           "text-[10px] mt-1 relative z-10",
                           mine ? "text-cyan-200/70" : "text-white/50"
@@ -319,7 +337,21 @@ export default function CustomerChatRoom() {
           animate={{ y: 0, opacity: 1 }}
           className="shrink-0 border-t border-cyan-500/30 bg-black/60 backdrop-blur-md p-3"
         >
+          {/* Media preview */}
+          {mediaFile && (
+            <MediaPreview 
+              file={mediaFile} 
+              onRemove={() => setMediaFile(null)} 
+              variant="dark"
+            />
+          )}
+          
           <div className="flex gap-2 items-end">
+            <ChatMediaUploader 
+              onFileSelect={setMediaFile} 
+              disabled={isSending}
+              variant="dark"
+            />
             <Textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -335,7 +367,7 @@ export default function CustomerChatRoom() {
             <Button
               type="button"
               onClick={handleSend}
-              disabled={isSending || !text.trim()}
+              disabled={isSending || (!text.trim() && !mediaFile)}
               className="h-11 px-4 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 border-0 shrink-0"
             >
               <Send className="h-4 w-4" />
