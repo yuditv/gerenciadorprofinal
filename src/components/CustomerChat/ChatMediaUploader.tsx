@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { ImagePlus, FileVideo, Mic, Paperclip, X, Loader2 } from "lucide-react";
+import { useRef, useState, useCallback } from "react";
+import { Camera, FileVideo, Mic, Paperclip, X, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -18,10 +18,14 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 
 export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
-  const audioInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -37,7 +41,101 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
     e.target.value = '';
   };
 
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.webm`, { type: 'audio/webm' });
+        
+        if (audioFile.size > MAX_FILE_SIZE) {
+          alert('Áudio muito grande. Máximo 25MB.');
+        } else {
+          onFileSelect(audioFile);
+        }
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+        setIsOpen(false);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      // Update recording time every second
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      alert('Não foi possível acessar o microfone. Verifique as permissões.');
+    }
+  }, [onFileSelect]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  }, [isRecording]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const isDark = variant === "dark";
+
+  // If recording, show the recording UI
+  if (isRecording) {
+    return (
+      <div className={cn(
+        "flex items-center gap-2 px-3 py-2 rounded-lg",
+        isDark 
+          ? "bg-red-500/20 border border-red-500/50" 
+          : "bg-red-50 border border-red-200"
+      )}>
+        <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+        <span className={cn(
+          "text-sm font-mono",
+          isDark ? "text-red-400" : "text-red-600"
+        )}>
+          {formatTime(recordingTime)}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={stopRecording}
+          className={cn(
+            "h-8 w-8",
+            isDark 
+              ? "text-red-400 hover:bg-red-500/20" 
+              : "text-red-600 hover:bg-red-100"
+          )}
+          title="Parar gravação"
+        >
+          <Square className="h-4 w-4 fill-current" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -65,11 +163,12 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
         )}
       >
         <div className="flex gap-1">
-          {/* Hidden inputs */}
+          {/* Hidden inputs with camera capture */}
           <input
             ref={imageInputRef}
             type="file"
             accept="image/*"
+            capture="environment"
             className="hidden"
             onChange={handleFileChange}
           />
@@ -77,13 +176,7 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
             ref={videoInputRef}
             type="file"
             accept="video/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <input
-            ref={audioInputRef}
-            type="file"
-            accept="audio/*"
+            capture="environment"
             className="hidden"
             onChange={handleFileChange}
           />
@@ -106,9 +199,9 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
                 ? "text-green-400 hover:bg-green-500/20" 
                 : "text-green-600 hover:bg-green-50"
             )}
-            title="Foto"
+            title="Tirar Foto"
           >
-            <ImagePlus className="h-5 w-5" />
+            <Camera className="h-5 w-5" />
           </Button>
 
           <Button
@@ -122,7 +215,7 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
                 ? "text-purple-400 hover:bg-purple-500/20" 
                 : "text-purple-600 hover:bg-purple-50"
             )}
-            title="Vídeo"
+            title="Gravar Vídeo"
           >
             <FileVideo className="h-5 w-5" />
           </Button>
@@ -131,14 +224,17 @@ export function ChatMediaUploader({ onFileSelect, disabled, variant = "light" }:
             type="button"
             variant="ghost"
             size="icon"
-            onClick={() => audioInputRef.current?.click()}
+            onClick={() => {
+              setIsOpen(false);
+              startRecording();
+            }}
             className={cn(
               "h-10 w-10",
               isDark 
                 ? "text-orange-400 hover:bg-orange-500/20" 
                 : "text-orange-600 hover:bg-orange-50"
             )}
-            title="Áudio"
+            title="Gravar Áudio"
           >
             <Mic className="h-5 w-5" />
           </Button>
@@ -179,6 +275,7 @@ export function MediaPreview({ file, onRemove, variant = "light" }: PreviewProps
   });
 
   const isDark = variant === "dark";
+  const isAudio = file.type.startsWith('audio/');
 
   return (
     <div className={cn(
@@ -193,7 +290,15 @@ export function MediaPreview({ file, onRemove, variant = "light" }: PreviewProps
       {file.type.startsWith('video/') && previewUrl && (
         <video src={previewUrl} className="h-16 w-16 object-cover rounded" muted />
       )}
-      {!previewUrl && (
+      {isAudio && (
+        <div className={cn(
+          "h-12 w-12 rounded flex items-center justify-center",
+          isDark ? "bg-orange-500/20" : "bg-orange-100"
+        )}>
+          <Mic className={cn("h-5 w-5", isDark ? "text-orange-400" : "text-orange-600")} />
+        </div>
+      )}
+      {!previewUrl && !isAudio && (
         <div className={cn(
           "h-12 w-12 rounded flex items-center justify-center",
           isDark ? "bg-cyan-500/20" : "bg-primary/10"
@@ -206,7 +311,7 @@ export function MediaPreview({ file, onRemove, variant = "light" }: PreviewProps
           "text-xs font-medium truncate max-w-[120px]",
           isDark ? "text-white" : "text-foreground"
         )}>
-          {file.name}
+          {isAudio ? '🎙️ Áudio gravado' : file.name}
         </span>
         <span className={cn("text-[10px]", isDark ? "text-cyan-400/70" : "text-muted-foreground")}>
           {(file.size / 1024 / 1024).toFixed(2)} MB
