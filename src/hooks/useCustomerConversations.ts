@@ -100,7 +100,7 @@ export function useCustomerConversations(ownerId: string | null, callbacks?: Not
           table: "customer_messages",
           filter: `owner_id=eq.${ownerId}`,
         },
-        (payload) => {
+        async (payload) => {
           const msg = payload.new as { 
             id: string; 
             conversation_id: string; 
@@ -124,7 +124,7 @@ export function useCustomerConversations(ownerId: string | null, callbacks?: Not
             processedMessagesRef.current = new Set(arr.slice(-50));
           }
           
-          // Only notify for messages from customers
+          // Only notify and trigger AI for messages from customers
           if (msg.sender_type === 'customer') {
             setLastUpdatedConversationId(msg.conversation_id);
             
@@ -145,6 +145,24 @@ export function useCustomerConversations(ownerId: string | null, callbacks?: Not
             setTimeout(() => {
               setLastUpdatedConversationId(null);
             }, 3000);
+            
+            // Trigger AI response
+            try {
+              console.log('[useCustomerConversations] Calling AI edge function...');
+              const { error } = await supabase.functions.invoke('customer-chat-ai', {
+                body: {
+                  conversationId: msg.conversation_id,
+                  messageId: msg.id,
+                },
+              });
+              if (error) {
+                console.error('[useCustomerConversations] AI call failed:', error);
+              } else {
+                console.log('[useCustomerConversations] AI call successful');
+              }
+            } catch (e) {
+              console.error('[useCustomerConversations] AI call exception:', e);
+            }
           }
           
           refetch();
