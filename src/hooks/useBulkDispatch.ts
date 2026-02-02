@@ -5,6 +5,26 @@ import { processMessage } from '@/lib/spintaxParser';
 import { useToast } from '@/hooks/use-toast';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 
+// Throttle utility for reducing state update frequency
+const throttle = <T extends (...args: any[]) => void>(func: T, limit: number): T => {
+  let lastRun = 0;
+  let timeout: NodeJS.Timeout | null = null;
+  
+  return ((...args: any[]) => {
+    const now = Date.now();
+    if (now - lastRun >= limit) {
+      func(...args);
+      lastRun = now;
+    } else if (!timeout) {
+      timeout = setTimeout(() => {
+        func(...args);
+        lastRun = Date.now();
+        timeout = null;
+      }, limit - (now - lastRun));
+    }
+  }) as T;
+};
+
 export interface DispatchContact {
   phone: string;
   name?: string;
@@ -195,12 +215,29 @@ export function useBulkDispatch() {
     }
   }, []);
 
+  // Throttled progress updates to reduce render frequency
+  const throttledSetProgress = useRef(
+    throttle((updater: React.SetStateAction<DispatchProgress>) => {
+      setProgress(updater);
+    }, 250) // Update at most every 250ms
+  ).current;
+
   const addLog = useCallback((type: DispatchProgress['logs'][0]['type'], message: string) => {
     setProgress(prev => ({
       ...prev,
       logs: [{ time: new Date(), type, message }, ...prev.logs.slice(0, 99)]
     }));
   }, []);
+
+  // Throttled version of addLog for high-frequency updates
+  const throttledAddLog = useRef(
+    throttle((type: DispatchProgress['logs'][0]['type'], message: string) => {
+      setProgress(prev => ({
+        ...prev,
+        logs: [{ time: new Date(), type, message }, ...prev.logs.slice(0, 99)]
+      }));
+    }, 500)
+  ).current;
 
   const getRandomDelay = useCallback(() => {
     const { minDelay, maxDelay, smartDelay } = config;
@@ -679,7 +716,8 @@ export function useBulkDispatch() {
         continue;
       }
 
-      setProgress(prev => ({
+      // Use throttled progress update for performance
+      throttledSetProgress(prev => ({
         ...prev,
         sent: sentCount,
         failed: failedCount,
