@@ -690,7 +690,7 @@ export function BulkDispatcher() {
             progress={progress}
             onStart={handleStart}
             onPause={pauseDispatch}
-            onResume={resumeDispatch}
+            onResume={() => resumeDispatch(instances)}
             onCancel={cancelDispatch}
             canStart={canStart}
           />
@@ -775,7 +775,7 @@ export function BulkDispatcher() {
               ) : (
                 <div className="flex items-center gap-2">
                   {progress.isPaused ? (
-                    <Button onClick={resumeDispatch} className="gap-2" size="lg">
+                    <Button onClick={() => resumeDispatch(instances)} className="gap-2" size="lg">
                       <Play className="w-5 h-5" />
                       Retomar
                     </Button>

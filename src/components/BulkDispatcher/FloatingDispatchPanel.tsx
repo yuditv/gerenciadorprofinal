@@ -8,9 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useBulkDispatchContext } from "@/contexts/BulkDispatchContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useWhatsAppInstances } from "@/hooks/useWhatsAppInstances";
 
 export function FloatingDispatchPanel() {
   const { user } = useAuth();
+  const { instances } = useWhatsAppInstances();
   const { progress, pauseDispatch, resumeDispatch, cancelDispatch } = useBulkDispatchContext();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -74,7 +76,7 @@ export function FloatingDispatchPanel() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      resumeDispatch();
+                      resumeDispatch(instances);
                     }}
                     aria-label="Retomar disparo"
                   >
