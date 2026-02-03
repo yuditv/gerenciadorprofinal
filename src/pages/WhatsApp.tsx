@@ -1,7 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense, useCallback } from 'react';
 import { useWhatsAppInstances, WhatsAppInstance } from '@/hooks/useWhatsAppInstances';
 import { useCampaigns, Campaign } from '@/hooks/useCampaigns';
 import { usePlanLimits } from '@/hooks/usePlanLimits';
+import { useInstanceStatusMonitor } from '@/hooks/useInstanceStatusMonitor';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -138,6 +139,34 @@ export default function WhatsApp() {
   const [renameInstance, setRenameInstance] = useState<WhatsAppInstance | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
+
+  // Extract instance IDs for monitoring
+  const instanceIds = instances.map(i => i.id);
+
+  // Handle status change notifications
+  const handleStatusChange = useCallback((instanceId: string, newStatus: string) => {
+    const instance = instances.find(i => i.id === instanceId);
+    const name = instance?.name || 'Instância';
+    
+    if (newStatus === 'disconnected') {
+      toast.warning(`${name} desconectou do WhatsApp`, {
+        description: 'Reconecte via QR Code ou código de pareamento',
+        duration: 8000,
+      });
+    } else if (newStatus === 'connected') {
+      toast.success(`${name} conectado ao WhatsApp!`);
+    }
+    
+    // Refetch to update UI
+    refetchInstances();
+  }, [instances, refetchInstances]);
+
+  // Auto-monitor instance status when on instances tab
+  useInstanceStatusMonitor(
+    instanceIds,
+    activeTab === 'instances' && !subscriptionExpired && instances.length > 0,
+    handleStatusChange
+  );
 
   // Polling for campaign progress
   useEffect(() => {
@@ -279,11 +308,11 @@ export default function WhatsApp() {
   };
 
   const getInstanceStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'connected':
         return (
           <Badge className="bg-green-500/15 text-green-500 border-green-500/30 gap-1.5">
-            <span className="status-indicator online h-2 w-2" />
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             Conectado
           </Badge>
         );
@@ -294,6 +323,13 @@ export default function WhatsApp() {
             Desconectado
           </Badge>
         );
+      case 'connecting':
+        return (
+          <Badge className="bg-yellow-500/15 text-yellow-500 border-yellow-500/30 gap-1.5">
+            <RefreshCw className="w-3 h-3 animate-spin" />
+            Conectando...
+          </Badge>
+        );
       case 'pending':
         return (
           <Badge variant="secondary" className="gap-1.5">
@@ -302,7 +338,7 @@ export default function WhatsApp() {
           </Badge>
         );
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{status || 'Desconhecido'}</Badge>;
     }
   };
 
