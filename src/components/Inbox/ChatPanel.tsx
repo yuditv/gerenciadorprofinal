@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -171,6 +171,34 @@ export function ChatPanel({
   const {
     sendPresence
   } = usePresence(conversation?.id || null);
+  
+  // Debounce timer for stopping composing presence
+  const composingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Send composing presence with auto-stop after 3 seconds of inactivity
+  const handleComposingPresence = useCallback(() => {
+    // Clear existing timeout
+    if (composingTimeoutRef.current) {
+      clearTimeout(composingTimeoutRef.current);
+    }
+    
+    // Send composing
+    sendPresence('composing');
+    
+    // Auto-stop after 3 seconds
+    composingTimeoutRef.current = setTimeout(() => {
+      sendPresence('paused');
+    }, 3000);
+  }, [sendPresence]);
+  
+  // Cleanup on unmount or conversation change
+  useEffect(() => {
+    return () => {
+      if (composingTimeoutRef.current) {
+        clearTimeout(composingTimeoutRef.current);
+      }
+    };
+  }, [conversation?.id]);
 
   // Get WhatsApp instances to find instance_key
   const {
@@ -296,6 +324,16 @@ export function ChatPanel({
     setMessage("");
     setIsPrivate(false);
     setAttachments([]);
+    
+    // Cancel composing presence immediately
+    if (composingTimeoutRef.current) {
+      clearTimeout(composingTimeoutRef.current);
+      composingTimeoutRef.current = null;
+    }
+    // Send paused to stop typing indicator (UAZAPI cancels on message send anyway)
+    if (!privateToSend) {
+      sendPresence('paused');
+    }
 
     // Se tiver anexos, enviar cada um separadamente
     if (attachmentsToSend.length > 0) {
@@ -1075,7 +1113,7 @@ export function ChatPanel({
               setMessage(e.target.value);
               // Send composing presence when typing (not for private notes)
               if (e.target.value.length > 0 && !isPrivate) {
-                sendPresence('composing');
+                handleComposingPresence();
               }
             }} onKeyDown={handleKeyDown} className={cn("min-h-[44px] max-h-32 resize-none inbox-input-field", "bg-inbox-input dark:bg-inbox-input", isPrivate && "!border-amber-500/50 dark:!border-amber-500/40")} rows={1} />
           </div>
