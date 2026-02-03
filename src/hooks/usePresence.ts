@@ -42,13 +42,19 @@ export function usePresence(conversationId: string | null) {
         lastSentRef.current = { type: presence, time: now };
         isActiveRef.current = presence !== 'paused';
 
-        await supabase.functions.invoke('send-presence', {
+        const { data, error } = await supabase.functions.invoke('send-presence', {
           body: { 
             conversationId, 
             presence, 
             delay: 30000 // 30 seconds
           }
         });
+
+        // Silently ignore errors - presence is a non-critical feature
+        if (error || data?.success === false) {
+          console.warn('Presence update skipped:', error?.message || data?.error);
+          return;
+        }
 
         // Auto-cancel after 30 seconds of inactivity
         if (presence !== 'paused') {
@@ -59,7 +65,8 @@ export function usePresence(conversationId: string | null) {
           }, 30000);
         }
       } catch (error) {
-        console.error('Error sending presence:', error);
+        // Silently ignore - presence is non-critical
+        console.warn('Presence update failed:', error);
       }
     },
     [conversationId]
