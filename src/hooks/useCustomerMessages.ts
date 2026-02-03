@@ -159,29 +159,49 @@ export function useCustomerMessages(
   useEffect(() => {
     if (!conversationId) return;
 
-    // Polling function as fallback
+    let isActive = true;
+
+    // Polling function as fallback - always runs to catch any missed realtime events
     const poll = async () => {
-      if (!conversationId || !lastSyncTimestamp.current) return;
+      if (!conversationId || !isActive) return;
       
       try {
-        const { data, error } = await supabase
+        // Build query - if no timestamp yet, fetch all recent messages
+        let query = supabase
           .from("customer_messages")
           .select(
             "id, conversation_id, owner_id, customer_user_id, sender_type, content, media_url, media_type, file_name, created_at, is_read_by_owner, is_read_by_customer"
           )
           .eq("conversation_id", conversationId)
-          .gt("created_at", lastSyncTimestamp.current)
           .order("created_at", { ascending: true });
+
+        // Only filter by timestamp if we have one
+        if (lastSyncTimestamp.current) {
+          query = query.gt("created_at", lastSyncTimestamp.current);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error("[useCustomerMessages] poll error", error);
           pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, MAX_POLL_INTERVAL);
         } else if (data && data.length > 0) {
-          console.log(`[useCustomerMessages] Poll found ${data.length} new messages`);
-          data.forEach((msg) => {
-            const isFromOther = (msg as CustomerMessage).sender_type !== viewer;
-            addMessageWithDedup(msg as CustomerMessage, isFromOther);
-          });
+          console.log(`[useCustomerMessages] Poll found ${data.length} messages`);
+          
+          // If this is the first poll (no timestamp), just set the messages without notifications
+          if (!lastSyncTimestamp.current) {
+            setMessages(data as CustomerMessage[]);
+            if (data.length > 0) {
+              lastSyncTimestamp.current = data[data.length - 1].created_at;
+            }
+            initialLoadDone.current = true;
+          } else {
+            // Otherwise, add each new message with dedup
+            data.forEach((msg) => {
+              const isFromOther = (msg as CustomerMessage).sender_type !== viewer;
+              addMessageWithDedup(msg as CustomerMessage, isFromOther);
+            });
+          }
           pollIntervalRef.current = BASE_POLL_INTERVAL; // Reset on new messages
         } else {
           // Backoff when no changes
@@ -192,13 +212,15 @@ export function useCustomerMessages(
         pollIntervalRef.current = Math.min(pollIntervalRef.current * 1.5, MAX_POLL_INTERVAL);
       }
 
-      // Schedule next poll
-      pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+      // Schedule next poll if still active
+      if (isActive) {
+        pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
+      }
     };
 
     // Real-time subscription
     const channel = supabase
-      .channel(`customer-messages-${conversationId}`)
+      .channel(`customer-messages-${conversationId}-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "customer_messages", filter: `conversation_id=eq.${conversationId}` },
@@ -213,18 +235,23 @@ export function useCustomerMessages(
       .subscribe((status, err) => {
         console.log('[useCustomerMessages] Channel status:', status, err);
         if (status === 'SUBSCRIBED') {
+          console.log('[useCustomerMessages] Realtime connected, starting polling backup');
           // Start polling as backup after successful subscription
           pollTimeoutRef.current = setTimeout(poll, pollIntervalRef.current);
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn('[useCustomerMessages] Realtime channel error, relying on polling');
           // Start polling immediately on error
           pollTimeoutRef.current = setTimeout(poll, BASE_POLL_INTERVAL);
+        } else if (status === 'CLOSED') {
+          console.log('[useCustomerMessages] Channel closed');
         }
       });
 
     return () => {
+      isActive = false;
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
       supabase.removeChannel(channel);
     };
