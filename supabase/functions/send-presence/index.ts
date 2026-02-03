@@ -57,15 +57,15 @@ serve(async (req) => {
 
     if (!conversationId) {
       return new Response(
-        JSON.stringify({ error: 'conversationId is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'conversationId is required' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!presence || !['composing', 'recording', 'paused'].includes(presence)) {
       return new Response(
-        JSON.stringify({ error: 'presence must be composing, recording, or paused' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'presence must be composing, recording, or paused' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -85,9 +85,10 @@ serve(async (req) => {
 
     if (convError || !conversation) {
       console.error('Error fetching conversation:', convError);
+      // Return 200 with success:false to prevent supabase-js from throwing fatal exceptions
       return new Response(
-        JSON.stringify({ error: 'Conversation not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'Conversation not found' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -100,9 +101,10 @@ serve(async (req) => {
 
     if (instanceError || !instance || !instance.instance_key) {
       console.error('Error fetching instance:', instanceError);
+      // Return 200 with success:false to prevent supabase-js from throwing fatal exceptions
       return new Response(
-        JSON.stringify({ error: 'WhatsApp instance not configured' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'WhatsApp instance not configured' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
