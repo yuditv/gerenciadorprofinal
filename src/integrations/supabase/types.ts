@@ -2315,6 +2315,51 @@ export type Database = {
         }
         Relationships: []
       }
+      mercado_pago_payments: {
+        Row: {
+          amount_brl: number
+          created_at: string
+          external_reference: string | null
+          id: string
+          metadata: Json | null
+          paid_at: string | null
+          payment_id: string | null
+          qr_code: string | null
+          qr_code_base64: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_brl: number
+          created_at?: string
+          external_reference?: string | null
+          id?: string
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_id?: string | null
+          qr_code?: string | null
+          qr_code_base64?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_brl?: number
+          created_at?: string
+          external_reference?: string | null
+          id?: string
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_id?: string | null
+          qr_code?: string | null
+          qr_code_base64?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_templates: {
         Row: {
           content: string
@@ -2697,6 +2742,57 @@ export type Database = {
         }
         Relationships: []
       }
+      reseller_requests: {
+        Row: {
+          admin_password: string
+          admin_username: string
+          approved_at: string | null
+          created_at: string
+          currency: string
+          domain: string
+          id: string
+          metadata: Json | null
+          monthly_price: number
+          rejected_at: string | null
+          rejection_reason: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_password: string
+          admin_username: string
+          approved_at?: string | null
+          created_at?: string
+          currency?: string
+          domain: string
+          id?: string
+          metadata?: Json | null
+          monthly_price: number
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_password?: string
+          admin_username?: string
+          approved_at?: string | null
+          created_at?: string
+          currency?: string
+          domain?: string
+          id?: string
+          metadata?: Json | null
+          monthly_price?: number
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       scheduled_messages: {
         Row: {
           client_id: string
@@ -2774,6 +2870,39 @@ export type Database = {
           phone?: string
           sent_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      smm_markup_rules: {
+        Row: {
+          category_pattern: string | null
+          created_at: string
+          fee_fixed_brl: number
+          id: string
+          is_active: boolean
+          markup_percent: number
+          service_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          category_pattern?: string | null
+          created_at?: string
+          fee_fixed_brl?: number
+          id?: string
+          is_active?: boolean
+          markup_percent?: number
+          service_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category_pattern?: string | null
+          created_at?: string
+          fee_fixed_brl?: number
+          id?: string
+          is_active?: boolean
+          markup_percent?: number
+          service_id?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
