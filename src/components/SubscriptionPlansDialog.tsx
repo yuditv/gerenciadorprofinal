@@ -194,8 +194,8 @@ export function SubscriptionPlansDialog({
                     transition={{ delay: index * 0.1 }}
                     onClick={() => setSelectedPlan(plan.id)}
                     className={cn(
-                      'relative cursor-pointer rounded-xl border-2 p-5 transition-all duration-300',
-                      'hover:scale-105 hover:shadow-lg',
+                      'relative cursor-pointer rounded-xl border-2 p-5 transition-colors duration-200',
+                      'hover:shadow-lg hover:shadow-primary/10',
                       isSelected
                         ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
                         : 'border-border/50 bg-card/50 hover:border-primary/50',
