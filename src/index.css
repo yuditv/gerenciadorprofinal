@@ -392,12 +392,14 @@
   .glass-card:hover {
     box-shadow: var(--glass-shadow), var(--shadow-glow), 0 0 80px hsl(var(--primary) / 0.12);
     border-color: hsl(var(--primary) / 0.35);
-    transform: translateY(-2px);
+    /* Use the `translate` property to avoid overriding existing transforms
+       (e.g. Radix Dialog uses translate(-50%, -50%) to center). */
+    translate: 0 -2px;
   }
 
   /* Opt-out: keep glass styling but disable the hover "lift" (prevents jitter in dialogs/modals) */
   .glass-card.glass-card-static:hover {
-    transform: none;
+    translate: 0 0;
   }
 
   /* Inner highlight for depth - enhanced glow */
