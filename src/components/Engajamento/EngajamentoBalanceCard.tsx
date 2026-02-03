@@ -28,22 +28,28 @@ export function EngajamentoBalanceCard(props: {
     <Card className="border-primary/15 hover:border-primary/30">
       <CardHeader className="space-y-1">
         <CardTitle>Saldo</CardTitle>
-        <CardDescription>Consulta em tempo real do painel SMM</CardDescription>
+        <CardDescription>
+          {isAdmin ? "Consulta em tempo real do painel SMM" : "Seus créditos disponíveis"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="text-3xl font-semibold tabular-nums">
-          {props.balanceQuery.isLoading ? "..." : props.balanceQuery.data?.balance ?? "—"}
-          <span className="ml-2 text-base text-muted-foreground">
-            {props.balanceQuery.data?.currency ?? ""}
-          </span>
-        </div>
+        {/* Saldo do painel SMM - apenas para admins */}
+        {isAdmin && (
+          <div className="text-3xl font-semibold tabular-nums">
+            {props.balanceQuery.isLoading ? "..." : props.balanceQuery.data?.balance ?? "—"}
+            <span className="ml-2 text-base text-muted-foreground">
+              {props.balanceQuery.data?.currency ?? ""}
+            </span>
+          </div>
+        )}
 
-        <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-          <div className="text-xs text-muted-foreground">Créditos disponíveis</div>
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <div className="text-lg font-semibold tabular-nums">
+        {/* Créditos do usuário - visível para todos */}
+        <div className={isAdmin ? "rounded-lg border border-border/60 bg-muted/20 p-3" : ""}>
+          {isAdmin && <div className="text-xs text-muted-foreground">Créditos disponíveis</div>}
+          <div className={`${isAdmin ? "mt-1" : ""} flex items-center justify-between gap-2`}>
+            <div className={`${isAdmin ? "text-lg" : "text-3xl"} font-semibold tabular-nums`}>
               {walletQuery.isLoading ? "..." : (walletQuery.data?.credits ?? 0).toFixed(2)}
-              <span className="ml-2 text-xs text-muted-foreground">cr</span>
+              <span className={`ml-2 ${isAdmin ? "text-xs" : "text-base"} text-muted-foreground`}>cr</span>
             </div>
             {isAdmin && (
               <Button
@@ -59,22 +65,25 @@ export function EngajamentoBalanceCard(props: {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => props.balanceQuery.refetch()}
-            disabled={props.balanceQuery.isFetching}
-            className="gap-2"
-          >
-            <RefreshCw className={props.balanceQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-            Atualizar
-          </Button>
-          {props.balanceQuery.isError && (
-            <span className="text-sm text-destructive">{balanceErrorMessage}</span>
-          )}
-        </div>
+        {/* Botão de atualizar - apenas para admins */}
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => props.balanceQuery.refetch()}
+              disabled={props.balanceQuery.isFetching}
+              className="gap-2"
+            >
+              <RefreshCw className={props.balanceQuery.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+              Atualizar
+            </Button>
+            {props.balanceQuery.isError && (
+              <span className="text-sm text-destructive">{balanceErrorMessage}</span>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
