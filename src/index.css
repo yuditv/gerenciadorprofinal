@@ -395,6 +395,11 @@
     transform: translateY(-2px);
   }
 
+  /* Opt-out: keep glass styling but disable the hover "lift" (prevents jitter in dialogs/modals) */
+  .glass-card.glass-card-static:hover {
+    transform: none;
+  }
+
   /* Inner highlight for depth - enhanced glow */
   .glass-card::before {
     content: '';
