@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode } from "lucide-react";
+import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode, X } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -145,6 +146,7 @@ export function ChatPanel({
   const [showPIXDialog, setShowPIXDialog] = useState(false);
   const [showScheduleMessage, setShowScheduleMessage] = useState(false);
   const [isStartingNumericMenu, setIsStartingNumericMenu] = useState(false);
+  const [showClientSheet, setShowClientSheet] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -643,7 +645,20 @@ export function ChatPanel({
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-
+          {/* Mobile Client Info Button - visible only on mobile */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="lg:hidden"
+                onClick={() => setShowClientSheet(true)}
+              >
+                <User className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Dados do Cliente</TooltipContent>
+          </Tooltip>
 
           {/* IPTV Test Generator Button */}
           <Tooltip>
@@ -1130,10 +1145,11 @@ export function ChatPanel({
       </div>
       </div>
 
-      {/* Client Info Panel - Right side (always visible) */}
+      {/* Client Info Panel - Right side (hidden on mobile, visible on lg+) */}
       <div className={cn(
         "border-l border-border/50 shrink-0 overflow-hidden w-80 py-0",
-        "bg-card/10 backdrop-blur-md"
+        "bg-card/10 backdrop-blur-md",
+        "hidden lg:block"
       )}>
         <ScrollArea className="w-80 h-full">
           <div className="p-3">
@@ -1141,6 +1157,23 @@ export function ChatPanel({
           </div>
         </ScrollArea>
       </div>
+
+      {/* Mobile Client Info Sheet */}
+      <Sheet open={showClientSheet} onOpenChange={setShowClientSheet}>
+        <SheetContent side="right" className="w-[320px] sm:w-[360px] p-0 bg-background/95 backdrop-blur-md">
+          <SheetHeader className="p-4 pb-2 border-b border-border/50">
+            <SheetTitle className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Dados do Cliente
+            </SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-[calc(100vh-60px)]">
+            <div className="p-3">
+              <ClientInfoPanel client={client} isLoading={isLoadingClient} phone={conversation.phone} contactName={conversation.contact_name || undefined} contactAvatar={contactAvatarUrl || conversation.contact_avatar} agentId={conversation.active_agent_id} onRegisterClient={onRegisterClient} />
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
 
 
       {/* Media Gallery Modal */}
