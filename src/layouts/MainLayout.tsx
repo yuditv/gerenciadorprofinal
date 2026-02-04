@@ -86,7 +86,7 @@ export function MainLayout() {
       <FloatingSidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
 
       {/* Main Content */}
-      <motion.main className="flex-1 overflow-hidden h-full" initial={{
+      <motion.main className="flex-1 p-6 overflow-auto mx-0 my-0 mr-0 pl-0 pt-0 pr-0 pb-0 border-none mb-0 px-0 py-0" initial={{
       opacity: 0,
       y: 20
     }} animate={{

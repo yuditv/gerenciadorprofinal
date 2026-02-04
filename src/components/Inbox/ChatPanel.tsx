@@ -605,9 +605,9 @@ export function ChatPanel({
   const assignedLabels = conversation.labels?.map(l => l.label) || [];
   const nonNullAssignedLabels = assignedLabels.filter(Boolean) as InboxLabel[];
   const availableLabels = labels.filter(l => !assignedLabels.some(al => al?.id === l.id));
-  return <div className="flex-1 flex h-full inbox-container overflow-hidden min-h-0">
+  return <div className="flex-1 flex h-full inbox-container overflow-hidden">
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden inbox-chat-area h-full">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden inbox-chat-area">
         {/* Header */}
         <div className={cn(
         "p-3 inbox-header flex items-center justify-between",
@@ -944,7 +944,7 @@ export function ChatPanel({
     })()}
 
       {/* Messages */}
-      <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-0 overflow-y-auto inbox-scroll">
+      <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-0 inbox-scroll">
         {isLoading ? <div className="space-y-4">
             {[...Array(5)].map((_, i) => <div key={i} className={cn("flex gap-2", i % 2 === 0 ? "justify-start" : "justify-end")}>
                 <div className={cn("animate-pulse rounded-lg p-3", i % 2 === 0 ? "bg-muted w-48" : "bg-primary/20 w-36")}>
@@ -1070,7 +1070,7 @@ export function ChatPanel({
 
       {/* Input */}
       <div className={cn(
-        "p-3 inbox-input-area shrink-0",
+        "p-3 inbox-input-area flex-shrink-0",
         "border-t border-border/50",
         "bg-card/15 backdrop-blur-md"
       )}>
