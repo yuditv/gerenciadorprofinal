@@ -1,1 +1,4 @@
 project_id = "tlanmmbgyyxuqvezudir"
+
+[functions.get-subscription-plans]
+verify_jwt = false
