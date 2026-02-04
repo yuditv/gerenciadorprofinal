@@ -184,9 +184,7 @@ const AppRoutes = () => (
       } />
       <Route path="/atendimento" element={
         <ProtectedRoute>
-          <div className="h-screen">
-            <Atendimento />
-          </div>
+          <Atendimento />
         </ProtectedRoute>
       } />
       <Route path="/inbox-settings" element={

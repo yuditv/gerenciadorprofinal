@@ -581,7 +581,7 @@ export default function Atendimento() {
   };
 
   return (
-    <div className="theme-atendimento h-full min-h-0 flex flex-col bg-inbox inbox-surface overflow-hidden">
+    <div className="theme-atendimento h-screen flex flex-col bg-inbox inbox-surface overflow-hidden">
       {/* Subscription Expired Banner */}
       {subscriptionExpired && (
         <motion.div
