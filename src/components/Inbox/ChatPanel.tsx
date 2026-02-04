@@ -645,13 +645,13 @@ export function ChatPanel({
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Client Info Button - visible on < xl (where side panel may cut off) */}
+          {/* Client Info Button - visible on screens < 2xl (where side panel may cut off) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="xl:hidden"
+                className="2xl:hidden"
                 onClick={() => setShowClientSheet(true)}
               >
                 <User className="h-4 w-4" />
@@ -1145,12 +1145,12 @@ export function ChatPanel({
       </div>
       </div>
 
-      {/* Client Info Panel - Right side (hidden on mobile, visible on lg+) */}
+      {/* Client Info Panel - Right side (only visible on 2xl+ screens to avoid being cut off) */}
       <div className={cn(
         "border-l border-border/50 shrink-0 overflow-hidden w-80 py-0",
         "bg-card/10 backdrop-blur-md",
-        // Only show on very large screens to avoid being cut off by the left sidebar
-        "hidden xl:block"
+        // Only show on extra-large screens (1536px+) to avoid being cut off
+        "hidden 2xl:block"
       )}>
         <ScrollArea className="w-80 h-full">
           <div className="p-3">
