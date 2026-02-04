@@ -24,6 +24,8 @@ serve(async (req) => {
     });
   }
 
+  const token = authHeader.replace(/^bearer\s+/i, "");
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: {
       headers: {
@@ -32,10 +34,11 @@ serve(async (req) => {
     },
   });
 
+  // CRITICAL: Must pass token explicitly when verify_jwt=false (Lovable Cloud uses ES256)
   const {
     data: { user },
     error: userError,
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser(token);
 
   if (userError || !user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
