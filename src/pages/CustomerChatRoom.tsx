@@ -138,31 +138,7 @@ export default function CustomerChatRoom() {
       }}
     >
       {/* Overlay for better readability */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      
-      {/* Animated particles overlay */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute h-1 w-1 rounded-full bg-cyan-400/30"
-            initial={{ 
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-              scale: Math.random() * 0.5 + 0.5
-            }}
-            animate={{ 
-              y: [null, -20, 20],
-              opacity: [0.3, 0.6, 0.3]
-            }}
-            transition={{ 
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        ))}
-      </div>
+      <div className="absolute inset-0 bg-black/60" />
       
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full">
