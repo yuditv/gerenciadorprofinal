@@ -587,46 +587,48 @@ export default function Atendimento() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-destructive/10 border-b border-destructive/20 px-4 py-3 flex items-center justify-between"
+          className="bg-destructive/10 border-b border-destructive/20 px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2"
         >
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-destructive" />
-            <div>
-              <p className="font-medium text-destructive">Assinatura Expirada</p>
-              <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive shrink-0" />
+            <div className="min-w-0">
+              <p className="font-medium text-destructive text-sm sm:text-base">Assinatura Expirada</p>
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
                 Renove sua assinatura para acessar a Central de Atendimento
               </p>
             </div>
           </div>
           <Button 
             onClick={() => setShowPlans(true)}
-            className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+            className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shrink-0"
+            size="sm"
           >
-            <Zap className="h-4 w-4 mr-2" />
-            Renovar Agora
+            <Zap className="h-4 w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Renovar Agora</span>
+            <span className="sm:hidden">Renovar</span>
           </Button>
         </motion.div>
       )}
 
       {/* Top Header */}
-      <header className="h-14 border-b border-border/50 bg-inbox-header flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-            <ArrowLeft className="h-5 w-5" />
+      <header className="h-12 sm:h-14 border-b border-border/50 bg-inbox-header flex items-center justify-between px-2 sm:px-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => navigate('/')}>
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">Central de Atendimento</h1>
+          <h1 className="text-sm sm:text-lg font-semibold truncate">Central de Atendimento</h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           {/* Status Selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2" disabled={subscriptionExpired}>
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs sm:text-sm" disabled={subscriptionExpired}>
                 <Circle className={cn(
                   "h-2 w-2 fill-current",
                   statusColors[myStatus?.status || 'offline']
                 )} />
-                {statusLabels[myStatus?.status || 'offline']}
+                <span className="hidden sm:inline">{statusLabels[myStatus?.status || 'offline']}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -649,6 +651,7 @@ export default function Atendimento() {
             <Button 
               variant="ghost" 
               size="icon" 
+              className="h-8 w-8"
               onClick={() => navigate('/inbox-settings')} 
               disabled={subscriptionExpired}
               title="Configurações do Inbox"
@@ -657,7 +660,7 @@ export default function Atendimento() {
             </Button>
           )}
 
-          <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={subscriptionExpired}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => refetch()} disabled={subscriptionExpired}>
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -717,7 +720,8 @@ export default function Atendimento() {
             />
           ) : activeTab === 'customer-chat' ? (
             <div className="flex-1 flex overflow-hidden min-h-0">
-              <div className="w-80 border-r border-border/50 flex flex-col bg-inbox-sidebar">
+              {/* Links sidebar - hidden on mobile */}
+              <div className="hidden lg:flex w-80 border-r border-border/50 flex-col bg-inbox-sidebar shrink-0">
                 <div className="p-3 border-b border-border/50 flex items-center justify-between gap-2">
                   <div className="text-sm font-medium">Links</div>
                   <Button size="sm" onClick={() => setShowCreateCustomerLink(true)}>
@@ -733,7 +737,7 @@ export default function Atendimento() {
                           {l.is_active ? "Ativo" : "Inativo"}
                           {l.customer_name ? ` • ${l.customer_name}` : ""}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <QuickCopyLinkButton url={getInviteUrl(l.token)} />
                           <Button
                             variant="outline"
@@ -771,77 +775,130 @@ export default function Atendimento() {
                 </div>
               </div>
 
-              <CustomerChatList
-                conversations={customerConversations}
-                selectedId={selectedCustomerConversationId}
-                onSelect={(c) => setSelectedCustomerConversationId(c.id)}
-                onDelete={async (id) => {
-                  setIsDeletingCustomerConv(true);
-                  const success = await deleteCustomerConversation(id);
-                  if (success && selectedCustomerConversationId === id) {
-                    setSelectedCustomerConversationId(null);
-                  }
-                  setIsDeletingCustomerConv(false);
-                  if (success) {
-                    toast({ title: "Conversa excluída" });
-                  } else {
-                    toast({ title: "Erro ao excluir conversa", variant: "destructive" });
-                  }
-                  return success;
-                }}
-                isLoading={isCustomerConversationsLoading}
-                isDeleting={isDeletingCustomerConv}
-                highlightedConversationId={highlightedCustomerConversationId}
-              />
+              {/* Customer Chat List - full width mobile, w-80 desktop; hidden when chat selected on mobile */}
+              <div className={cn(
+                "md:block",
+                selectedCustomerConversationId ? "hidden" : "flex-1 md:flex-none"
+              )}>
+                {/* Mobile create link button */}
+                <div className="lg:hidden p-2 border-b border-border/50 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{customerConversations.length} conversas</span>
+                  <Button size="sm" variant="outline" onClick={() => setShowCreateCustomerLink(true)}>
+                    Criar link
+                  </Button>
+                </div>
+                <CustomerChatList
+                  conversations={customerConversations}
+                  selectedId={selectedCustomerConversationId}
+                  onSelect={(c) => setSelectedCustomerConversationId(c.id)}
+                  onDelete={async (id) => {
+                    setIsDeletingCustomerConv(true);
+                    const success = await deleteCustomerConversation(id);
+                    if (success && selectedCustomerConversationId === id) {
+                      setSelectedCustomerConversationId(null);
+                    }
+                    setIsDeletingCustomerConv(false);
+                    if (success) {
+                      toast({ title: "Conversa excluída" });
+                    } else {
+                      toast({ title: "Erro ao excluir conversa", variant: "destructive" });
+                    }
+                    return success;
+                  }}
+                  isLoading={isCustomerConversationsLoading}
+                  isDeleting={isDeletingCustomerConv}
+                  highlightedConversationId={highlightedCustomerConversationId}
+                />
+              </div>
 
-              <CustomerChatPanel
-                title={selectedCustomerConversation ? selectedCustomerConversation.customer_name ?? "Cliente" : "Selecione um chat"}
-                messages={customerMessages}
-                isLoading={customerMessagesLoading}
-                isSending={isCustomerSending}
-                onSend={sendCustomerMessage}
-                viewer="owner"
-                conversation={selectedCustomerConversation}
-              />
+              {/* Customer Chat Panel - hidden on mobile when no chat selected */}
+              <div className={cn(
+                "flex-1 min-w-0",
+                selectedCustomerConversationId ? "flex flex-col" : "hidden md:flex md:flex-col"
+              )}>
+                {/* Mobile back button */}
+                {selectedCustomerConversationId && (
+                  <div className="md:hidden p-2 border-b border-border/50 flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedCustomerConversationId(null)}>
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Voltar
+                    </Button>
+                    <span className="text-sm font-medium truncate">
+                      {selectedCustomerConversation?.customer_name ?? "Cliente"}
+                    </span>
+                  </div>
+                )}
+                <CustomerChatPanel
+                  title={selectedCustomerConversation ? selectedCustomerConversation.customer_name ?? "Cliente" : "Selecione um chat"}
+                  messages={customerMessages}
+                  isLoading={customerMessagesLoading}
+                  isSending={isCustomerSending}
+                  onSend={sendCustomerMessage}
+                  viewer="owner"
+                  conversation={selectedCustomerConversation}
+                />
+              </div>
             </div>
           ) : (
             <>
-              {/* Conversation List */}
-              <ConversationList
-                conversations={conversations}
-                selectedId={selectedConversation?.id || null}
-                onSelect={handleSelectConversation}
-                isLoading={isLoading}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                defaultAgentId={defaultAgentId}
-              />
+              {/* Conversation List - full width on mobile, hidden when conversation is selected on mobile */}
+              <div className={cn(
+                "md:block",
+                selectedConversation ? "hidden" : "flex-1 md:flex-none"
+              )}>
+                <ConversationList
+                  conversations={conversations}
+                  selectedId={selectedConversation?.id || null}
+                  onSelect={handleSelectConversation}
+                  isLoading={isLoading}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  defaultAgentId={defaultAgentId}
+                />
+              </div>
 
-              {/* Chat Panel */}
-              <ChatPanel
-                conversation={selectedConversation}
-                messages={messages}
-                labels={labels}
-                isLoading={messagesLoading}
-                isSending={isSending}
-                isSyncing={isSyncing}
-                isDeleting={isDeleting}
-                onSendMessage={handleSendMessage}
-                onAssignToMe={handleAssignToMe}
-                onResolve={handleResolve}
-                onReopen={handleReopen}
-                onToggleAI={handleToggleAI}
-                onAssignLabel={handleAssignLabel}
-                onRemoveLabel={handleRemoveLabel}
-                onMarkAsRead={handleMarkAsRead}
-                onRegisterClient={handleRegisterClient}
-                onRetryMessage={retryMessage}
-                onSyncMessages={(limit) => syncMessages({ limit, silent: false })}
-                onDeleteConversation={handleDeleteConversation}
-                onDeleteMessage={deleteMessage}
-                onSaveContact={saveContactToWhatsApp}
-                onRenameContact={renameContact}
-              />
+              {/* Chat Panel - hidden on mobile when no conversation selected */}
+              <div className={cn(
+                "flex-1 min-w-0",
+                selectedConversation ? "flex flex-col" : "hidden md:flex md:flex-col"
+              )}>
+                {/* Mobile back button */}
+                {selectedConversation && (
+                  <div className="md:hidden p-2 border-b border-border/50 flex items-center gap-2 bg-inbox-header">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedConversation(null)}>
+                      <ArrowLeft className="h-4 w-4 mr-1" />
+                      Voltar
+                    </Button>
+                    <span className="text-sm font-medium truncate">
+                      {selectedConversation.contact_name || selectedConversation.phone}
+                    </span>
+                  </div>
+                )}
+                <ChatPanel
+                  conversation={selectedConversation}
+                  messages={messages}
+                  labels={labels}
+                  isLoading={messagesLoading}
+                  isSending={isSending}
+                  isSyncing={isSyncing}
+                  isDeleting={isDeleting}
+                  onSendMessage={handleSendMessage}
+                  onAssignToMe={handleAssignToMe}
+                  onResolve={handleResolve}
+                  onReopen={handleReopen}
+                  onToggleAI={handleToggleAI}
+                  onAssignLabel={handleAssignLabel}
+                  onRemoveLabel={handleRemoveLabel}
+                  onMarkAsRead={handleMarkAsRead}
+                  onRegisterClient={handleRegisterClient}
+                  onRetryMessage={retryMessage}
+                  onSyncMessages={(limit) => syncMessages({ limit, silent: false })}
+                  onDeleteConversation={handleDeleteConversation}
+                  onDeleteMessage={deleteMessage}
+                  onSaveContact={saveContactToWhatsApp}
+                  onRenameContact={renameContact}
+                />
+              </div>
             </>
           )}
         </div>

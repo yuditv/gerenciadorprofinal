@@ -426,7 +426,7 @@ export function WhatsAppWarming() {
   const canStartWarming = selectedInstances.size >= 2 && templates.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       {/* Scheduler Dialog */}
       <WarmingScheduler
         open={showScheduler}
@@ -568,20 +568,20 @@ export function WhatsAppWarming() {
       {/* Main Content */}
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Instance Selection */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6 min-w-0">
           <Card className="glass-card">
-            <CardHeader className="border-b border-border/30">
-              <CardTitle className="flex items-center gap-3">
-                <div className="stats-icon-container info">
-                  <Users className="h-5 w-5 text-blue-500" />
+            <CardHeader className="border-b border-border/30 p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base">
+                <div className="stats-icon-container info shrink-0">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                 </div>
-                Seleção de Instâncias para Aquecimento
+                <span className="truncate">Seleção de Instâncias</span>
               </CardTitle>
               <CardDescription>
                 Selecione as instâncias que irão trocar mensagens entre si
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-4 sm:p-6">
               {/* Balancing Mode */}
               <div className="space-y-2">
                 <Label>Modo de Balanceamento</Label>
@@ -707,15 +707,15 @@ export function WhatsAppWarming() {
 
           {/* Warming Configuration */}
           <Card className="glass-card">
-            <CardHeader className="border-b border-border/30">
-              <CardTitle className="flex items-center gap-3">
-                <div className="stats-icon-container accent">
-                  <Settings className="h-5 w-5 text-accent" />
+            <CardHeader className="border-b border-border/30 p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base">
+                <div className="stats-icon-container accent shrink-0">
+                  <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
                 </div>
                 Configurações de Aquecimento
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
               {/* Message Settings */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -759,10 +759,9 @@ Boa tarde!
 Boa noite!`}
                     className="min-h-[120px]"
                   />
-                  <Button variant="outline" onClick={addBatchTemplates} className="gap-2">
+                  <Button variant="outline" onClick={addBatchTemplates} className="gap-2 w-full sm:w-auto">
                     <Plus className="h-4 w-4" />
-                    Adicionar
-                    <span className="text-xs text-muted-foreground">Use Ctrl+Enter ou clique para adicionar</span>
+                    Adicionar em Lote
                   </Button>
                 </div>
 
@@ -1057,7 +1056,7 @@ Boa noite!`}
         </div>
 
         {/* Progress Panel */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Card className="bg-card/50 backdrop-blur-sm border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
