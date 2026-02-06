@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, memo } from "react";
-import { Users, Bot, Flame, Crown, Headset, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, TrendingUp, Wallet, LayoutGrid } from "lucide-react";
+import { Users, Bot, Flame, Crown, Headset, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, Wallet, LayoutGrid } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ const WhatsAppIcon = memo(({ className }: { className?: string }) => (
 ));
 WhatsAppIcon.displayName = 'WhatsAppIcon';
 
-export type AppSection = "clients" | "whatsapp" | "filter-numbers" | "ai-agent" | "warm-chips" | "revenda" | "iptv" | "admin" | "atendimento" | "engajamento" | "crm-kanban";
+export type AppSection = "clients" | "whatsapp" | "filter-numbers" | "ai-agent" | "warm-chips" | "revenda" | "iptv" | "admin" | "atendimento" | "crm-kanban";
 
 type PermissionKey = 
   | 'can_view_clients'
@@ -98,13 +98,6 @@ const menuItems: MenuItem[] = [
     permissionKey: "can_view_warming",
   },
   {
-    id: "engajamento",
-    title: "Engajamento",
-    icon: TrendingUp,
-    color: "text-emerald-500",
-    bgColor: "bg-emerald-500",
-  },
-  {
     id: "crm-kanban",
     title: "CRM Kanban",
     icon: LayoutGrid,
@@ -152,8 +145,6 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
   const handleClick = useCallback((item: MenuItem) => {
     if (item.id === 'admin') {
       navigate('/admin');
-    } else if (item.id === 'engajamento') {
-      navigate('/engajamento');
     } else {
       onSectionChange(item.id);
     }

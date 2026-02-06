@@ -189,69 +189,6 @@
     --qr-surface: 0 0% 100%;
   }
 
-  /* ============================================
-     Engajamento (SMM) scoped theme
-     Obs: para permitir MODO CLARO global, os overrides abaixo
-     só aplicam quando o app está em .dark.
-     ============================================ */
-  .dark .theme-engajamento {
-    --background: 230 18% 7%;
-    --foreground: 220 12% 90%;
-
-    --card: 230 16% 10%;
-    --card-foreground: 220 12% 90%;
-
-    --popover: 230 16% 10%;
-    --popover-foreground: 220 12% 90%;
-
-    /* Red primary */
-    --primary: 0 78% 56%;
-    --primary-foreground: 0 0% 100%;
-
-    /* Purple accent */
-    --accent: 270 78% 60%;
-    --accent-foreground: 0 0% 100%;
-
-    --secondary: 230 14% 15%;
-    --secondary-foreground: 220 12% 84%;
-
-    --muted: 230 12% 17%;
-    --muted-foreground: 220 8% 56%;
-
-    --destructive: 0 70% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 230 14% 20%;
-    --input: 230 14% 13%;
-    --ring: 0 78% 56%;
-
-    /* More “panel-like” glow, but still clean */
-    --shadow-sm:
-      0 1px 2px hsl(0 0% 0% / 0.20),
-      0 1px 0 hsl(var(--foreground) / 0.06) inset;
-    --shadow-md:
-      0 12px 30px -20px hsl(0 0% 0% / 0.55),
-      0 4px 12px hsl(0 0% 0% / 0.28),
-      0 1px 0 hsl(var(--foreground) / 0.06) inset;
-    --shadow-lg:
-      0 22px 56px -30px hsl(0 0% 0% / 0.60),
-      0 8px 20px hsl(0 0% 0% / 0.32),
-      0 1px 0 hsl(var(--foreground) / 0.06) inset;
-    --shadow-xl:
-      0 32px 90px -44px hsl(0 0% 0% / 0.62),
-      0 14px 34px hsl(0 0% 0% / 0.36),
-      0 1px 0 hsl(var(--foreground) / 0.06) inset;
-    --shadow-glow: 0 0 52px hsl(0 78% 56% / 0.12);
-
-    /* Glass */
-    --glass-bg: 230 18% 12% / 0.88;
-    --glass-border: 220 15% 30% / 0.14;
-    --glass-shadow: 0 12px 44px hsl(0 0% 0% / 0.32);
-    --glass-blur: 22px;
-
-    /* QR surface (kept white for PIX scanning) */
-    --qr-surface: 0 0% 100%;
-  }
 
   /* ============================================
      Atendimento (Inbox) scoped theme
@@ -328,24 +265,6 @@
       radial-gradient(ellipse 80% 60% at 50% 50%, hsl(260 30% 20% / 0.15), transparent);
   }
 
-  /* Background vignette + red/purple glows for the Engajamento page */
-  .theme-engajamento {
-    background-color: hsl(var(--background));
-    background-image:
-      radial-gradient(ellipse 80% 70% at 80% 12%, hsl(var(--accent) / 0.16), transparent 55%),
-      radial-gradient(ellipse 110% 85% at 18% 0%, hsl(var(--primary) / 0.14), transparent 55%),
-      radial-gradient(ellipse 80% 70% at 50% 55%, hsl(0 0% 0% / 0.04), transparent 70%);
-    background-attachment: fixed;
-  }
-
-  .dark .theme-engajamento {
-    background-color: hsl(var(--background));
-    background-image:
-      radial-gradient(ellipse 80% 70% at 80% 12%, hsl(var(--accent) / 0.16), transparent 55%),
-      radial-gradient(ellipse 110% 85% at 18% 0%, hsl(var(--primary) / 0.14), transparent 55%),
-      radial-gradient(ellipse 80% 70% at 50% 55%, hsl(230 30% 10% / 0.35), transparent 70%);
-    background-attachment: fixed;
-  }
 
   /* Smoother font rendering */
   html {

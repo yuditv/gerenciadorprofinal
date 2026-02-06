@@ -1822,6 +1822,39 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_addresses: {
+        Row: {
+          address: string
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          phone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          phone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          phone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       customer_chat_links: {
         Row: {
           created_at: string
@@ -2363,6 +2396,75 @@ export type Database = {
           name?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      menu_categories: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          icon: string
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          icon?: string
+          id: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          icon?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
+      menu_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          display_order: number | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          price: number
+          removable_items: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          price?: number
+          removable_items?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          removable_items?: string[] | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3149,6 +3251,30 @@ export type Database = {
           text_content?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      store_settings: {
+        Row: {
+          created_at: string
+          id: string
+          owner_whatsapp: string | null
+          store_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_whatsapp?: string | null
+          store_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_whatsapp?: string | null
+          store_name?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

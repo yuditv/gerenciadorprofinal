@@ -12,8 +12,6 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletTopup } from "@/hooks/useWalletTopup";
-import { usePricingSettings } from "@/hooks/usePricingSettings";
-import { Switch } from "@/components/ui/switch";
 
 function formatBRL(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -22,18 +20,12 @@ function formatBRL(value: number) {
 export default function Wallet() {
   const navigate = useNavigate();
   const { walletQuery, transactionsQuery } = useWallet();
-  const { pricingQuery, upsertMarkup, setMarkupLocked } = usePricingSettings();
   const { createTopup, checkTopup } = useWalletTopup();
 
   const [topupOpen, setTopupOpen] = useState(false);
   const [amount, setAmount] = useState("1,00");
   const [activeTopupId, setActiveTopupId] = useState<string | null>(null);
   const [activeTopup, setActiveTopup] = useState<any | null>(null);
-  const [markupDraft, setMarkupDraft] = useState<string>("0");
-
-  useEffect(() => {
-    if (pricingQuery.data) setMarkupDraft(String(pricingQuery.data.markup_percent ?? 0));
-  }, [pricingQuery.data]);
 
   // polling while pending
   useEffect(() => {
@@ -97,131 +89,62 @@ export default function Wallet() {
     toast.success("Código PIX copiado!");
   };
 
-  const saveMarkup = async () => {
-    try {
-      if (pricingQuery.data?.markup_locked) {
-        toast.message("Markup travado", { description: "O markup está travado pelo admin." });
-        return;
-      }
-      const n = Number(markupDraft.replace(",", "."));
-      await upsertMarkup.mutateAsync(n);
-      toast.success("Markup salvo");
-    } catch (e) {
-      toast.error("Falha ao salvar", { description: e instanceof Error ? e.message : "Erro desconhecido" });
-    }
-  };
-
-  const toggleLocked = async (locked: boolean) => {
-    try {
-      await setMarkupLocked.mutateAsync(locked);
-      toast.success(locked ? "Markup travado" : "Markup destravado");
-    } catch (e) {
-      toast.error("Falha ao atualizar", { description: e instanceof Error ? e.message : "Erro desconhecido" });
-    }
-  };
-
   return (
-    <div className="min-h-screen flex flex-col w-full relative theme-engajamento">
+    <div className="min-h-screen flex flex-col w-full relative">
       <SubscriptionBanner />
-      <FloatingSidebar activeSection="engajamento" onSectionChange={(s) => handleSidebarSectionChange(s)} />
+      <FloatingSidebar activeSection="whatsapp" onSectionChange={(s) => handleSidebarSectionChange(s)} />
 
       <main className="flex-1 p-6">
-        <div className="mx-auto w-full max-w-6xl space-y-6">
+        <div className="mx-auto w-full max-w-4xl space-y-6">
           <header className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shadow-sm">
               <WalletIcon className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl font-bold">Carteira</h1>
-              <p className="text-sm text-muted-foreground">Recarregue via PIX e configure seu markup.</p>
+              <p className="text-sm text-muted-foreground">Recarregue via PIX.</p>
             </div>
           </header>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <Card className="border-primary/15 hover:border-primary/30">
-              <CardHeader className="space-y-1">
-                <CardTitle>Saldo de créditos</CardTitle>
-                <CardDescription>1 crédito = R$ 1,00</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-3xl font-semibold tabular-nums">
-                  {walletQuery.isLoading ? "..." : credits.toFixed(2)}
-                  <span className="ml-2 text-base text-muted-foreground">créditos</span>
-                </div>
-                <div className="text-sm text-muted-foreground">Equivalente: {formatBRL(credits)}</div>
+          <Card className="border-primary/15 hover:border-primary/30">
+            <CardHeader className="space-y-1">
+              <CardTitle>Saldo de créditos</CardTitle>
+              <CardDescription>1 crédito = R$ 1,00</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-3xl font-semibold tabular-nums">
+                {walletQuery.isLoading ? "..." : credits.toFixed(2)}
+                <span className="ml-2 text-base text-muted-foreground">créditos</span>
+              </div>
+              <div className="text-sm text-muted-foreground">Equivalente: {formatBRL(credits)}</div>
 
-                <div className="flex items-center gap-2">
-                  <Button type="button" className="gap-2" onClick={() => setTopupOpen(true)}>
-                    <CreditCard className="h-4 w-4" />
-                    Recarregar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      walletQuery.refetch();
-                      transactionsQuery.refetch();
-                    }}
-                    disabled={walletQuery.isFetching || transactionsQuery.isFetching}
-                    className="gap-2"
-                  >
-                    <RefreshCw
-                      className={
-                        walletQuery.isFetching || transactionsQuery.isFetching
-                          ? "h-4 w-4 animate-spin"
-                          : "h-4 w-4"
-                      }
-                    />
-                    Atualizar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2 border-primary/15 hover:border-primary/30">
-              <CardHeader className="space-y-1">
-                <CardTitle>Markup (%)</CardTitle>
-                <CardDescription>Define seu preço final: custo × (1 + markup/100)</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
-                  <div className="space-y-0.5">
-                    <div className="text-sm font-medium">Markup travado (global obrigatório)</div>
-                    <div className="text-xs text-muted-foreground">
-                      Quando ativado, usuários não podem personalizar o markup.
-                    </div>
-                  </div>
-                  <Switch
-                    checked={pricingQuery.data?.markup_locked ?? true}
-                    onCheckedChange={toggleLocked}
-                    disabled={pricingQuery.isLoading || setMarkupLocked.isPending}
+              <div className="flex items-center gap-2">
+                <Button type="button" className="gap-2" onClick={() => setTopupOpen(true)}>
+                  <CreditCard className="h-4 w-4" />
+                  Recarregar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    walletQuery.refetch();
+                    transactionsQuery.refetch();
+                  }}
+                  disabled={walletQuery.isFetching || transactionsQuery.isFetching}
+                  className="gap-2"
+                >
+                  <RefreshCw
+                    className={
+                      walletQuery.isFetching || transactionsQuery.isFetching
+                        ? "h-4 w-4 animate-spin"
+                        : "h-4 w-4"
+                    }
                   />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div className="md:col-span-1">
-                    <Label htmlFor="markup">Markup</Label>
-                    <Input
-                      id="markup"
-                      value={markupDraft}
-                      onChange={(e) => setMarkupDraft(e.target.value.replace(/[^0-9.,]/g, ""))}
-                      placeholder="50"
-                      inputMode="decimal"
-                      disabled={pricingQuery.data?.markup_locked ?? true}
-                    />
-                  </div>
-                  <div className="md:col-span-2 flex items-end gap-2">
-                    <Button type="button" onClick={saveMarkup} disabled={upsertMarkup.isPending || (pricingQuery.data?.markup_locked ?? true)}>
-                      {upsertMarkup.isPending ? "Salvando..." : "Salvar"}
-                    </Button>
-                    <div className="text-sm text-muted-foreground">
-                      Atual: {pricingQuery.isLoading ? "..." : `${(pricingQuery.data?.markup_percent ?? 0).toFixed(2)}%`}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  Atualizar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="border-primary/15 hover:border-primary/30">
             <CardHeader className="space-y-1">
@@ -291,7 +214,7 @@ export default function Wallet() {
                 </div>
                 <Separator />
 
-                  <div className="flex justify-center">
+                <div className="flex justify-center">
                   <div className="w-44 h-44 bg-qr rounded-xl p-3 flex items-center justify-center">
                     {activeTopup.pix_qr_code ? (
                       <img src={activeTopup.pix_qr_code} alt="QR Code PIX" className="w-full h-full object-contain" />

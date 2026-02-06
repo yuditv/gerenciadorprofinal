@@ -36,7 +36,7 @@ const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Engajamento = lazy(() => import("./pages/Engajamento"));
+
 const Wallet = lazy(() => import("./pages/Wallet"));
   const VPNTest = lazy(() => import("./pages/VPNTest"));
 
@@ -206,11 +206,6 @@ const AppRoutes = () => (
       <Route path="/filter-numbers" element={
         <ProtectedRoute>
           <FilterNumbers />
-        </ProtectedRoute>
-      } />
-      <Route path="/engajamento" element={
-        <ProtectedRoute>
-          <Engajamento />
         </ProtectedRoute>
       } />
       <Route path="/carteira" element={
