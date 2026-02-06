@@ -178,27 +178,46 @@ export default function InboxSettings() {
     }
   };
 
+  // On mobile, track whether user is viewing the menu or the content
+  const [showContent, setShowContent] = useState(false);
+
+  const handleSelectSection = (id: SettingsSection) => {
+    setActiveSection(id);
+    setShowContent(true); // navigate to content on mobile
+  };
+
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-x-hidden">
       {/* Header */}
-      <header className="h-14 border-b flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/atendimento')}>
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-          <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-lg font-semibold">Configurações do Inbox</h1>
+      <header className="h-14 border-b flex items-center justify-between px-3 sm:px-4 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          {/* On mobile when viewing content, show back-to-menu button */}
+          {showContent ? (
+            <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={() => setShowContent(false)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+          ) : null}
+          <Button variant="ghost" size="icon" className={cn("shrink-0", showContent && "hidden md:flex")} onClick={() => navigate('/atendimento')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2 min-w-0">
+            <Settings className="h-5 w-5 text-muted-foreground shrink-0" />
+            <h1 className="text-base sm:text-lg font-semibold truncate">
+              {showContent ? effectiveMenu.find(m => m.id === activeSection)?.title || 'Configurações' : 'Configurações do Inbox'}
+            </h1>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar Menu */}
-        <aside className="w-64 border-r shrink-0">
+        {/* Sidebar Menu — hidden on mobile when content is shown */}
+        <aside className={cn(
+          "w-full md:w-64 border-r shrink-0",
+          showContent ? "hidden md:block" : "block"
+        )}>
           <ScrollArea className="h-full">
-            <nav className="p-3 space-y-1">
+            <nav className="p-2 sm:p-3 space-y-1">
               {effectiveMenu.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeSection === item.id;
@@ -206,7 +225,7 @@ export default function InboxSettings() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => setActiveSection(item.id)}
+                    onClick={() => handleSelectSection(item.id)}
                     className={cn(
                       "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors",
                       isActive
@@ -239,9 +258,12 @@ export default function InboxSettings() {
           </ScrollArea>
         </aside>
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-auto">
-          <div className="p-6 max-w-4xl">
+        {/* Content Area — hidden on mobile when menu is shown */}
+        <main className={cn(
+          "flex-1 overflow-auto min-w-0",
+          showContent ? "block" : "hidden md:block"
+        )}>
+          <div className="p-3 sm:p-6 max-w-4xl">
             {renderContent()}
           </div>
         </main>
