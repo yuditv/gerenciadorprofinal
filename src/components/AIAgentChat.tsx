@@ -244,7 +244,7 @@ export function AIAgentChat() {
   }
 
   return (
-    <Card className="glass-card flex flex-col h-[600px]">
+    <Card className="glass-card flex flex-col h-[calc(100vh-280px)] min-h-[400px] max-h-[700px]">
       {/* Header */}
       <CardHeader className="border-b border-border/30 pb-4">
         <div className="flex items-center justify-between">

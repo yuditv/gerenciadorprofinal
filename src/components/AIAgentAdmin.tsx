@@ -74,51 +74,62 @@ export function AIAgentAdmin() {
 
   return (
     <Tabs defaultValue="agents" className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="agents" className="gap-2">
-            <Bot className="h-4 w-4" />
-            Agentes
-          </TabsTrigger>
-          <TabsTrigger value="preferences" className="gap-2">
-            <Settings className="h-4 w-4" />
-            Preferências
-          </TabsTrigger>
-          <TabsTrigger value="sub-agents" className="gap-2">
-            <Users className="h-4 w-4" />
-            Sub-Agentes
-          </TabsTrigger>
-          <TabsTrigger value="routing" className="gap-2">
-            <Link2 className="h-4 w-4" />
-            Roteamento
-          </TabsTrigger>
-          <TabsTrigger value="transfer" className="gap-2">
-            <Shuffle className="h-4 w-4" />
-            Transferências
-          </TabsTrigger>
-        </TabsList>
-        <div className="flex gap-2">
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="overflow-x-auto scrollbar-hide -mx-1 px-1">
+          <TabsList className="bg-muted/50 w-max min-w-full sm:w-auto">
+            <TabsTrigger value="agents" className="gap-1.5 sm:gap-2 px-2 sm:px-3 text-xs sm:text-sm">
+              <Bot className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Agentes</span>
+              <span className="sm:hidden">Bots</span>
+            </TabsTrigger>
+            <TabsTrigger value="preferences" className="gap-1.5 sm:gap-2 px-2 sm:px-3 text-xs sm:text-sm">
+              <Settings className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Preferências</span>
+              <span className="sm:hidden">Prefs</span>
+            </TabsTrigger>
+            <TabsTrigger value="sub-agents" className="gap-1.5 sm:gap-2 px-2 sm:px-3 text-xs sm:text-sm">
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Sub-Agentes</span>
+              <span className="sm:hidden">Sub</span>
+            </TabsTrigger>
+            <TabsTrigger value="routing" className="gap-1.5 sm:gap-2 px-2 sm:px-3 text-xs sm:text-sm">
+              <Link2 className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Roteamento</span>
+              <span className="sm:hidden">Rota</span>
+            </TabsTrigger>
+            <TabsTrigger value="transfer" className="gap-1.5 sm:gap-2 px-2 sm:px-3 text-xs sm:text-sm">
+              <Shuffle className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Transferências</span>
+              <span className="sm:hidden">Trans</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={() => setIsWizardOpen(true)}
-            className="gap-2"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+            size="sm"
             disabled={!canCreate}
             title={!canCreate ? `Limite de ${maxAgents === -1 ? '∞' : maxAgents} agentes atingido` : undefined}
           >
             <Sparkles className="h-4 w-4" />
-            Criar Bot (Wizard)
+            <span className="hidden sm:inline">Criar Bot (Wizard)</span>
+            <span className="sm:hidden">Wizard</span>
           </Button>
           <Button 
             variant="outline"
             onClick={() => setIsMaintenanceOpen(true)} 
-            className="gap-2"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm"
+            size="sm"
           >
             <Settings2 className="h-4 w-4" />
-            Manutenção
+            <span className="hidden sm:inline">Manutenção</span>
           </Button>
           <Button 
             onClick={() => setIsCreateDialogOpen(true)} 
-            className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90"
+            className="gap-1.5 sm:gap-2 text-xs sm:text-sm bg-gradient-to-r from-primary to-accent hover:opacity-90"
+            size="sm"
             disabled={!canCreate}
             title={!canCreate ? `Limite de ${maxAgents === -1 ? '∞' : maxAgents} agentes atingido` : undefined}
           >
