@@ -12,7 +12,7 @@ export default function WarmChips() {
   const isTrial = planType === 'trial';
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8 overflow-x-hidden">
       {/* Premium Header */}
       <motion.div 
         className="flex items-center gap-3 sm:gap-4"

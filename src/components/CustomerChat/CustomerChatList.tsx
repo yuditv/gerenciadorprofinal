@@ -67,7 +67,7 @@ export function CustomerChatList({
   }, [conversations, q]);
 
   return (
-    <div className="w-80 border-r border-border/50 flex flex-col h-full bg-inbox-sidebar overflow-hidden">
+    <div className="w-full md:w-80 border-r border-border/50 flex flex-col h-full bg-inbox-sidebar overflow-hidden">
       <div className="p-3 border-b border-border/50">
         <Input
           placeholder="Buscar cliente..."
