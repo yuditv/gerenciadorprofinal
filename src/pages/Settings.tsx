@@ -12,11 +12,13 @@ import { SubscriptionReminderSettings } from '@/components/SubscriptionReminderS
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
 import { CredentialsSettings } from '@/components/CredentialsSettings';
 import { NotificationSettingsCard } from '@/components/NotificationSettingsCard';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Key } from 'lucide-react';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { settings, isLoading, saveSettings } = usePlanSettings();
+  const { isAdmin } = useUserPermissions();
   
   const [editedSettings, setEditedSettings] = useState<PlanSetting[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -69,12 +71,14 @@ export default function Settings() {
           </div>
         </div>
 
-        <Tabs defaultValue="plans" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="plans" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              <span className="hidden sm:inline">Planos</span>
-            </TabsTrigger>
+        <Tabs defaultValue={isAdmin ? "plans" : "notifications"} className="space-y-6">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
+            {isAdmin && (
+              <TabsTrigger value="plans" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden sm:inline">Planos</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Clientes</span>
@@ -97,69 +101,71 @@ export default function Settings() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Plans Tab */}
-          <TabsContent value="plans" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                  Configurações de Planos
-                </CardTitle>
-                <CardDescription>
-                  Personalize os nomes e preços padrão dos planos oferecidos aos seus clientes.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid gap-6 sm:grid-cols-2">
-                  {currentSettings.map((plan) => (
-                    <Card key={plan.planKey} className="bg-muted/30">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <span>{planIcons[plan.planKey]}</span>
-                          {plan.planKey === 'monthly' && 'Plano Mensal'}
-                          {plan.planKey === 'quarterly' && 'Plano Trimestral'}
-                          {plan.planKey === 'semiannual' && 'Plano Semestral'}
-                          {plan.planKey === 'annual' && 'Plano Anual'}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`name-${plan.planKey}`}>Nome do Plano</Label>
-                          <Input
-                            id={`name-${plan.planKey}`}
-                            value={plan.planName}
-                            onChange={(e) => handlePlanSettingChange(plan.planKey, 'planName', e.target.value)}
-                            placeholder="Nome do plano"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`price-${plan.planKey}`}>Preço Padrão (R$)</Label>
-                          <Input
-                            id={`price-${plan.planKey}`}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={plan.planPrice}
-                            onChange={(e) => handlePlanSettingChange(plan.planKey, 'planPrice', e.target.value)}
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {hasChanges && (
-                  <div className="flex justify-end">
-                    <Button onClick={handleSavePlanSettings} className="gap-2">
-                      <Save className="h-4 w-4" />
-                      Salvar Alterações
-                    </Button>
+          {/* Plans Tab - Admin only */}
+          {isAdmin && (
+            <TabsContent value="plans" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    Configurações de Planos
+                  </CardTitle>
+                  <CardDescription>
+                    Personalize os nomes e preços padrão dos planos oferecidos aos seus clientes.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    {currentSettings.map((plan) => (
+                      <Card key={plan.planKey} className="bg-muted/30">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <span>{planIcons[plan.planKey]}</span>
+                            {plan.planKey === 'monthly' && 'Plano Mensal'}
+                            {plan.planKey === 'quarterly' && 'Plano Trimestral'}
+                            {plan.planKey === 'semiannual' && 'Plano Semestral'}
+                            {plan.planKey === 'annual' && 'Plano Anual'}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor={`name-${plan.planKey}`}>Nome do Plano</Label>
+                            <Input
+                              id={`name-${plan.planKey}`}
+                              value={plan.planName}
+                              onChange={(e) => handlePlanSettingChange(plan.planKey, 'planName', e.target.value)}
+                              placeholder="Nome do plano"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`price-${plan.planKey}`}>Preço Padrão (R$)</Label>
+                            <Input
+                              id={`price-${plan.planKey}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={plan.planPrice}
+                              onChange={(e) => handlePlanSettingChange(plan.planKey, 'planPrice', e.target.value)}
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+
+                  {hasChanges && (
+                    <div className="flex justify-end">
+                      <Button onClick={handleSavePlanSettings} className="gap-2">
+                        <Save className="h-4 w-4" />
+                        Salvar Alterações
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* Client Notifications Tab */}
           <TabsContent value="notifications" className="space-y-6">
