@@ -74,6 +74,30 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_markup_settings: {
+        Row: {
+          created_at: string
+          global_markup_percentage: number
+          id: string
+          is_global_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          global_markup_percentage?: number
+          id?: string
+          is_global_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          global_markup_percentage?: number
+          id?: string
+          is_global_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_status: {
         Row: {
           auto_offline: boolean | null
@@ -1034,6 +1058,33 @@ export type Database = {
           short_code?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      category_markup: {
+        Row: {
+          category_name: string
+          created_at: string
+          id: string
+          is_enabled: boolean
+          markup_percentage: number
+          updated_at: string
+        }
+        Insert: {
+          category_name: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          markup_percentage?: number
+          updated_at?: string
+        }
+        Update: {
+          category_name?: string
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          markup_percentage?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2870,6 +2921,39 @@ export type Database = {
           phone?: string
           sent_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      service_markup: {
+        Row: {
+          category: string
+          created_at: string
+          custom_markup_percentage: number | null
+          id: string
+          is_enabled: boolean
+          service_id: number
+          service_name: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          custom_markup_percentage?: number | null
+          id?: string
+          is_enabled?: boolean
+          service_id: number
+          service_name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          custom_markup_percentage?: number | null
+          id?: string
+          is_enabled?: boolean
+          service_id?: number
+          service_name?: string
+          updated_at?: string
         }
         Relationships: []
       }

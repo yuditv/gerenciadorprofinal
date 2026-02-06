@@ -80,12 +80,17 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: "Authorization required" }, 401);
     }
 
+    // Extract token for explicit validation (required when verify_jwt=false in Lovable Cloud)
+    const token = authHeader.replace(/^bearer\s+/i, "");
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // CRITICAL: Must pass token explicitly when verify_jwt=false (Lovable Cloud uses ES256)
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
+      console.error("Auth error:", userError);
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
