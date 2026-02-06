@@ -398,7 +398,7 @@ export default function WhatsApp() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
       {/* Premium Header */}
       <motion.div 
         className="flex items-center gap-4"
@@ -406,15 +406,15 @@ export default function WhatsApp() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="p-3 rounded-2xl" style={{
+        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl" style={{
           background: "linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(160 70% 40%) 100%)",
           boxShadow: "0 8px 32px hsl(142 70% 45% / 0.35), 0 0 0 1px hsl(142 70% 45% / 0.2)"
         }}>
-          <Send className="h-7 w-7 text-white" />
+          <Send className="h-5 w-5 sm:h-7 sm:w-7 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-gradient">WhatsApp</h1>
-          <p className="text-muted-foreground">Gerencie instâncias, campanhas e disparos em massa</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gradient">WhatsApp</h1>
+          <p className="text-muted-foreground text-xs sm:text-base">Gerencie instâncias, campanhas e disparos em massa</p>
         </div>
       </motion.div>
 
@@ -463,44 +463,46 @@ export default function WhatsApp() {
         )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="w-full max-w-5xl grid grid-cols-9">
-          <TabsTrigger value="dispatch" className="gap-2">
-            <Zap className="h-4 w-4" />
-            <span className="hidden sm:inline">Disparo</span>
-          </TabsTrigger>
-          <TabsTrigger value="contacts" className="gap-2">
-            <Database className="h-4 w-4" />
-            <span className="hidden sm:inline">Contatos</span>
-          </TabsTrigger>
-          <TabsTrigger value="filter" className="gap-2">
-            <Search className="h-4 w-4" />
-            <span className="hidden sm:inline">Filtrar</span>
-          </TabsTrigger>
-          <TabsTrigger value="status" className="gap-2">
-            <CircleDot className="h-4 w-4" />
-            <span className="hidden sm:inline">Status</span>
-          </TabsTrigger>
-          <TabsTrigger value="instances" className="gap-2">
-            <Smartphone className="h-4 w-4" />
-            <span className="hidden sm:inline">Instâncias</span>
-          </TabsTrigger>
-          <TabsTrigger value="campaigns" className="gap-2">
-            <Megaphone className="h-4 w-4" />
-            <span className="hidden sm:inline">Campanhas</span>
-          </TabsTrigger>
-          <TabsTrigger value="templates" className="gap-2">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Templates</span>
-          </TabsTrigger>
-          <TabsTrigger value="schedule" className="gap-2">
-            <CalendarDays className="h-4 w-4" />
-            <span className="hidden sm:inline">Agendar</span>
-          </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
-            <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Histórico</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+          <TabsList className="w-max min-w-full sm:w-full sm:max-w-5xl grid grid-cols-9 gap-0">
+            <TabsTrigger value="dispatch" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Zap className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Disparo</span>
+            </TabsTrigger>
+            <TabsTrigger value="contacts" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Database className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Contatos</span>
+            </TabsTrigger>
+            <TabsTrigger value="filter" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Search className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Filtrar</span>
+            </TabsTrigger>
+            <TabsTrigger value="status" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <CircleDot className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Status</span>
+            </TabsTrigger>
+            <TabsTrigger value="instances" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Smartphone className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Instâncias</span>
+            </TabsTrigger>
+            <TabsTrigger value="campaigns" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Megaphone className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Campanhas</span>
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <FileText className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Templates</span>
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <CalendarDays className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Agendar</span>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <History className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Histórico</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Dispatch Tab */}
         <TabsContent value="dispatch" className="space-y-6">

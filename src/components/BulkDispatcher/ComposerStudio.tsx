@@ -377,16 +377,16 @@ export function ComposerStudio({
     <div className="composer-studio">
       {/* Header */}
       <div className="composer-header">
-        <div className="flex items-center gap-3">
-          <div className="stats-icon-container accent p-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="stats-icon-container accent p-2 shrink-0">
             <MessageSquare className="w-4 h-4 text-accent" />
           </div>
-          <div>
-            <h3 className="font-semibold">Editor de Mensagens</h3>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm sm:text-base truncate">Editor de Mensagens</h3>
             <p className="text-xs text-muted-foreground">{messages.length} mensagem(ns)</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5">
@@ -454,7 +454,7 @@ export function ComposerStudio({
 
       <div className="composer-content">
         {/* Variables Bar */}
-        <div className="flex flex-wrap gap-1.5 p-3 rounded-xl bg-muted/30 border border-border/30">
+        <div className="flex flex-wrap gap-1 sm:gap-1.5 p-2 sm:p-3 rounded-xl bg-muted/30 border border-border/30">
           <span className="text-xs text-muted-foreground mr-2 flex items-center">
             <Zap className="w-3 h-3 mr-1 text-primary" />
             Variáveis:
@@ -521,7 +521,7 @@ export function ComposerStudio({
         {activeMessage ? (
           <div className="space-y-4">
             {/* Media Type Selector */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
               {[
                 { type: 'none' as MediaType, icon: Type, label: 'Texto' },
                 { type: 'image' as MediaType, icon: Image, label: 'Imagem' },

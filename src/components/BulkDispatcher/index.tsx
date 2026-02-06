@@ -407,7 +407,7 @@ export function BulkDispatcher() {
     : null;
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-3 sm:space-y-4 pb-8">
       {/* Premium Header with Progress Integration */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -420,7 +420,7 @@ export function BulkDispatcher() {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/5 rounded-full blur-3xl" />
         </div>
         
-        <div className="relative p-6">
+        <div className="relative p-3 sm:p-6">
           {/* Top Row - Title & Actions */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
@@ -432,21 +432,21 @@ export function BulkDispatcher() {
                 <Send className="w-7 h-7" />
               </motion.div>
               <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold">Disparo Studio</h1>
-                  <Badge className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary border-primary/30">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <h1 className="text-lg sm:text-2xl font-bold">Disparo Studio</h1>
+                  <Badge className="bg-gradient-to-r from-primary/20 to-accent/20 text-primary border-primary/30 text-xs">
                     <Sparkles className="w-3 h-3 mr-1" />
                     Pro
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground mt-0.5">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">
                   Crie e execute campanhas de WhatsApp com controle total
                 </p>
               </div>
             </div>
             
             {/* Quick Stats */}
-            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <motion.div 
                 className="quick-action-btn"
                 whileHover={{ scale: 1.02 }}
@@ -704,12 +704,12 @@ export function BulkDispatcher() {
         transition={{ delay: 0.35 }}
         className="sticky bottom-4 z-10"
       >
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-background via-background to-primary/5 border border-border/50 backdrop-blur-xl p-4">
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-r from-background via-background to-primary/5 border border-border/50 backdrop-blur-xl p-3 sm:p-4">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-accent/5" />
           
-          <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="relative flex flex-col items-center justify-between gap-3 sm:gap-4">
             {/* Status Summary */}
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-center sm:justify-start">
               <div className="flex items-center gap-2 text-sm">
                 <div className={cn(
                   "w-2 h-2 rounded-full",
