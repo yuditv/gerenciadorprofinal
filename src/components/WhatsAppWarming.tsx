@@ -489,16 +489,16 @@ export function WhatsAppWarming() {
 
         <TabsContent value="config" className="mt-6">
           {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
         <Card className={cn("warming-stat-card", warmingStatus === 'running' && "running")}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="stats-icon-container primary">
-                <Activity className="h-5 w-5 text-primary" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="stats-icon-container primary shrink-0">
+                <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <p className="font-semibold capitalize">
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground">Status</p>
+                <p className="font-semibold text-sm sm:text-base capitalize truncate">
                   {warmingStatus === 'idle' ? 'Parado' : warmingStatus === 'running' ? 'Executando' : 'Pausado'}
                 </p>
               </div>
@@ -507,56 +507,56 @@ export function WhatsAppWarming() {
         </Card>
         
         <Card className="warming-stat-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="stats-icon-container info">
-                <Users className="h-5 w-5 text-blue-500" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="stats-icon-container info shrink-0">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Instâncias</p>
-                <p className="font-semibold">{selectedInstances.size}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="warming-stat-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="stats-icon-container success">
-                <MessageSquare className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Mensagens</p>
-                <p className="font-semibold">{messagesSent + messagesReceived}</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground">Instâncias</p>
+                <p className="font-semibold text-sm sm:text-base">{selectedInstances.size}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="warming-stat-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="stats-icon-container warning">
-                <Zap className="h-5 w-5 text-orange-500" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="stats-icon-container success shrink-0">
+                <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Progresso</p>
-                <p className="font-semibold">{Math.round(overallProgress)}%</p>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground">Msgs</p>
+                <p className="font-semibold text-sm sm:text-base">{messagesSent + messagesReceived}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card className="warming-stat-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="stats-icon-container accent">
-                <Settings className="h-5 w-5 text-accent" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="stats-icon-container warning shrink-0">
+                <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Modo</p>
-                <p className="font-semibold capitalize">
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground">Progresso</p>
+                <p className="font-semibold text-sm sm:text-base">{Math.round(overallProgress)}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="warming-stat-card col-span-2 sm:col-span-1">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="stats-icon-container accent shrink-0">
+                <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground">Modo</p>
+                <p className="font-semibold text-sm sm:text-base capitalize truncate">
                   {balancingMode === 'auto' ? 'Auto' : balancingMode === 'round-robin' ? 'Sequencial' : 'Aleatório'}
                 </p>
               </div>
@@ -566,7 +566,7 @@ export function WhatsAppWarming() {
       </div>
 
       {/* Main Content */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Instance Selection */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="glass-card">
@@ -676,18 +676,18 @@ export function WhatsAppWarming() {
               </div>
 
               {/* Instance Summary */}
-              <div className="grid grid-cols-3 gap-4 p-4 bg-background/50 rounded-lg">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 p-3 sm:p-4 bg-background/50 rounded-lg">
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Total do usuário:</p>
-                  <p className="font-semibold">{instances.length}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Total:</p>
+                  <p className="font-semibold text-sm sm:text-base">{instances.length}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Conectadas:</p>
-                  <p className="font-semibold text-green-500">{connectedInstances.length}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Conectadas:</p>
+                  <p className="font-semibold text-sm sm:text-base text-green-500">{connectedInstances.length}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Selecionadas:</p>
-                  <p className="font-semibold text-primary">{selectedInstances.size}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Selecionadas:</p>
+                  <p className="font-semibold text-sm sm:text-base text-primary">{selectedInstances.size}</p>
                 </div>
               </div>
 
@@ -858,22 +858,22 @@ Boa noite!`}
                   <Label className="font-medium">Configurações de IA</Label>
                 </div>
                 
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                  <div className="space-y-1">
-                    <p className="font-medium">Usar IA para Personalização</p>
-                    <p className="text-sm text-muted-foreground">
-                      Gera frases curtas (2-8 palavras) mais naturais e humanizadas durante o aquecimento
+                <div className="flex items-center justify-between gap-3 p-3 sm:p-4 bg-muted/30 rounded-lg">
+                  <div className="space-y-1 min-w-0">
+                    <p className="font-medium text-sm sm:text-base">Usar IA para Personalização</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Gera frases curtas mais naturais e humanizadas
                     </p>
                   </div>
-                  <Switch checked={useAI} onCheckedChange={setUseAI} />
+                  <Switch checked={useAI} onCheckedChange={setUseAI} className="shrink-0" />
                 </div>
 
                 {useAI && (
-                  <div className="space-y-4 p-4 border border-primary/30 rounded-lg bg-primary/5">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="font-medium flex items-center gap-2">
-                          <Sparkles className="h-4 w-4" />
+                  <div className="space-y-4 p-3 sm:p-4 border border-primary/30 rounded-lg bg-primary/5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 shrink-0" />
                           Gerador de Mensagens IA
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -883,7 +883,8 @@ Boa noite!`}
                       <Button 
                         onClick={generateAIMessages}
                         disabled={isGeneratingAI}
-                        className="gap-2"
+                        className="gap-2 w-full sm:w-auto shrink-0"
+                        size="sm"
                       >
                         {isGeneratingAI ? (
                           <>
@@ -1087,7 +1088,7 @@ Boa noite!`}
                 <Progress value={overallProgress} />
               </div>
               
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-4 border-t">
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
                     <MessageSquare className="h-4 w-4" />
@@ -1128,7 +1129,7 @@ Boa noite!`}
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 gap-4 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-center">
                 <div>
                   <p className="text-lg font-bold">{connectedInstances.length}</p>
                   <p className="text-xs text-muted-foreground">Connected</p>
