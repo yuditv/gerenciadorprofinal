@@ -436,17 +436,17 @@ export function WhatsAppWarming() {
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Flame className="h-6 w-6 text-orange-500" />
-            Aquecimento de WhatsApp
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-2xl font-bold text-foreground flex items-center gap-2">
+            <Flame className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500 shrink-0" />
+            <span className="truncate">Aquecimento de WhatsApp</span>
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-xs sm:text-base">
             Sistema inteligente de aquecimento para números WhatsApp
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Notifications Toggle */}
           <Button
             variant={notificationsEnabled ? "default" : "outline"}
@@ -455,10 +455,10 @@ export function WhatsAppWarming() {
               setNotificationsEnabled(!notificationsEnabled);
               toast.info(notificationsEnabled ? 'Notificações desativadas' : 'Notificações ativadas');
             }}
-            className="gap-2"
+            className="gap-1.5 text-xs sm:text-sm"
           >
             {notificationsEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-            {notificationsEnabled ? 'Notificações On' : 'Notificações Off'}
+            <span className="hidden sm:inline">{notificationsEnabled ? 'Notificações On' : 'Notificações Off'}</span>
           </Button>
           
           {/* Schedule Button */}
@@ -466,10 +466,10 @@ export function WhatsAppWarming() {
             variant={scheduleConfig?.enabled ? "default" : "outline"}
             size="sm"
             onClick={() => setShowScheduler(true)}
-            className="gap-2"
+            className="gap-1.5 text-xs sm:text-sm"
           >
             <Calendar className="h-4 w-4" />
-            {scheduleConfig?.enabled ? `Agendado ${scheduleConfig.startTime}` : 'Agendar'}
+            <span className="hidden sm:inline">{scheduleConfig?.enabled ? `Agendado ${scheduleConfig.startTime}` : 'Agendar'}</span>
           </Button>
         </div>
       </div>
@@ -489,7 +489,7 @@ export function WhatsAppWarming() {
 
         <TabsContent value="config" className="mt-6">
           {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4">
         <Card className={cn("warming-stat-card", warmingStatus === 'running' && "running")}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">

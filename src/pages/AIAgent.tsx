@@ -22,7 +22,7 @@ export default function AIAgent() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
       {/* Blocked Alert */}
       {isBlocked && (
         <motion.div
@@ -39,21 +39,21 @@ export default function AIAgent() {
 
       {/* Premium Header */}
       <motion.div 
-        className="flex items-center gap-4"
+        className="flex items-center gap-3 sm:gap-4"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="p-3 rounded-2xl" style={{
+        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0" style={{
           background: 'linear-gradient(135deg, hsl(260 85% 60%) 0%, hsl(280 80% 55%) 100%)',
           boxShadow: '0 8px 32px hsl(260 85% 60% / 0.35), 0 0 60px hsl(260 85% 60% / 0.15)'
         }}>
-          <Bot className="h-7 w-7 text-white" />
+          <Bot className="h-5 w-5 sm:h-7 sm:w-7 text-white" />
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-gradient">Agente IA</h1>
-          <p className="text-muted-foreground">
-            Configure e gerencie seus agentes de IA para automatizar conversas
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-3xl font-bold text-gradient">Agente IA</h1>
+          <p className="text-muted-foreground text-xs sm:text-base">
+            Configure e gerencie seus agentes de IA
           </p>
         </div>
       </motion.div>
