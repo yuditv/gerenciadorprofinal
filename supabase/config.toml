@@ -2,3 +2,6 @@ project_id = "tlanmmbgyyxuqvezudir"
 
 [functions.get-subscription-plans]
 verify_jwt = false
+
+[functions.whatsapp-instances]
+verify_jwt = false
