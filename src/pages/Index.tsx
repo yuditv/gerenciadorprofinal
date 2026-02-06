@@ -490,11 +490,11 @@ const Index = () => {
         WebkitBackdropFilter: "blur(24px)",
         boxShadow: "0 4px 30px rgba(0, 0, 0, 0.2), 0 0 40px hsl(0 75% 55% / 0.06)"
       }}>
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative group">
-                <div className="h-14 w-14 rounded-xl overflow-hidden" style={{
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <div className="relative group shrink-0">
+                <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl overflow-hidden" style={{
                   boxShadow: "0 0 30px hsl(0 75% 55% / 0.4), 0 0 60px hsl(0 75% 55% / 0.2)",
                   border: "1px solid hsl(0 75% 55% / 0.3)"
                 }}>
@@ -503,11 +503,12 @@ const Index = () => {
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/30 to-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary animate-pulse" style={{ boxShadow: "0 0 10px hsl(0 75% 55%)" }}></div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gradient">Gerenciador de Clientes</h1>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-primary" />
-                  Sistema inteligente de gestão
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-gradient truncate">Gerenciador</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                  <span className="hidden sm:inline">Sistema inteligente de gestão</span>
+                  <span className="sm:hidden">Gestão inteligente</span>
                 </p>
               </div>
             </div>
@@ -575,7 +576,7 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
         {/* Quick KPIs */}
         <div className="animate-fade-in">
           <QuickKPIs 
@@ -599,7 +600,7 @@ const Index = () => {
         </div>
 
         {/* Filters & Sort */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between glass-card p-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+        <div className="flex flex-col gap-3 sm:gap-4 glass-card p-3 sm:p-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <SearchBar value={search} onChange={setSearch} />
           <div className="flex flex-wrap gap-2 items-center">
             {/* View Mode Toggle */}
@@ -660,7 +661,7 @@ const Index = () => {
 
         {/* Bulk Actions Bar */}
         {selectedClients.size > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-card border border-primary/50 rounded-xl px-4 py-3 flex items-center gap-4 shadow-lg animate-fade-in">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass-card border border-primary/50 rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-4 shadow-lg animate-fade-in max-w-[calc(100vw-2rem)]">
             <div className="flex items-center gap-2">
               <CheckSquare className="h-5 w-5 text-primary" />
               <span className="font-medium">{selectedClients.size} selecionado(s)</span>
