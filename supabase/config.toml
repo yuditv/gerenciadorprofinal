@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.whatsapp-instances]
 verify_jwt = false
+
+[functions.infinitepay-webhook]
+verify_jwt = false

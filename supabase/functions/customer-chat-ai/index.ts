@@ -480,39 +480,47 @@ serve(async (req: Request) => {
             
           case 'generate_pix':
             try {
-              const pixResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mercado-pago-pix`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-                },
-                body: JSON.stringify({
-                  userId: conversation.owner_id,
-                  amount: args.amount,
-                  description: args.description,
-                  planName: args.plan_name || args.description,
-                  customerPhone: conversation.customer_user_id,
-                  conversationId: conversationId,
-                  source: 'customer_chat'
-                })
-              });
-              
-              if (pixResponse.ok) {
-                const pixData = await pixResponse.json();
-                if (pixData.pix_code) {
-                  toolResult = `PIX gerado com sucesso! Código: ${pixData.pix_code}`;
-                  // Append PIX info to response
-                  responseText += `\n\n💰 *PIX Gerado!*\n\nValor: R$ ${args.amount.toFixed(2)}\nDescrição: ${args.description}\n\n\`\`\`\n${pixData.pix_code}\n\`\`\`\n\n_Copie o código acima e cole no seu banco para pagar._`;
-                } else {
-                  toolResult = 'Erro: PIX não retornou código';
-                }
+              // Get owner's InfinitePay handle
+              const { data: ownerCreds } = await supabaseAdmin
+                .from('user_payment_credentials')
+                .select('infinitepay_handle')
+                .eq('user_id', conversation.owner_id)
+                .maybeSingle();
+
+              const ipHandle = (ownerCreds as any)?.infinitepay_handle || Deno.env.get('INFINITEPAY_HANDLE') || '';
+
+              if (!ipHandle) {
+                toolResult = 'Erro: InfinitePay não configurado pelo vendedor';
               } else {
-                toolResult = 'Erro ao gerar PIX';
+                const orderNsu = crypto.randomUUID();
+                const priceInCents = Math.round(args.amount * 100);
+                const SUPABASE_URL_IP = Deno.env.get('SUPABASE_URL')!;
+
+                const ipResponse = await fetch('https://api.infinitepay.io/invoices/public/checkout/links', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    handle: ipHandle,
+                    items: [{ quantity: 1, price: priceInCents, description: args.description || args.plan_name || 'Pagamento' }],
+                    order_nsu: orderNsu,
+                    webhook_url: `${SUPABASE_URL_IP}/functions/v1/infinitepay-webhook`,
+                    customer: { phone_number: conversation.customer_user_id },
+                  })
+                });
+
+                if (ipResponse.ok) {
+                  const ipData = await ipResponse.json();
+                  const checkoutUrl = ipData.url || ipData.checkout_url || ipData.link || '';
+                  toolResult = `Link de pagamento gerado com sucesso!`;
+                  responseText += `\n\n💰 *Pagamento Gerado!*\n\nValor: R$ ${args.amount.toFixed(2)}\nDescrição: ${args.description}\n\n🔗 *Link de pagamento:*\n${checkoutUrl}\n\n_Clique no link acima para pagar via PIX, cartão ou outros métodos._`;
+                } else {
+                  toolResult = 'Erro ao gerar link de pagamento';
+                }
               }
-              console.log(`[${VERSION}] PIX generated`);
+              console.log(`[${VERSION}] Checkout generated`);
             } catch (e) {
-              toolResult = `Erro ao gerar PIX: ${e}`;
-              console.error(`[${VERSION}] Failed to generate PIX:`, e);
+              toolResult = `Erro ao gerar pagamento: ${e}`;
+              console.error(`[${VERSION}] Failed to generate checkout:`, e);
             }
             break;
             

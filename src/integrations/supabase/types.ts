@@ -1144,6 +1144,7 @@ export type Database = {
       client_pix_payments: {
         Row: {
           amount: number
+          checkout_url: string | null
           client_id: string | null
           client_phone: string
           conversation_id: string | null
@@ -1155,6 +1156,7 @@ export type Database = {
           expires_at: string | null
           external_id: string | null
           id: string
+          infinitepay_slug: string | null
           instance_id: string | null
           paid_at: string | null
           pix_code: string | null
@@ -1169,6 +1171,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          checkout_url?: string | null
           client_id?: string | null
           client_phone: string
           conversation_id?: string | null
@@ -1180,6 +1183,7 @@ export type Database = {
           expires_at?: string | null
           external_id?: string | null
           id?: string
+          infinitepay_slug?: string | null
           instance_id?: string | null
           paid_at?: string | null
           pix_code?: string | null
@@ -1194,6 +1198,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          checkout_url?: string | null
           client_id?: string | null
           client_phone?: string
           conversation_id?: string | null
@@ -1205,6 +1210,7 @@ export type Database = {
           expires_at?: string | null
           external_id?: string | null
           id?: string
+          infinitepay_slug?: string | null
           instance_id?: string | null
           paid_at?: string | null
           pix_code?: string | null
@@ -3529,10 +3535,12 @@ export type Database = {
       subscription_payments: {
         Row: {
           amount: number
+          checkout_url: string | null
           created_at: string
           expires_at: string | null
           external_id: string | null
           id: string
+          infinitepay_slug: string | null
           paid_at: string | null
           payment_method: string
           pix_code: string | null
@@ -3544,10 +3552,12 @@ export type Database = {
         }
         Insert: {
           amount: number
+          checkout_url?: string | null
           created_at?: string
           expires_at?: string | null
           external_id?: string | null
           id?: string
+          infinitepay_slug?: string | null
           paid_at?: string | null
           payment_method?: string
           pix_code?: string | null
@@ -3559,10 +3569,12 @@ export type Database = {
         }
         Update: {
           amount?: number
+          checkout_url?: string | null
           created_at?: string
           expires_at?: string | null
           external_id?: string | null
           id?: string
+          infinitepay_slug?: string | null
           paid_at?: string | null
           payment_method?: string
           pix_code?: string | null
@@ -3655,18 +3667,21 @@ export type Database = {
       user_payment_credentials: {
         Row: {
           created_at: string
+          infinitepay_handle: string | null
           mercado_pago_access_token_enc: string
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          infinitepay_handle?: string | null
           mercado_pago_access_token_enc: string
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          infinitepay_handle?: string | null
           mercado_pago_access_token_enc?: string
           updated_at?: string
           user_id?: string
@@ -3864,11 +3879,13 @@ export type Database = {
       wallet_topups: {
         Row: {
           amount_brl: number
+          checkout_url: string | null
           created_at: string
           credits: number
           expires_at: string
           external_id: string | null
           id: string
+          infinitepay_slug: string | null
           paid_at: string | null
           pix_code: string | null
           pix_qr_code: string | null
@@ -3878,11 +3895,13 @@ export type Database = {
         }
         Insert: {
           amount_brl: number
+          checkout_url?: string | null
           created_at?: string
           credits: number
           expires_at: string
           external_id?: string | null
           id?: string
+          infinitepay_slug?: string | null
           paid_at?: string | null
           pix_code?: string | null
           pix_qr_code?: string | null
@@ -3892,11 +3911,13 @@ export type Database = {
         }
         Update: {
           amount_brl?: number
+          checkout_url?: string | null
           created_at?: string
           credits?: number
           expires_at?: string
           external_id?: string | null
           id?: string
+          infinitepay_slug?: string | null
           paid_at?: string | null
           pix_code?: string | null
           pix_qr_code?: string | null
