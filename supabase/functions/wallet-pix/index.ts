@@ -8,20 +8,13 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const MERCADO_PAGO_ACCESS_TOKEN = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN")!;
+const INFINITEPAY_HANDLE = Deno.env.get("INFINITEPAY_HANDLE") || "";
+const INFINITEPAY_API = "https://api.infinitepay.io/invoices/public/checkout";
 
 type Action = "create" | "check";
 
-type CreateBody = {
-  action: "create";
-  amount_brl: number;
-};
-
-type CheckBody = {
-  action: "check";
-  topup_id: string;
-};
-
+type CreateBody = { action: "create"; amount_brl: number };
+type CheckBody = { action: "check"; topup_id: string };
 type RequestBody = CreateBody | CheckBody;
 
 function json(data: unknown, status = 200) {
@@ -31,62 +24,21 @@ function json(data: unknown, status = 200) {
   });
 }
 
-type MpErrorShape = {
-  message?: string;
-  blocked_by?: string;
-  status?: number;
-  code?: string;
-};
-
-async function fetchMercadoPago(url: string, init: RequestInit) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    const raw = await res.text();
-    let parsed: any = null;
-    try {
-      parsed = raw ? JSON.parse(raw) : null;
-    } catch {
-      // non-JSON response (HTML, plain text, etc.)
-      parsed = null;
-    }
-    return { res, raw, parsed };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function isPolicyAgentBlock(payload: any): payload is MpErrorShape {
-  return Boolean(
-    payload &&
-      typeof payload === "object" &&
-      (payload as any).blocked_by === "PolicyAgent" &&
-      (payload as any).code === "PA_UNAUTHORIZED_RESULT_FROM_POLICIES",
-  );
-}
-
 async function requireUser(supabase: ReturnType<typeof createClient>, req: Request) {
   const authHeader = req.headers.get("Authorization") ?? "";
-  if (!authHeader.startsWith("Bearer ")) {
-    throw new Error("Unauthorized");
-  }
+  if (!authHeader.startsWith("Bearer ")) throw new Error("Unauthorized");
   const token = authHeader.replace("Bearer ", "");
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
+  const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) throw new Error("Unauthorized");
   return user;
 }
 
 async function creditWalletIfNeeded(
   supabase: any,
-  topup: { id: string; user_id: string; credits: number; status: string; amount_brl: number },
+  topup: { id: string; user_id: string; credits: number; status: string; amount_brl: number }
 ) {
   if (topup.status === "paid") {
-    const { data: wallet } = await (supabase as any)
+    const { data: wallet } = await supabase
       .from("user_wallets")
       .select("credits")
       .eq("user_id", topup.user_id)
@@ -94,9 +46,8 @@ async function creditWalletIfNeeded(
     return { alreadyCredited: true, walletCredits: Number(wallet?.credits ?? 0) };
   }
 
-  // 1) mark paid
   const paidAt = new Date().toISOString();
-  const { data: updatedTopup, error: updateErr } = await (supabase as any)
+  const { data: updatedTopup, error: updateErr } = await supabase
     .from("wallet_topups")
     .update({ status: "paid", paid_at: paidAt })
     .eq("id", topup.id)
@@ -104,8 +55,7 @@ async function creditWalletIfNeeded(
     .single();
   if (updateErr) throw updateErr;
 
-  // 2) upsert wallet balance
-  const { data: existingWallet } = await (supabase as any)
+  const { data: existingWallet } = await supabase
     .from("user_wallets")
     .select("credits")
     .eq("user_id", topup.user_id)
@@ -114,13 +64,12 @@ async function creditWalletIfNeeded(
   const current = Number(existingWallet?.credits ?? 0);
   const nextCredits = Number((current + Number(topup.credits)).toFixed(2));
 
-  const { error: walletErr } = await (supabase as any)
+  const { error: walletErr } = await supabase
     .from("user_wallets")
     .upsert({ user_id: topup.user_id, credits: nextCredits }, { onConflict: "user_id" });
   if (walletErr) throw walletErr;
 
-  // 3) ledger entry
-  const { error: ledgerErr } = await (supabase as any).from("wallet_transactions").insert({
+  const { error: ledgerErr } = await supabase.from("wallet_transactions").insert({
     user_id: topup.user_id,
     type: "topup",
     credits: Number(topup.credits),
@@ -137,8 +86,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // NOTE: this edge function is typechecked without generated Database types;
-    // force `any` to avoid `never` inference on `.from(...)`.
     const supabase: any = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const user = await requireUser(supabase as any, req);
 
@@ -149,72 +96,59 @@ serve(async (req) => {
       const amount = Number(body.amount_brl);
       if (!Number.isFinite(amount) || amount < 1) return json({ error: "Valor mínimo é R$ 1,00" }, 400);
 
+      const handle = INFINITEPAY_HANDLE;
+      if (!handle) return json({ error: "InfinitePay não configurado (handle ausente)" }, 500);
+
       const amountFixed = Number(amount.toFixed(2));
+      const priceInCents = Math.round(amountFixed * 100);
+      const orderNsu = crypto.randomUUID();
       const expirationDate = new Date(Date.now() + 30 * 60 * 1000);
 
-      const mpPayload = {
-        transaction_amount: amountFixed,
-        description: `Recarga de créditos (${amountFixed.toFixed(2)} BRL)`,
-        payment_method_id: "pix",
-        payer: {
+      const checkoutPayload = {
+        handle,
+        items: [
+          {
+            quantity: 1,
+            price: priceInCents,
+            description: `Recarga de créditos (${amountFixed.toFixed(2)} BRL)`,
+          },
+        ],
+        order_nsu: orderNsu,
+        redirect_url: `${SUPABASE_URL.replace('.supabase.co', '')}/carteira`,
+        webhook_url: `${SUPABASE_URL}/functions/v1/infinitepay-webhook`,
+        customer: {
           email: user.email || "cliente@gerenciadorpro.com",
         },
-        date_of_expiration: expirationDate.toISOString(),
       };
 
-      const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
-        "https://api.mercadopago.com/v1/payments",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
-            Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
-            "X-Idempotency-Key": `${user.id}-wallet-${Date.now()}`,
-          },
-          body: JSON.stringify(mpPayload),
-        },
-      );
+      console.log("[wallet-pix] Creating InfinitePay checkout...");
 
-      if (!mpResponse.ok) {
-        if (isPolicyAgentBlock(mpData)) {
-          console.error("[wallet-pix] MP blocked by PolicyAgent", mpData);
-          return json(
-            {
-              error:
-                "Bloqueio de rede (PolicyAgent): o Supabase não conseguiu acessar a API do Mercado Pago.",
-              details:
-                "Isso não é credencial faltando. É bloqueio de egress/política de rede. Tente liberar outbound para api.mercadopago.com no Supabase ou usar um proxy externo.",
-            },
-            503,
-          );
-        }
-        console.error("[wallet-pix] MP error", mpData ?? raw?.slice?.(0, 500));
-        return json(
-          {
-            error:
-              (mpData && (mpData as any).message) ||
-              "Erro ao criar pagamento no Mercado Pago",
-          },
-          502,
-        );
+      const ipResponse = await fetch(`${INFINITEPAY_API}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checkoutPayload),
+      });
+
+      const ipData = await ipResponse.json();
+
+      if (!ipResponse.ok) {
+        console.error("[wallet-pix] InfinitePay error:", JSON.stringify(ipData));
+        return json({ error: ipData?.message || "Erro ao criar checkout InfinitePay" }, 502);
       }
 
-      const pixData = mpData?.point_of_interaction?.transaction_data;
-      const pixCode = pixData?.qr_code || null;
-      const pixQrCode = pixData?.qr_code_base64 ? `data:image/png;base64,${pixData.qr_code_base64}` : null;
+      const checkoutUrl = ipData.url || ipData.checkout_url || ipData.link;
+      const infinitepaySlug = ipData.slug || ipData.invoice_slug || orderNsu;
 
-      const { data: topup, error: topupErr } = await (supabase as any)
+      const { data: topup, error: topupErr } = await supabase
         .from("wallet_topups")
         .insert({
           user_id: user.id,
           amount_brl: amountFixed,
           credits: amountFixed,
           status: "pending",
-          external_id: mpData.id?.toString?.() ?? String(mpData.id),
-          pix_code: pixCode,
-          pix_qr_code: pixQrCode,
+          external_id: orderNsu,
+          checkout_url: checkoutUrl,
+          infinitepay_slug: infinitepaySlug,
           expires_at: expirationDate.toISOString(),
         })
         .select("*")
@@ -225,10 +159,10 @@ serve(async (req) => {
     }
 
     // check
-    const topupId = body.topup_id;
+    const topupId = (body as CheckBody).topup_id;
     if (!topupId) return json({ error: "topup_id é obrigatório" }, 400);
 
-    const { data: topup, error: topupErr } = await (supabase as any)
+    const { data: topup, error: topupErr } = await supabase
       .from("wallet_topups")
       .select("*")
       .eq("id", topupId)
@@ -237,7 +171,7 @@ serve(async (req) => {
     if (topupErr || !topup) return json({ error: "Recarga não encontrada" }, 404);
 
     if (topup.status === "paid") {
-      const { data: wallet } = await (supabase as any)
+      const { data: wallet } = await supabase
         .from("user_wallets")
         .select("credits")
         .eq("user_id", user.id)
@@ -245,33 +179,26 @@ serve(async (req) => {
       return json({ success: true, topup, wallet_credits: Number(wallet?.credits ?? 0) });
     }
 
-    const { res: mpResponse, parsed: mpData, raw } = await fetchMercadoPago(
-      `https://api.mercadopago.com/v1/payments/${topup.external_id}`,
-      {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "gerenciadorpro/1.0 (supabase-edge)",
-          Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
-        },
-      },
-    );
+    // Check with InfinitePay
+    const handle = INFINITEPAY_HANDLE;
+    if (!handle) return json({ error: "InfinitePay não configurado" }, 500);
 
-    if (!mpResponse.ok) {
-      if (isPolicyAgentBlock(mpData)) {
-        console.error("[wallet-pix] MP blocked by PolicyAgent (check)", mpData);
-        return json(
-          {
-            error:
-              "Bloqueio de rede (PolicyAgent): o Supabase não conseguiu acessar a API do Mercado Pago.",
-          },
-          503,
-        );
-      }
-      console.error("[wallet-pix] MP status error", mpData ?? raw?.slice?.(0, 500));
-      return json({ error: "Falha ao consultar pagamento no Mercado Pago" }, 502);
-    }
+    const checkPayload = {
+      handle,
+      order_nsu: topup.external_id,
+      slug: topup.infinitepay_slug || topup.external_id,
+    };
 
-    if (mpData.status === "approved") {
+    const checkResponse = await fetch(`${INFINITEPAY_API}/payment_check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(checkPayload),
+    });
+
+    const checkData = await checkResponse.json();
+    console.log("[wallet-pix] InfinitePay check:", JSON.stringify(checkData));
+
+    if (checkData.paid === true || checkData.success === true) {
       const credited = await creditWalletIfNeeded(supabase, {
         id: topup.id,
         user_id: topup.user_id,
@@ -284,13 +211,12 @@ serve(async (req) => {
       return json({ success: true, topup: resultTopup, wallet_credits: credited.walletCredits });
     }
 
-    // update local status if expired/failed
+    // Check expiry
     let nextStatus: string | null = null;
-    if (mpData.status === "cancelled" || mpData.status === "rejected") nextStatus = "failed";
-    else if (topup.expires_at && new Date(topup.expires_at) < new Date()) nextStatus = "expired";
+    if (topup.expires_at && new Date(topup.expires_at) < new Date()) nextStatus = "expired";
 
     if (nextStatus && nextStatus !== topup.status) {
-      const { data: updatedTopup } = await (supabase as any)
+      const { data: updatedTopup } = await supabase
         .from("wallet_topups")
         .update({ status: nextStatus })
         .eq("id", topup.id)

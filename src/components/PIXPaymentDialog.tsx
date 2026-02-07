@@ -13,11 +13,11 @@ import {
   Check, 
   Clock, 
   Copy, 
-  QrCode, 
   RefreshCw,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 import { SubscriptionPlan, SubscriptionPayment, formatCurrencyBRL } from '@/types/subscription';
 import { toast } from '@/hooks/use-toast';
@@ -37,20 +37,20 @@ export function PIXPaymentDialog({
   plan,
 }: PIXPaymentDialogProps) {
   const { user } = useAuth();
-  const [payment, setPayment] = useState<SubscriptionPayment | null>(null);
+  const [payment, setPayment] = useState<any>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30 * 60);
   const [copied, setCopied] = useState(false);
 
-  // Criar pagamento quando abre o dialog
+  // Create payment on open
   useEffect(() => {
     if (open && !payment && !isCreating) {
       createPayment();
     }
   }, [open]);
 
-  // Timer de expiração
+  // Expiration timer
   useEffect(() => {
     if (!open || payment?.status === 'paid') return;
 
@@ -67,7 +67,6 @@ export function PIXPaymentDialog({
     return () => clearInterval(interval);
   }, [open, payment?.status]);
 
-  // Reset timer quando recebe expires_at
   useEffect(() => {
     if (payment?.expires_at) {
       const expiresAt = new Date(payment.expires_at);
@@ -82,8 +81,7 @@ export function PIXPaymentDialog({
     
     setIsCreating(true);
     try {
-      // Chama a edge function para criar o pagamento PIX
-      const { data, error } = await supabase.functions.invoke('mercado-pago-pix', {
+      const { data, error } = await supabase.functions.invoke('infinitepay-checkout', {
         body: {
           action: 'create',
           planId: plan.id,
@@ -99,8 +97,8 @@ export function PIXPaymentDialog({
     } catch (error) {
       console.error('Erro ao criar pagamento:', error);
       toast({
-        title: 'Erro ao gerar PIX',
-        description: 'Não foi possível gerar o código PIX. Tente novamente.',
+        title: 'Erro ao gerar pagamento',
+        description: 'Não foi possível gerar o link de pagamento. Tente novamente.',
         variant: 'destructive'
       });
     } finally {
@@ -113,7 +111,7 @@ export function PIXPaymentDialog({
     
     setIsChecking(true);
     try {
-      const { data, error } = await supabase.functions.invoke('mercado-pago-pix', {
+      const { data, error } = await supabase.functions.invoke('infinitepay-checkout', {
         body: {
           action: 'check',
           paymentId: payment.id
@@ -148,17 +146,23 @@ export function PIXPaymentDialog({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleCopyCode = () => {
-    const pixCode = payment?.pix_code || '';
-    if (!pixCode) return;
+  const handleCopyLink = () => {
+    const url = payment?.checkout_url || '';
+    if (!url) return;
     
-    navigator.clipboard.writeText(pixCode);
+    navigator.clipboard.writeText(url);
     setCopied(true);
     toast({
-      title: 'Código copiado!',
-      description: 'Cole no seu app do banco para pagar.',
+      title: 'Link copiado!',
+      description: 'Abra no navegador para pagar.',
     });
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOpenCheckout = () => {
+    if (payment?.checkout_url) {
+      window.open(payment.checkout_url, '_blank');
+    }
   };
 
   const handleClose = () => {
@@ -174,7 +178,7 @@ export function PIXPaymentDialog({
       <DialogContent className="sm:max-w-md glass-card border-primary/20">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-center">
-            {isPaid ? 'Pagamento Confirmado!' : 'Pagamento PIX'}
+            {isPaid ? 'Pagamento Confirmado!' : 'Pagamento InfinitePay'}
           </DialogTitle>
           <DialogDescription className="text-center">
             {isPaid 
@@ -186,13 +190,11 @@ export function PIXPaymentDialog({
 
         <div className="py-6 space-y-6">
           {isCreating ? (
-            // Estado de carregamento
             <div className="flex flex-col items-center gap-4 py-8">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Gerando código PIX...</p>
+              <p className="text-muted-foreground">Gerando link de pagamento...</p>
             </div>
           ) : isPaid ? (
-            // Estado de sucesso
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -209,13 +211,12 @@ export function PIXPaymentDialog({
               </Button>
             </motion.div>
           ) : isExpired ? (
-            // Estado de expirado
             <div className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
                 <AlertCircle className="h-10 w-10 text-red-500" />
               </div>
               <p className="text-center text-muted-foreground">
-                O código PIX expirou. Gere um novo código para continuar.
+                O link de pagamento expirou. Gere um novo.
               </p>
               <Button 
                 onClick={createPayment} 
@@ -228,12 +229,11 @@ export function PIXPaymentDialog({
                     Gerando...
                   </>
                 ) : (
-                  'Gerar Novo Código'
+                  'Gerar Novo Link'
                 )}
               </Button>
             </div>
           ) : payment ? (
-            // Estado de aguardando pagamento
             <>
               {/* Timer */}
               <div className="flex items-center justify-center gap-2">
@@ -252,39 +252,32 @@ export function PIXPaymentDialog({
                 </Badge>
               </div>
 
-              {/* QR Code */}
-              <div className="flex justify-center">
-                <div className="w-48 h-48 bg-white rounded-xl p-4 flex items-center justify-center">
-                  {payment.pix_qr_code ? (
-                    <img 
-                      src={payment.pix_qr_code} 
-                      alt="QR Code PIX" 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                      <QrCode className="h-16 w-16 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-              </div>
+              {/* Open Checkout Button */}
+              <Button
+                onClick={handleOpenCheckout}
+                className="w-full gap-2 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
+                size="lg"
+              >
+                <ExternalLink className="h-5 w-5" />
+                Abrir Checkout InfinitePay
+              </Button>
 
-              {/* Código copia e cola */}
-              {payment.pix_code && (
+              {/* Copy Link */}
+              {payment.checkout_url && (
                 <div className="space-y-2">
                   <p className="text-sm text-center text-muted-foreground">
-                    Ou copie o código PIX:
+                    Ou copie o link de pagamento:
                   </p>
                   <div className="relative">
                     <div className="p-3 bg-muted rounded-lg font-mono text-xs break-all text-center pr-16">
-                      {payment.pix_code.length > 50 
-                        ? `${payment.pix_code.slice(0, 50)}...` 
-                        : payment.pix_code}
+                      {payment.checkout_url.length > 60 
+                        ? `${payment.checkout_url.slice(0, 60)}...` 
+                        : payment.checkout_url}
                     </div>
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={handleCopyCode}
+                      onClick={handleCopyLink}
                       className="absolute right-2 top-1/2 -translate-y-1/2"
                     >
                       {copied ? (
@@ -297,7 +290,7 @@ export function PIXPaymentDialog({
                 </div>
               )}
 
-              {/* Botão de verificar */}
+              {/* Check Status */}
               <Button
                 variant="outline"
                 onClick={checkPaymentStatus}
@@ -318,7 +311,7 @@ export function PIXPaymentDialog({
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                O pagamento é processado automaticamente. Aguarde a confirmação.
+                Após pagar, clique em "Verificar Pagamento" para confirmar.
               </p>
             </>
           ) : null}

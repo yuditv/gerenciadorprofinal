@@ -1197,52 +1197,54 @@ INSTRUÇÕES IMPORTANTES:
       plan_name: string;
       amount: number;
       duration_days: number;
-      pix_code: string;
-      pix_qr_code: string;
+      checkout_url: string;
       external_id: string;
     } | null = null;
     
     if (pixDecision && phone && conversationId) {
-      console.log(`[ai-agent-chat] Generating PIX for plan option ${pixDecision.plan_option}`);
+      console.log(`[ai-agent-chat] Generating checkout for plan option ${pixDecision.plan_option}`);
       
       // Find the plan by option number
       const selectedPlan = availablePlans.find(p => p.option_number === pixDecision.plan_option);
       
       if (selectedPlan) {
         try {
-          const MERCADO_PAGO_ACCESS_TOKEN = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
+          // Get user's InfinitePay handle
+          const { data: userCreds } = await supabaseAdmin
+            .from('user_payment_credentials')
+            .select('infinitepay_handle')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          const handle = (userCreds as any)?.infinitepay_handle || Deno.env.get('INFINITEPAY_HANDLE') || '';
           
-          if (!MERCADO_PAGO_ACCESS_TOKEN) {
-            console.error('[ai-agent-chat] MERCADO_PAGO_ACCESS_TOKEN not configured');
+          if (!handle) {
+            console.error('[ai-agent-chat] InfinitePay handle not configured');
           } else {
-            // Generate PIX via Mercado Pago
-            const now = new Date();
-            const expiresAt = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
-            
-            const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
+            const orderNsu = crypto.randomUUID();
+            const priceInCents = Math.round(selectedPlan.price * 100);
+            const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+
+            const ipResponse = await fetch('https://api.infinitepay.io/invoices/public/checkout/links', {
               method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json',
-                'X-Idempotency-Key': `ai-pix-${conversationId}-${Date.now()}`
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                transaction_amount: selectedPlan.price,
-                description: `${selectedPlan.name} - ${selectedPlan.duration_days} dias`,
-                payment_method_id: 'pix',
-                payer: {
-                  email: `${phone.replace(/\D/g, '')}@pix.generated.com`
-                },
-                date_of_expiration: expiresAt.toISOString()
+                handle,
+                items: [{
+                  quantity: 1,
+                  price: priceInCents,
+                  description: `${selectedPlan.name} - ${selectedPlan.duration_days} dias`,
+                }],
+                order_nsu: orderNsu,
+                webhook_url: `${SUPABASE_URL}/functions/v1/infinitepay-webhook`,
+                customer: { phone_number: phone },
               })
             });
             
-            if (mpResponse.ok) {
-              const mpData = await mpResponse.json();
-              
-              // Extract PIX data
-              const pixCode = mpData.point_of_interaction?.transaction_data?.qr_code || '';
-              const pixQrCode = mpData.point_of_interaction?.transaction_data?.qr_code_base64 || '';
+            if (ipResponse.ok) {
+              const ipData = await ipResponse.json();
+              const checkoutUrl = ipData.url || ipData.checkout_url || ipData.link || '';
+              const infinitepaySlug = ipData.slug || ipData.invoice_slug || orderNsu;
               
               // Save to database
               const { error: savePixError } = await supabaseAdmin
@@ -1255,33 +1257,32 @@ INSTRUÇÕES IMPORTANTES:
                   plan_name: selectedPlan.name,
                   amount: selectedPlan.price,
                   duration_days: selectedPlan.duration_days,
-                  external_id: String(mpData.id),
-                  pix_code: pixCode,
-                  pix_qr_code: pixQrCode,
+                  external_id: orderNsu,
+                  checkout_url: checkoutUrl,
+                  infinitepay_slug: infinitepaySlug,
                   status: 'pending',
-                  expires_at: expiresAt.toISOString()
+                  expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()
                 });
               
               if (savePixError) {
-                console.error('[ai-agent-chat] Error saving PIX payment:', savePixError);
+                console.error('[ai-agent-chat] Error saving payment:', savePixError);
               } else {
                 pixGenerated = {
                   plan_name: selectedPlan.name,
                   amount: selectedPlan.price,
                   duration_days: selectedPlan.duration_days,
-                  pix_code: pixCode,
-                  pix_qr_code: pixQrCode,
-                  external_id: String(mpData.id)
+                  checkout_url: checkoutUrl,
+                  external_id: orderNsu
                 };
-                console.log(`[ai-agent-chat] PIX generated successfully: ${mpData.id}`);
+                console.log(`[ai-agent-chat] Checkout generated successfully: ${orderNsu}`);
               }
             } else {
-              const errorText = await mpResponse.text();
-              console.error('[ai-agent-chat] Mercado Pago error:', mpResponse.status, errorText);
+              const errorText = await ipResponse.text();
+              console.error('[ai-agent-chat] InfinitePay error:', ipResponse.status, errorText);
             }
           }
         } catch (pixError) {
-          console.error('[ai-agent-chat] Error generating PIX:', pixError);
+          console.error('[ai-agent-chat] Error generating checkout:', pixError);
         }
       } else {
         console.warn(`[ai-agent-chat] Plan option ${pixDecision.plan_option} not found`);
