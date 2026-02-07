@@ -83,7 +83,7 @@ serve(async (req: Request) => {
     const orderNsu = crypto.randomUUID();
     const priceInCents = Math.round(Number(amount) * 100);
 
-    const checkoutPayload = {
+    const checkoutPayload: Record<string, unknown> = {
       handle,
       items: [
         {
@@ -94,10 +94,6 @@ serve(async (req: Request) => {
       ],
       order_nsu: orderNsu,
       webhook_url: `${supabaseUrl}/functions/v1/infinitepay-webhook`,
-      customer: {
-        phone_number: client_phone,
-      },
-      address_required: false,
     };
 
     console.log("[generate-client-pix-v2] Creating InfinitePay checkout...");
