@@ -38,8 +38,7 @@ const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const CRMKanban = lazy(() => import("./pages/CRMKanban"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const Wallet = lazy(() => import("./pages/Wallet"));
-  const VPNTest = lazy(() => import("./pages/VPNTest"));
+const VPNTest = lazy(() => import("./pages/VPNTest"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -213,11 +212,6 @@ const AppRoutes = () => (
         <ProtectedRoute>
           <CRMKanban />
         </ProtectedRoute>
-      } />
-      <Route path="/carteira" element={
-        <AdminRoute>
-          <Wallet />
-        </AdminRoute>
       } />
       <Route path="*" element={<NotFound />} />
     </Routes>
