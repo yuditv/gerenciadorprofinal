@@ -944,7 +944,7 @@ export function ChatPanel({
     })()}
 
       {/* Messages */}
-      <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-0 inbox-scroll">
+      <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-0 inbox-scroll bg-white dark:bg-white/5">
         {isLoading ? <div className="space-y-4">
             {[...Array(5)].map((_, i) => <div key={i} className={cn("flex gap-2", i % 2 === 0 ? "justify-start" : "justify-end")}>
                 <div className={cn("animate-pulse rounded-lg p-3", i % 2 === 0 ? "bg-muted w-48" : "bg-primary/20 w-36")}>
