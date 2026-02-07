@@ -26,7 +26,8 @@ import {
   FileText,
   Trash2,
   Filter as FilterIcon,
-  Type
+  Type,
+  Copy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -277,6 +278,39 @@ export function WhatsAppNumberFilter() {
     URL.revokeObjectURL(url);
     
     toast.success(`${invalid.length} números exportados`);
+  };
+
+  // Remove Brazil country code (55 or +55) from phone
+  const stripBrazilCode = (phone: string): string => {
+    let cleaned = phone.replace(/^\+/, '');
+    if (cleaned.startsWith('55') && cleaned.length > 10) {
+      cleaned = cleaned.slice(2);
+    }
+    return cleaned;
+  };
+
+  // Copy valid numbers to clipboard
+  const copyValidNumbers = () => {
+    const valid = verificationResults.filter(r => r.exists);
+    if (valid.length === 0) {
+      toast.error("Nenhum número válido para copiar");
+      return;
+    }
+    const content = valid.map(r => r.phone).join('\n');
+    navigator.clipboard.writeText(content);
+    toast.success(`${valid.length} números copiados`);
+  };
+
+  // Copy valid numbers without +55 prefix
+  const copyValidNumbersWithout55 = () => {
+    const valid = verificationResults.filter(r => r.exists);
+    if (valid.length === 0) {
+      toast.error("Nenhum número válido para copiar");
+      return;
+    }
+    const content = valid.map(r => stripBrazilCode(r.phone)).join('\n');
+    navigator.clipboard.writeText(content);
+    toast.success(`${valid.length} números copiados sem o código 55`);
   };
 
   const totalNumbers = parsedNumbers.length;
@@ -578,7 +612,25 @@ export function WhatsAppNumberFilter() {
                   </CardDescription>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={copyValidNumbers}
+                  className="gap-1.5 bg-green-500/10 border-green-500/30 text-green-500 hover:bg-green-500/20"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar Válidos
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={copyValidNumbersWithout55}
+                  className="gap-1.5 bg-blue-500/10 border-blue-500/30 text-blue-500 hover:bg-blue-500/20"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar sem 55
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
