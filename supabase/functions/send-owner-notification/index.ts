@@ -12,7 +12,8 @@ type NotificationEventType =
   | 'new_contact'
   | 'complaint'
   | 'vip_message'
-  | 'long_wait';
+  | 'long_wait'
+  | 'human_handoff';
 
 interface NotificationPayload {
   userId: string;
@@ -48,6 +49,7 @@ const EVENT_EMOJIS: Record<NotificationEventType, string> = {
   'complaint': '⚠️',
   'vip_message': '⭐',
   'long_wait': '⏰',
+  'human_handoff': '🤖➡️👤',
 };
 
 const EVENT_TITLES: Record<NotificationEventType, string> = {
@@ -57,6 +59,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   'complaint': 'Possível reclamação',
   'vip_message': 'Cliente VIP',
   'long_wait': 'Cliente aguardando',
+  'human_handoff': 'Cliente quer falar com humano',
 };
 
 function isInQuietHours(settings: NotificationSettings): boolean {
@@ -175,10 +178,12 @@ serve(async (req: Request) => {
       'complaint': 'notify_on_complaint',
       'vip_message': 'notify_on_vip_message',
       'long_wait': 'notify_on_long_wait',
+      'human_handoff': 'notify_on_ai_uncertainty', // Human handoff always follows AI uncertainty setting
     };
 
     const enabledField = eventEnabledMap[payload.eventType];
-    if (!settings[enabledField]) {
+    // human_handoff is always sent regardless of settings (critical security event)
+    if (payload.eventType !== 'human_handoff' && !settings[enabledField]) {
       console.log(`[send-owner-notification] Event type ${payload.eventType} is disabled`);
       return new Response(
         JSON.stringify({ skipped: true, reason: 'event_type_disabled' }),
