@@ -25,12 +25,23 @@ import {
   Send,
   DollarSign,
   Calendar,
-  ExternalLink
+  ExternalLink,
+  QrCode,
+  CreditCard,
+  ArrowLeft,
+  Smartphone,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useBotProxy, BotProxyPlan } from '@/hooks/useBotProxy';
+import { useBotProxy } from '@/hooks/useBotProxy';
+import pixQrCode from '@/assets/pix-qrcode.png';
+
+const PIX_KEY = '91980910280';
+const PIX_KEY_FORMATTED = '(91) 98091-0280';
+const PIX_QRCODE_PUBLIC_URL = 'https://tgprvcodlwyfxjbxirgh.supabase.co/storage/v1/object/public/lovable-uploads/lovable_1770450883470_c86cf8a1.png';
+
+type PaymentMethod = 'pix' | 'card' | null;
 
 interface ClientPixPayment {
   id: string;
@@ -68,12 +79,26 @@ export function GeneratePIXDialog({
   const [customAmount, setCustomAmount] = useState('');
   const [customDescription, setCustomDescription] = useState('');
   const [useCustomValue, setUseCustomValue] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
   const [payment, setPayment] = useState<ClientPixPayment | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30 * 60);
   const [copied, setCopied] = useState(false);
+
+  // Derived state for selected plan info
+  const selectedPlan = plans.find(p => p.id === selectedPlanId);
+  const resolvedAmount = useCustomValue 
+    ? parseFloat(customAmount.replace(',', '.')) || 0 
+    : (selectedPlan?.price || 0);
+  const resolvedPlanName = useCustomValue 
+    ? 'Valor Personalizado' 
+    : (selectedPlan?.name || '');
+  const resolvedDescription = useCustomValue 
+    ? (customDescription || 'Pagamento') 
+    : `Pagamento - ${selectedPlan?.name || ''}`;
+  const resolvedDurationDays = useCustomValue ? null : (selectedPlan?.duration_days || null);
 
   useEffect(() => {
     if (open) {
@@ -82,6 +107,7 @@ export function GeneratePIXDialog({
       setCustomAmount('');
       setCustomDescription('');
       setUseCustomValue(false);
+      setPaymentMethod(null);
       setTimeLeft(30 * 60);
     }
   }, [open]);
@@ -116,42 +142,58 @@ export function GeneratePIXDialog({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleGeneratePIX = async () => {
-    if (!selectedPlanId && !useCustomValue) {
-      toast({ title: 'Selecione um plano', variant: 'destructive' });
-      return;
-    }
+  const hasValidSelection = selectedPlanId || (useCustomValue && resolvedAmount > 0);
 
-    if (useCustomValue && (!customAmount || parseFloat(customAmount.replace(',', '.')) <= 0)) {
-      toast({ title: 'Digite um valor válido', variant: 'destructive' });
-      return;
+  // ── PIX Manual: send QR code + message ──
+  const handleSendPIX = async () => {
+    if (!hasValidSelection) return;
+
+    setIsSending(true);
+    try {
+      const amountStr = formatCurrency(resolvedAmount);
+      const durationStr = resolvedDurationDays ? `\n📅 Válido por ${resolvedDurationDays} dias` : '';
+
+      const message = `💰 *${resolvedPlanName}* - ${amountStr}${durationStr}
+
+📲 *Pague via PIX:*
+
+📱 Chave PIX (Celular): *${PIX_KEY_FORMATTED}*
+
+_Escaneie o QR Code acima ou copie a chave PIX para realizar o pagamento._
+
+⚠️ Após o pagamento, envie o comprovante aqui.`;
+
+      // Send QR code image first
+      await onSendMessage('', false, PIX_QRCODE_PUBLIC_URL, 'image/png');
+      // Then send the text message
+      await onSendMessage(message, false);
+
+      toast({
+        title: 'PIX enviado!',
+        description: 'QR Code e chave PIX enviados para o cliente.',
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Erro ao enviar PIX:', error);
+      toast({ title: 'Erro ao enviar', variant: 'destructive' });
+    } finally {
+      setIsSending(false);
     }
+  };
+
+  // ── Card: generate InfinitePay checkout ──
+  const handleGenerateCard = async () => {
+    if (!hasValidSelection) return;
 
     setIsCreating(true);
     try {
-      let planName = 'Valor Personalizado';
-      let amount = 0;
-      let durationDays: number | null = null;
-      let description = customDescription || 'Pagamento via InfinitePay';
-
-      if (useCustomValue) {
-        amount = parseFloat(customAmount.replace(',', '.'));
-      } else {
-        const selectedPlan = plans.find(p => p.id === selectedPlanId);
-        if (selectedPlan) {
-          planName = selectedPlan.name;
-          amount = selectedPlan.price;
-          durationDays = selectedPlan.duration_days;
-          description = `Pagamento - ${selectedPlan.name}`;
-        }
-      }
-
       const payload = {
         client_phone: clientPhone,
-        plan_name: planName,
-        amount,
-        duration_days: durationDays,
-        description,
+        plan_name: resolvedPlanName,
+        amount: resolvedAmount,
+        duration_days: resolvedDurationDays,
+        description: resolvedDescription,
         conversation_id: conversationId,
         instance_id: instanceId,
       };
@@ -165,10 +207,10 @@ export function GeneratePIXDialog({
 
       setPayment({
         id: data.payment.id,
-        plan_name: planName,
-        description,
+        plan_name: resolvedPlanName,
+        description: resolvedDescription,
         amount: data.payment.amount,
-        duration_days: durationDays,
+        duration_days: resolvedDurationDays,
         status: 'pending',
         checkout_url: data.payment.checkout_url,
         expires_at: data.payment.expires_at,
@@ -197,7 +239,6 @@ export function GeneratePIXDialog({
       });
 
       if (error) throw error;
-
       setPayment(data.payment);
       
       if (data.payment.status === 'paid') {
@@ -221,7 +262,14 @@ export function GeneratePIXDialog({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSendToClient = async () => {
+  const handleCopyPixKey = () => {
+    navigator.clipboard.writeText(PIX_KEY);
+    setCopied(true);
+    toast({ title: 'Chave PIX copiada!' });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendCardLink = async () => {
     if (!payment) return;
 
     setIsSending(true);
@@ -234,7 +282,7 @@ ${payment.duration_days ? `📅 Válido por ${payment.duration_days} dias` : `�
 🔗 *Link de pagamento:*
 ${payment.checkout_url}
 
-_Clique no link acima para pagar via PIX, cartão ou outros métodos._`;
+_Clique no link acima para pagar via cartão de crédito._`;
 
       await onSendMessage(message, false);
 
@@ -256,13 +304,27 @@ _Clique no link acima para pagar via PIX, cartão ou outros métodos._`;
   const isExpired = timeLeft === 0 || payment?.status === 'expired';
   const activePlans = plans.filter(p => p.is_active);
 
+  // Step logic: 
+  // 1. Select plan/amount
+  // 2. Choose payment method (PIX or Card)
+  // 3. For PIX: preview + send | For Card: generate checkout link
+  const currentStep = payment 
+    ? 'card-result' 
+    : paymentMethod === 'pix' 
+      ? 'pix-preview' 
+      : paymentMethod === 'card' 
+        ? 'card-generating' 
+        : hasValidSelection 
+          ? 'choose-method' 
+          : 'select-plan';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md glass-card border-primary/20">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <CreditCardIcon className="h-5 w-5 text-primary" />
-            {payment ? 'Cobrança Gerada' : 'Gerar Cobrança'}
+            {payment ? 'Cobrança Gerada' : paymentMethod === 'pix' ? 'PIX Manual' : 'Gerar Cobrança'}
           </DialogTitle>
           <DialogDescription>
             {payment 
@@ -274,7 +336,8 @@ _Clique no link acima para pagar via PIX, cartão ou outros métodos._`;
 
         <div className="py-4 space-y-4">
           <AnimatePresence mode="wait">
-            {!payment ? (
+            {/* ── Step 1: Select Plan/Amount ── */}
+            {currentStep === 'select-plan' && (
               <motion.div
                 key="select"
                 initial={{ opacity: 0 }}
@@ -383,124 +446,308 @@ _Clique no link acima para pagar via PIX, cartão ou outros métodos._`;
                     </motion.div>
                   )}
                 </div>
+              </motion.div>
+            )}
+
+            {/* ── Step 2: Choose Payment Method ── */}
+            {currentStep === 'choose-method' && (
+              <motion.div
+                key="method"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <div className="text-center space-y-1">
+                  <p className="font-medium">{resolvedPlanName}</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(resolvedAmount)}</p>
+                  {resolvedDurationDays && (
+                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {resolvedDurationDays} dias
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Forma de Pagamento</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* PIX Option */}
+                    <button
+                      onClick={() => setPaymentMethod('pix')}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
+                        "hover:border-green-500/50 hover:bg-green-500/5",
+                        "border-border cursor-pointer"
+                      )}
+                    >
+                      <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                        <QrCode className="h-6 w-6 text-green-500" />
+                      </div>
+                      <span className="font-medium text-sm">PIX</span>
+                      <span className="text-[10px] text-muted-foreground text-center">QR Code + Chave</span>
+                    </button>
+
+                    {/* Card Option */}
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('card');
+                        // Auto-start card generation
+                      }}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
+                        "hover:border-blue-500/50 hover:bg-blue-500/5",
+                        "border-border cursor-pointer"
+                      )}
+                    >
+                      <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                        <CreditCard className="h-6 w-6 text-blue-500" />
+                      </div>
+                      <span className="font-medium text-sm">Cartão</span>
+                      <span className="text-[10px] text-muted-foreground text-center">Link InfinitePay</span>
+                    </button>
+                  </div>
+                </div>
 
                 <Button
-                  onClick={handleGeneratePIX}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setPaymentMethod(null);
+                    // Go back: if custom, keep custom; if plan, keep plan but allow re-selection
+                  }}
+                  className="w-full text-muted-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Voltar
+                </Button>
+              </motion.div>
+            )}
+
+            {/* ── PIX Preview: Show QR Code + Send ── */}
+            {currentStep === 'pix-preview' && (
+              <motion.div
+                key="pix"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <div className="text-center space-y-1">
+                  <p className="font-medium">{resolvedPlanName}</p>
+                  <p className="text-2xl font-bold text-green-500">{formatCurrency(resolvedAmount)}</p>
+                </div>
+
+                {/* QR Code Preview */}
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-white rounded-xl p-3 shadow-sm border border-border/50">
+                    <img 
+                      src={pixQrCode} 
+                      alt="QR Code PIX" 
+                      className="w-48 h-48 object-contain"
+                    />
+                  </div>
+                  
+                  {/* PIX Key */}
+                  <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-4 py-2.5 w-full">
+                    <Smartphone className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Chave PIX (Celular)</p>
+                      <p className="font-mono font-medium text-sm">{PIX_KEY_FORMATTED}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCopyPixKey}
+                      className="shrink-0"
+                    >
+                      {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleSendPIX}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    disabled={isSending}
+                  >
+                    {isSending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    Enviar PIX para o Cliente
+                  </Button>
+
+                  <p className="text-xs text-center text-muted-foreground">
+                    O QR Code e a chave PIX serão enviados na conversa
+                  </p>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPaymentMethod(null)}
+                    className="w-full text-muted-foreground"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Voltar
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── Card Generating: InfinitePay Checkout ── */}
+            {currentStep === 'card-generating' && (
+              <motion.div
+                key="card-gen"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <div className="text-center space-y-1">
+                  <p className="font-medium">{resolvedPlanName}</p>
+                  <p className="text-2xl font-bold text-blue-500">{formatCurrency(resolvedAmount)}</p>
+                </div>
+
+                <Button
+                  onClick={handleGenerateCard}
                   className="w-full"
-                  disabled={isCreating || (!selectedPlanId && !useCustomValue)}
+                  disabled={isCreating}
                 >
                   {isCreating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Gerando...
+                      Gerando link...
                     </>
                   ) : (
                     <>
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      Gerar Cobrança
+                      Gerar Link de Cartão
                     </>
                   )}
                 </Button>
-              </motion.div>
-            ) : isPaid ? (
-              <motion.div
-                key="paid"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="flex flex-col items-center gap-4"
-              >
-                <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle2 className="h-10 w-10 text-green-500" />
-                </div>
-                <p className="text-center text-muted-foreground">Pagamento confirmado com sucesso!</p>
-                <Button onClick={() => onOpenChange(false)} className="w-full">Fechar</Button>
-              </motion.div>
-            ) : isExpired ? (
-              <motion.div
-                key="expired"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center gap-4"
-              >
-                <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <AlertCircle className="h-10 w-10 text-red-500" />
-                </div>
-                <p className="text-center text-muted-foreground">O link expirou. Gere uma nova cobrança.</p>
-                <Button onClick={() => setPayment(null)} className="w-full">Gerar Nova Cobrança</Button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="generated"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-4"
-              >
-                {/* Timer */}
-                <div className="flex items-center justify-center gap-2">
-                  <Clock className={cn('h-5 w-5', timeLeft < 120 ? 'text-red-400' : 'text-muted-foreground')} />
-                  <span className={cn('font-mono text-lg', timeLeft < 120 ? 'text-red-400' : 'text-muted-foreground')}>
-                    {formatTime(timeLeft)}
-                  </span>
-                  <Badge variant="outline" className="text-xs">Expira</Badge>
-                </div>
 
-                {/* Checkout Link */}
-                {payment.checkout_url && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-center text-muted-foreground">Link de pagamento:</p>
-                    <div className="relative">
-                      <div className="p-2 bg-muted rounded-lg font-mono text-[10px] break-all text-center pr-12 max-h-16 overflow-hidden">
-                        {payment.checkout_url.slice(0, 80)}...
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPaymentMethod(null)}
+                  className="w-full text-muted-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Voltar
+                </Button>
+              </motion.div>
+            )}
+
+            {/* ── Card Result: Show checkout link ── */}
+            {currentStep === 'card-result' && payment && (
+              <>
+                {isPaid ? (
+                  <motion.div
+                    key="paid"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="flex flex-col items-center gap-4"
+                  >
+                    <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <CheckCircle2 className="h-10 w-10 text-green-500" />
+                    </div>
+                    <p className="text-center text-muted-foreground">Pagamento confirmado com sucesso!</p>
+                    <Button onClick={() => onOpenChange(false)} className="w-full">Fechar</Button>
+                  </motion.div>
+                ) : isExpired ? (
+                  <motion.div
+                    key="expired"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center gap-4"
+                  >
+                    <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <AlertCircle className="h-10 w-10 text-red-500" />
+                    </div>
+                    <p className="text-center text-muted-foreground">O link expirou. Gere uma nova cobrança.</p>
+                    <Button onClick={() => { setPayment(null); setPaymentMethod(null); }} className="w-full">
+                      Gerar Nova Cobrança
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="generated"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-4"
+                  >
+                    {/* Timer */}
+                    <div className="flex items-center justify-center gap-2">
+                      <Clock className={cn('h-5 w-5', timeLeft < 120 ? 'text-red-400' : 'text-muted-foreground')} />
+                      <span className={cn('font-mono text-lg', timeLeft < 120 ? 'text-red-400' : 'text-muted-foreground')}>
+                        {formatTime(timeLeft)}
+                      </span>
+                      <Badge variant="outline" className="text-xs">Expira</Badge>
+                    </div>
+
+                    {/* Checkout Link */}
+                    {payment.checkout_url && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-center text-muted-foreground">Link de pagamento:</p>
+                        <div className="relative">
+                          <div className="p-2 bg-muted rounded-lg font-mono text-[10px] break-all text-center pr-12 max-h-16 overflow-hidden">
+                            {payment.checkout_url.slice(0, 80)}...
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={handleCopyLink}
+                            className="absolute right-1 top-1/2 -translate-y-1/2"
+                          >
+                            {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </div>
                       </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
                       <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={handleCopyLink}
-                        className="absolute right-1 top-1/2 -translate-y-1/2"
+                        variant="outline"
+                        onClick={handleCheckStatus}
+                        className="flex-1"
+                        disabled={isChecking}
                       >
-                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                        {isChecking ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Verificar
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={handleSendCardLink}
+                        className="flex-1"
+                        disabled={isSending}
+                      >
+                        {isSending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-1" />
+                            Enviar Link
+                          </>
+                        )}
                       </Button>
                     </div>
-                  </div>
+
+                    <p className="text-xs text-center text-muted-foreground">
+                      Clique em "Enviar Link" para mandar o link de pagamento para o cliente
+                    </p>
+                  </motion.div>
                 )}
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleCheckStatus}
-                    className="flex-1"
-                    disabled={isChecking}
-                  >
-                    {isChecking ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Verificar
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={handleSendToClient}
-                    className="flex-1"
-                    disabled={isSending}
-                  >
-                    {isSending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-1" />
-                        Enviar Link
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <p className="text-xs text-center text-muted-foreground">
-                  Clique em "Enviar Link" para mandar o link de pagamento para o cliente
-                </p>
-              </motion.div>
+              </>
             )}
           </AnimatePresence>
         </div>
