@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+// framer-motion import removed for performance
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode, X } from "lucide-react";

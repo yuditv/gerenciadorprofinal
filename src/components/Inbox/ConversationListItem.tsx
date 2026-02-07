@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Conversation } from '@/hooks/useInboxConversations';
 import { SLABadge } from './SLABadge';
-import { useInboxSLA } from '@/hooks/useInboxSLA';
+import { SLAStatus } from '@/hooks/useInboxSLA';
 
 // Country code to flag emoji and name mapping
 const countryData: Record<string, { flag: string; name: string }> = {
@@ -71,6 +71,7 @@ interface ConversationListItemProps {
   isSelected: boolean;
   defaultAgentId?: string | null;
   onSelect: (conversation: Conversation) => void;
+  getSLAStatus?: (createdAt: string, firstReplyAt: string | null, priority: string) => SLAStatus | null;
 }
 
 export const ConversationListItem = memo(function ConversationListItem({
@@ -78,12 +79,12 @@ export const ConversationListItem = memo(function ConversationListItem({
   isSelected,
   defaultAgentId,
   onSelect,
+  getSLAStatus,
 }: ConversationListItemProps) {
-  const { getSLAStatus } = useInboxSLA();
   const isUnread = conversation.unread_count > 0;
   const mediaPreview = getMediaPreview(conversation.last_message_preview);
   const MediaIcon = mediaPreview.icon;
-  const slaStatus = conversation.status === 'open' || conversation.status === 'pending'
+  const slaStatus = getSLAStatus && (conversation.status === 'open' || conversation.status === 'pending')
     ? getSLAStatus(conversation.created_at, conversation.first_reply_at, conversation.priority)
     : null;
 
@@ -93,7 +94,7 @@ export const ConversationListItem = memo(function ConversationListItem({
       className={cn(
         "group relative w-[calc(100%-16px)] mx-2 p-3 flex items-start gap-3 text-left",
         "rounded-xl border border-border/30",
-        "bg-card/25 backdrop-blur-md",
+        "bg-card/30",
         "shadow-[var(--shadow-sm)]",
         "transition-all duration-200",
         "hover:bg-card/40 hover:border-border/45 hover:shadow-[var(--shadow-md)] hover:-translate-y-[1px]",

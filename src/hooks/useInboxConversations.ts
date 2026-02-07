@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -497,6 +497,24 @@ export function useInboxConversations() {
   }, [fetchConversations, fetchLabels]);
 
   // Real-time subscription
+  // Throttled refetch for real-time events - prevents cascade re-fetches
+  const refetchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const throttledRefetch = useCallback(() => {
+    if (refetchTimerRef.current) return; // Already scheduled
+    refetchTimerRef.current = setTimeout(() => {
+      refetchTimerRef.current = null;
+      fetchConversations();
+    }, 1500); // Batch real-time events within 1.5s window
+  }, [fetchConversations]);
+
+  // Cleanup throttle timer
+  useEffect(() => {
+    return () => {
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+    };
+  }, []);
+
+  // Real-time subscription using throttled refetch
   useEffect(() => {
     if (!user) return;
 
@@ -506,14 +524,14 @@ export function useInboxConversations() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations' },
         () => {
-          fetchConversations();
+          throttledRefetch();
         }
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_inbox_messages' },
         () => {
-          fetchConversations();
+          throttledRefetch();
         }
       )
       .subscribe();
@@ -521,10 +539,10 @@ export function useInboxConversations() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchConversations]);
+  }, [user, throttledRefetch]);
 
-  // Metrics
-  const metrics = {
+  // Memoized metrics to prevent unnecessary downstream re-renders
+  const metrics = useMemo(() => ({
     total: conversations.length,
     open: conversations.filter(c => c.status === 'open').length,
     pending: conversations.filter(c => c.status === 'pending').length,
@@ -532,7 +550,7 @@ export function useInboxConversations() {
     unassigned: conversations.filter(c => !c.assigned_to && c.status === 'open').length,
     unread: conversations.filter(c => c.unread_count > 0).length,
     mine: conversations.filter(c => c.assigned_to === user?.id).length
-  };
+  }), [conversations, user?.id]);
 
   return {
     conversations,
