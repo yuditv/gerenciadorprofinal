@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, memo } from "react";
 import { Users, Bot, Flame, Crown, Headset, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, Wallet, LayoutGrid } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useAccountContext } from "@/hooks/useAccountContext";
@@ -157,19 +156,14 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
 
   return (
     <TooltipProvider delayDuration={0}>
-      <motion.header
+      <header
         className={cn(
           "w-full border-b border-primary/20 shrink-0 z-50",
         )}
         style={{
-          background: "hsl(230 18% 8% / 0.7)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
-          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.25), 0 0 60px hsl(0 75% 55% / 0.08), inset 0 1px 0 hsl(0 75% 55% / 0.1)"
+          background: "hsl(230 18% 8% / 0.9)",
+          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.25)"
         }}
-        initial={{ y: -60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
         <div className="flex items-center h-12 sm:h-16 px-2 sm:px-6 gap-2 sm:gap-4">
           {/* Logo */}
@@ -180,10 +174,8 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
                 alt="ATLAS 2.0"
                 className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain"
               />
-              <motion.div 
+              <div 
                 className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-primary"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
               />
             </div>
             <span className="font-bold text-xl text-gradient hidden sm:inline">ATLAS 2.0</span>
@@ -210,24 +202,21 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
-                    <motion.button
+                    <button
                       onClick={() => handleClick(item)}
                       className={cn(
                         "relative flex items-center gap-1.5 sm:gap-2.5 px-2 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl shrink-0",
                         "transition-all duration-200 ease-out",
-                        "hover:bg-muted/50",
+                        "hover:bg-muted/50 active:scale-95",
                         isActive && "bg-primary text-primary-foreground shadow-lg"
                       )}
                       style={isActive ? {
                         boxShadow: `0 4px 16px hsl(var(--primary) / 0.35)`
                       } : undefined}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
                     >
                       {/* Active indicator */}
                       {isActive && (
-                        <motion.div
-                          layoutId="activeIndicator"
+                        <div
                           className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1.5 w-10 h-1 rounded-t-full bg-primary"
                           style={{
                             boxShadow: "0 0 10px hsl(var(--primary))"
@@ -243,23 +232,16 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
                         
                         {/* Notification badge for customer chat */}
                         {showNotificationBadge && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
+                          <div
                             className={cn(
                               "absolute -top-1.5 -right-1.5 flex items-center justify-center",
                               "min-w-[18px] h-[18px] px-1 rounded-full",
                               "bg-destructive text-destructive-foreground text-[10px] font-bold",
                               isPulsing && "animate-pulse"
                             )}
-                            style={{
-                              boxShadow: isPulsing 
-                                ? "0 0 10px hsl(var(--destructive)), 0 0 20px hsl(var(--destructive) / 0.5)" 
-                                : undefined
-                            }}
                           >
                             {customerChatUnread > 99 ? '99+' : customerChatUnread}
-                          </motion.div>
+                          </div>
                         )}
                       </div>
 
@@ -269,7 +251,7 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
                       )}>
                         {item.title}
                       </span>
-                    </motion.button>
+                    </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" sideOffset={8}>
                     {item.title}
@@ -284,14 +266,12 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
           <div className="pl-1 sm:pl-6 border-border/50 shrink-0 border-l-0 sm:border-l">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <motion.button
+                <button
                   className={cn(
                     "flex items-center gap-3 p-1.5 sm:p-2 rounded-xl",
                     "transition-all duration-200 ease-out",
-                    "hover:bg-muted/50"
+                    "hover:bg-muted/50 active:scale-95"
                   )}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                 >
                   <Avatar className="h-8 w-8 sm:h-10 sm:w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} alt="Avatar" />
@@ -305,9 +285,9 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground hidden lg:block" />
-                </motion.button>
+                </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={8} className="glass-card border-primary/20 w-56" style={{ background: "hsl(230 18% 10% / 0.9)", backdropFilter: "blur(24px)" }}>
+              <DropdownMenuContent align="end" sideOffset={8} className="glass-card border-primary/20 w-56" style={{ background: "hsl(230 18% 10% / 0.95)" }}>
                 <div className="px-3 py-2 text-sm text-muted-foreground border-b border-border/50 flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={profile?.avatar_url || undefined} alt="Avatar" />
@@ -364,7 +344,7 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
             </DropdownMenu>
           </div>
         </div>
-      </motion.header>
+      </header>
     </TooltipProvider>
   );
 });

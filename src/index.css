@@ -245,19 +245,6 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    /* Subtle animated gradient background */
-    background-image: 
-      radial-gradient(ellipse 100% 80% at 20% 0%, hsl(255 75% 58% / 0.08), transparent 50%),
-      radial-gradient(ellipse 60% 50% at 80% 100%, hsl(340 80% 55% / 0.06), transparent 50%),
-      radial-gradient(ellipse 80% 60% at 50% 50%, hsl(220 30% 8% / 0.02), transparent);
-    background-attachment: fixed;
-  }
-
-  .dark body, body.dark {
-    background-image: 
-      radial-gradient(ellipse 100% 80% at 20% 0%, hsl(260 80% 50% / 0.14), transparent 50%),
-      radial-gradient(ellipse 60% 50% at 80% 100%, hsl(340 85% 50% / 0.10), transparent 50%),
-      radial-gradient(ellipse 80% 60% at 50% 50%, hsl(220 40% 20% / 0.18), transparent);
   }
 
 
@@ -296,57 +283,20 @@
   .glass-card {
     @apply relative overflow-hidden rounded-2xl;
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid hsl(var(--glass-border));
     box-shadow: var(--glass-shadow);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, translate 0.3s ease;
   }
 
   .glass-card:hover {
-    box-shadow: var(--glass-shadow), var(--shadow-glow), 0 0 80px hsl(var(--primary) / 0.12);
+    box-shadow: var(--glass-shadow), var(--shadow-glow);
     border-color: hsl(var(--primary) / 0.35);
-    /* Use the `translate` property to avoid overriding existing transforms
-       (e.g. Radix Dialog uses translate(-50%, -50%) to center). */
     translate: 0 -2px;
   }
 
   /* Opt-out: keep glass styling but disable the hover "lift" (prevents jitter in dialogs/modals) */
   .glass-card.glass-card-static:hover {
     translate: 0 0;
-  }
-
-  /* Inner highlight for depth - enhanced glow */
-  .glass-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      135deg, 
-      hsl(260 70% 55% / 0.08) 0%, 
-      transparent 30%,
-      transparent 70%,
-      hsl(0 0% 0% / 0.05) 100%
-    );
-    pointer-events: none;
-    border-radius: inherit;
-  }
-
-  /* Accent glow line on top */
-  .glass-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.5) 50%, transparent 100%);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-  }
-
-  .glass-card:hover::after {
-    opacity: 1;
   }
 
   /* ============================================
@@ -356,10 +306,8 @@
     @apply fixed left-4 top-1/2 -translate-y-1/2 z-50;
     @apply rounded-2xl p-3;
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid hsl(var(--glass-border));
-    box-shadow: var(--shadow-xl), var(--shadow-glow);
+    box-shadow: var(--shadow-xl);
   }
 
   .floating-sidebar-item {
@@ -448,9 +396,8 @@
   /* Glass button variant */
   .btn-glass {
     @apply relative rounded-xl px-5 py-2.5 font-medium;
-    @apply transition-all duration-300 ease-out;
+    @apply transition-all duration-200 ease-out;
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(12px);
     border: 1px solid hsl(var(--glass-border));
     color: hsl(var(--foreground));
   }
@@ -467,33 +414,15 @@
   .stat-card-premium {
     @apply relative overflow-hidden rounded-2xl p-6;
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(var(--glass-blur));
     border: 1px solid hsl(var(--glass-border));
     box-shadow: var(--shadow-md);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   }
 
   .stat-card-premium:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-xl), 0 0 40px hsl(var(--primary) / 0.1);
+    box-shadow: var(--shadow-xl);
     border-color: hsl(var(--primary) / 0.2);
-  }
-
-  /* Accent line on top */
-  .stat-card-premium::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-
-  .stat-card-premium:hover::before {
-    opacity: 1;
   }
 
   /* ============================================
@@ -633,40 +562,18 @@
   /* ============================================
      SHIMMER EFFECT
      ============================================ */
+  /* Shimmer effect - only used on-demand, not infinite by default */
   .shimmer-premium {
     @apply relative overflow-hidden;
-  }
-
-  .shimmer-premium::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      hsl(0 0% 100% / 0.03) 45%,
-      hsl(0 0% 100% / 0.06) 50%,
-      hsl(0 0% 100% / 0.03) 55%,
-      transparent 100%
-    );
-    animation: shimmer-move 3s ease-in-out infinite;
-  }
-
-  @keyframes shimmer-move {
-    0% {
-      transform: translateX(-100%);
-    }
-    100% {
-      transform: translateX(100%);
-    }
   }
 
   /* ============================================
      BACKDROP BLUR UTILITIES
      ============================================ */
+  /* Backdrop blur - use sparingly, only where truly needed */
   .backdrop-blur-premium {
-    backdrop-filter: blur(var(--glass-blur));
-    -webkit-backdrop-filter: blur(var(--glass-blur));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 
   /* ============================================
@@ -890,33 +797,18 @@
 }
 
 /* Premium Instance/Contact Card */
-.instance-card {
-  @apply relative overflow-hidden rounded-2xl p-5;
-  @apply transition-all duration-300 ease-out;
-  background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid hsl(var(--glass-border));
-}
+  .instance-card {
+    @apply relative overflow-hidden rounded-2xl p-5;
+    @apply transition-all duration-200 ease-out;
+    background: hsl(var(--glass-bg));
+    border: 1px solid hsl(var(--glass-border));
+  }
 
-.instance-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-xl), 0 0 40px hsl(var(--primary) / 0.1);
-  border-color: hsl(var(--primary) / 0.25);
-}
-
-.instance-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg, 
-    hsl(0 0% 100% / 0.05) 0%, 
-    transparent 50%
-  );
-  pointer-events: none;
-  border-radius: inherit;
-}
+  .instance-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
+    border-color: hsl(var(--primary) / 0.25);
+  }
 
 /* Conversation Card in Inbox */
 .conversation-card {
@@ -997,9 +889,8 @@
 .kpi-card {
   @apply relative overflow-hidden rounded-2xl p-6;
   background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid hsl(var(--glass-border));
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .kpi-card:hover {
@@ -1348,41 +1239,23 @@
 /* AI Agent Card Premium */
 .agent-card-premium {
   @apply relative overflow-hidden rounded-2xl p-5;
-  @apply transition-all duration-300 ease-out;
+  @apply transition-all duration-200 ease-out;
   background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid hsl(var(--glass-border));
 }
 
 .agent-card-premium:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: var(--shadow-xl), 0 0 40px hsl(var(--primary) / 0.12);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
   border-color: hsl(var(--primary) / 0.3);
-}
-
-.agent-card-premium::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.agent-card-premium:hover::before {
-  opacity: 1;
 }
 
 /* Warming Stats Card */
 .warming-stat-card {
   @apply relative overflow-hidden rounded-xl p-4;
   background: hsl(var(--glass-bg));
-  backdrop-filter: blur(12px);
   border: 1px solid hsl(var(--glass-border));
-  transition: all 0.3s ease-out;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .warming-stat-card:hover {
@@ -1392,18 +1265,6 @@
 
 .warming-stat-card.running {
   border-color: hsl(var(--primary) / 0.3);
-  box-shadow: 0 0 30px hsl(var(--primary) / 0.15);
-}
-
-.warming-stat-card.running::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
-  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 /* ============================================
@@ -1516,7 +1377,6 @@
 .instance-sidebar {
   @apply flex flex-col gap-2 p-3 rounded-2xl;
   background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid hsl(var(--glass-border));
   max-height: 500px;
   overflow-y: auto;
@@ -1562,7 +1422,6 @@
 .composer-studio {
   @apply relative rounded-2xl overflow-hidden;
   background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid hsl(var(--glass-border));
 }
 
@@ -1645,7 +1504,6 @@
 .bottom-panel {
   @apply rounded-2xl overflow-hidden;
   background: hsl(var(--glass-bg));
-  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid hsl(var(--glass-border));
 }
 
@@ -1920,21 +1778,15 @@
    ENHANCED TRANSPARENCY UTILITIES
    ============================================ */
 .bg-glass {
-  background: hsl(230 18% 10% / 0.65);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: hsl(230 18% 10% / 0.85);
 }
 
 .bg-glass-light {
-  background: hsl(230 18% 12% / 0.5);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: hsl(230 18% 12% / 0.75);
 }
 
 .bg-glass-dark {
-  background: hsl(230 18% 8% / 0.8);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: hsl(230 18% 8% / 0.92);
 }
 
 /* Neon glow effects */
