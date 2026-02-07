@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { FloatingSidebar, AppSection } from "@/components/FloatingSidebar";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 import { usePersistedState } from "@/hooks/usePersistedState";
@@ -86,19 +85,10 @@ export function MainLayout() {
       <FloatingSidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
 
       {/* Main Content */}
-      <motion.main className="flex-1 overflow-auto" initial={{
-      opacity: 0,
-      y: 20
-    }} animate={{
-      opacity: 1,
-      y: 0
-    }} transition={{
-      duration: 0.4,
-      ease: "easeOut"
-    }} key={activeSection}>
+      <main className="flex-1 overflow-auto">
         <Suspense fallback={<ContentLoader />}>
           {renderContent()}
         </Suspense>
-      </motion.main>
+      </main>
     </div>;
 }
