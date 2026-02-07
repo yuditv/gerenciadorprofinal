@@ -35,6 +35,7 @@ const WhatsApp = lazy(() => import("./pages/WhatsApp"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
+const CRMKanban = lazy(() => import("./pages/CRMKanban"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const Wallet = lazy(() => import("./pages/Wallet"));
@@ -206,6 +207,11 @@ const AppRoutes = () => (
       <Route path="/filter-numbers" element={
         <ProtectedRoute>
           <FilterNumbers />
+        </ProtectedRoute>
+      } />
+      <Route path="/crm-kanban" element={
+        <ProtectedRoute>
+          <CRMKanban />
         </ProtectedRoute>
       } />
       <Route path="/carteira" element={
