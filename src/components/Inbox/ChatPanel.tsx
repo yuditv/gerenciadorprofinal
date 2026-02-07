@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 // framer-motion import removed for performance
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode, X } from "lucide-react";
+import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode, X, SpellCheck } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ import { GextvTestGeneratorDialog } from "./GextvTestGeneratorDialog";
 import { VPNTestGeneratorDialog } from "./VPNTestGeneratorDialog";
 import { GeneratePIXDialog } from "./GeneratePIXDialog";
 import { ScheduleMessageDialog } from "./ScheduleMessageDialog";
+import { useAutoCorrect } from "@/hooks/useAutoCorrect";
 interface ChatPanelProps {
   conversation: Conversation | null;
   messages: ChatMessage[];
@@ -149,6 +150,9 @@ export function ChatPanel({
   const [showClientSheet, setShowClientSheet] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-correct hook
+  const { isEnabled: autoCorrectEnabled, toggleEnabled: toggleAutoCorrect, processText: autoCorrectText } = useAutoCorrect();
 
   // Fetch client by phone
   const {
@@ -1114,6 +1118,15 @@ export function ChatPanel({
 
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleAutoCorrect}>
+                  <SpellCheck className={cn("h-4 w-4", autoCorrectEnabled ? "text-primary" : "text-muted-foreground")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{autoCorrectEnabled ? 'Correção automática ativada' : 'Ativar correção automática'}</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <AudioRecorder onAudioReady={handleAudioReady} disabled={isSending || attachments.length > 0} onRecordingStart={() => sendPresence('recording')} onRecordingEnd={() => sendPresence('paused')} />
               </TooltipTrigger>
               <TooltipContent>Gravar áudio</TooltipContent>
@@ -1125,12 +1138,13 @@ export function ChatPanel({
             <QuickReplyAutocomplete responses={autocompleteSuggestions} isVisible={showAutocomplete} selectedIndex={autocompleteIndex} onSelect={handleSelectAutocomplete} />
 
             <Textarea ref={textareaRef} placeholder={isPrivate ? "Escreva uma nota privada..." : "Digite sua mensagem..."} value={message} onChange={e => {
-              setMessage(e.target.value);
+              const newValue = autoCorrectText(e.target.value);
+              setMessage(newValue);
               // Send composing presence when typing (not for private notes)
-              if (e.target.value.length > 0 && !isPrivate) {
+              if (newValue.length > 0 && !isPrivate) {
                 handleComposingPresence();
               }
-            }} onKeyDown={handleKeyDown} className={cn("min-h-[44px] max-h-32 resize-none inbox-input-field", "bg-inbox-input dark:bg-inbox-input", isPrivate && "!border-amber-500/50 dark:!border-amber-500/40")} rows={1} />
+            }} onKeyDown={handleKeyDown} spellCheck={true} className={cn("min-h-[44px] max-h-32 resize-none inbox-input-field", "bg-inbox-input dark:bg-inbox-input", isPrivate && "!border-amber-500/50 dark:!border-amber-500/40")} rows={1} />
           </div>
           
           <Button onClick={handleSend} disabled={!message.trim() && attachments.length === 0 || isSending} className="h-11 shadow-[var(--shadow-sm)]">
