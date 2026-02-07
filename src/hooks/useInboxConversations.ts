@@ -14,7 +14,7 @@ export interface Conversation {
   status: 'open' | 'pending' | 'resolved' | 'snoozed';
   assigned_to: string | null;
   ai_enabled: boolean;
-  ai_paused_at: string | null; // Timestamp when AI was paused, used for auto-resume after 1 hour
+  ai_paused_at: string | null;
   active_agent_id: string | null;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   unread_count: number;
@@ -23,6 +23,9 @@ export interface Conversation {
   first_reply_at: string | null;
   resolved_at: string | null;
   snoozed_until: string | null;
+  ticket_number: string | null;
+  summary: string | null;
+  closed_at: string | null;
   metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;

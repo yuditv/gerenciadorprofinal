@@ -1,12 +1,14 @@
 import { memo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Bot, User, Mic, Image, Video, FileText, MapPin, Sticker } from 'lucide-react';
+import { Bot, User, Mic, Image, Video, FileText, MapPin, Sticker, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Conversation } from '@/hooks/useInboxConversations';
+import { SLABadge } from './SLABadge';
+import { useInboxSLA } from '@/hooks/useInboxSLA';
 
 // Country code to flag emoji and name mapping
 const countryData: Record<string, { flag: string; name: string }> = {
@@ -77,9 +79,13 @@ export const ConversationListItem = memo(function ConversationListItem({
   defaultAgentId,
   onSelect,
 }: ConversationListItemProps) {
+  const { getSLAStatus } = useInboxSLA();
   const isUnread = conversation.unread_count > 0;
   const mediaPreview = getMediaPreview(conversation.last_message_preview);
   const MediaIcon = mediaPreview.icon;
+  const slaStatus = conversation.status === 'open' || conversation.status === 'pending'
+    ? getSLAStatus(conversation.created_at, conversation.first_reply_at, conversation.priority)
+    : null;
 
   return (
     <button
@@ -172,6 +178,12 @@ export const ConversationListItem = memo(function ConversationListItem({
           )}>
             {mediaPreview.text}
           </p>
+          {/* Ticket number */}
+          {conversation.ticket_number && (
+            <span className="text-[9px] text-muted-foreground font-mono shrink-0">
+              #{conversation.ticket_number}
+            </span>
+          )}
         </div>
 
         {/* Labels, Agent Badge & Unread badge row */}
@@ -219,6 +231,9 @@ export const ConversationListItem = memo(function ConversationListItem({
             </span>
           )}
           
+          {/* SLA Badge */}
+          <SLABadge slaStatus={slaStatus} />
+
           {isUnread && (
             <Badge 
               variant="destructive" 

@@ -19,6 +19,7 @@ import { BlockedContactsSettings } from "@/components/Inbox/Settings/BlockedCont
 import { CannedResponsesSettings } from "@/components/Inbox/Settings/CannedResponsesSettings";
 import { CallSettings } from "@/components/Inbox/Settings/CallSettings";
 import { BotProxySettings } from "@/components/Inbox/Settings/BotProxySettings";
+import { AdvancedSettingsPanel } from "@/components/Inbox/Settings/AdvancedSettingsPanel";
 
 type SettingsSection = 
   | "labels"
@@ -31,7 +32,8 @@ type SettingsSection =
   | "audit-logs"
   | "canned-responses"
   | "call-settings"
-  | "bot-proxy";
+  | "bot-proxy"
+  | "advanced";
 
 interface MenuItem {
   id: SettingsSection;
@@ -102,6 +104,12 @@ const menuItems: MenuItem[] = [
     icon: Bot,
   },
   {
+    id: "advanced",
+    title: "Avançado",
+    description: "SLA, Horário, Triagem e Motivos",
+    icon: Settings,
+  },
+  {
     id: "audit-logs",
     title: "Auditoria",
     description: "Log de atividades do sistema",
@@ -144,6 +152,7 @@ export default function InboxSettings() {
       'canned-responses',
       'call-settings',
       'bot-proxy',
+      'advanced',
     ];
 
     if (allowed.includes(section)) setActiveSection(section);
@@ -171,6 +180,8 @@ export default function InboxSettings() {
         return <CallSettings />;
       case "bot-proxy":
         return <BotProxySettings />;
+      case "advanced":
+        return <AdvancedSettingsPanel labels={[]} />;
       case "audit-logs":
         return <AuditLogsSettings />;
       default:
