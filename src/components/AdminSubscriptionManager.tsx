@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +26,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { AdminChangePlanDialog } from './AdminChangePlanDialog';
 
 interface UserSubscriptionData {
   id: string;
@@ -75,55 +75,44 @@ export function AdminSubscriptionManager({
   onRefresh,
   isLoading,
 }: AdminSubscriptionManagerProps) {
-  const [activatingUser, setActivatingUser] = useState<string | null>(null);
+  const [editingSub, setEditingSub] = useState<UserSubscriptionData | null>(null);
 
-  const handleActivateSubscription = async (
-    subscriptionId: string, 
+  const handleChangePlan = async (
+    subscriptionId: string,
     planId: string,
-    userId: string
+    status: string,
+    periodEnd: string
   ) => {
-    setActivatingUser(userId);
-    
-    const plan = plans.find(p => p.id === planId);
-    if (!plan) {
-      toast({
-        title: 'Erro',
-        description: 'Plano não encontrado',
-        variant: 'destructive',
-      });
-      setActivatingUser(null);
-      return;
-    }
+    const updateData: Record<string, unknown> = {
+      plan_id: planId,
+      status,
+      current_period_start: new Date().toISOString(),
+      current_period_end: periodEnd,
+    };
 
-    const periodStart = new Date();
-    const periodEnd = new Date();
-    periodEnd.setMonth(periodEnd.getMonth() + plan.duration_months);
+    // If setting to trial, also update trial_ends_at
+    if (status === 'trial') {
+      updateData.trial_ends_at = periodEnd;
+    }
 
     const { error } = await supabase
       .from('user_subscriptions')
-      .update({
-        plan_id: planId,
-        status: 'active',
-        current_period_start: periodStart.toISOString(),
-        current_period_end: periodEnd.toISOString(),
-      })
+      .update(updateData)
       .eq('id', subscriptionId);
 
     if (error) {
       toast({
         title: 'Erro',
-        description: 'Falha ao ativar assinatura',
+        description: 'Falha ao atualizar assinatura',
         variant: 'destructive',
       });
     } else {
       toast({
         title: 'Sucesso',
-        description: 'Assinatura ativada com sucesso',
+        description: 'Assinatura atualizada com sucesso',
       });
       onRefresh();
     }
-
-    setActivatingUser(null);
   };
 
   const stats = {
@@ -286,22 +275,15 @@ export function AdminSubscriptionManager({
                         }
                       </TableCell>
                       <TableCell className="text-right">
-                        {(sub.status === 'trial' || sub.status === 'expired') && plans.length > 0 && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleActivateSubscription(
-                              sub.id, 
-                              plans[0].id,
-                              sub.user_id
-                            )}
-                            disabled={activatingUser === sub.user_id}
-                            className="border-primary/30"
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Ativar
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingSub(sub)}
+                          className="border-primary/30"
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Gerenciar
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -318,6 +300,15 @@ export function AdminSubscriptionManager({
           </div>
         </CardContent>
       </Card>
+
+      {/* Change Plan Dialog */}
+      <AdminChangePlanDialog
+        subscription={editingSub}
+        plans={plans}
+        open={!!editingSub}
+        onOpenChange={(open) => !open && setEditingSub(null)}
+        onConfirm={handleChangePlan}
+      />
     </div>
   );
 }
