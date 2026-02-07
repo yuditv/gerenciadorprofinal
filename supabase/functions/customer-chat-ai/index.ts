@@ -18,6 +18,20 @@ const DEFAULT_MODEL = 'google/gemini-3-flash-preview';
 const LOCK_TTL_SECONDS = 30; // Lock expires after 30 seconds
 
 // Tools for the AI agent
+const HUMAN_HANDOFF_KEYWORDS = [
+  'humano', 'pessoa real', 'atendente', 'falar com alguem', 'falar com alguém',
+  'não é robô', 'nao e robo', 'é um robô', 'e um robo', 'é um bot', 'e um bot',
+  'quero falar com humano', 'quero um humano', 'atendimento humano',
+  'não quero falar com ia', 'nao quero falar com ia', 'não quero ia', 'nao quero ia',
+  'quero atendente', 'me passa para um humano', 'transfere para humano',
+  'você é um robô', 'voce e um robo', 'vc é um robô', 'vc e um robo',
+  'ta falando com robô', 'ta falando com robo', 'isso é ia', 'isso e ia',
+  'sou real', 'pessoa de verdade', 'gente de verdade', 'ser humano',
+  'não é real', 'nao e real', 'atendente real', 'suporte humano',
+  'chat com pessoa', 'falar com gente', 'operador', 'operadora',
+  'to falando com maquina', 'to falando com máquina', 'automático', 'automatico'
+];
+
 const AI_TOOLS = [
   {
     type: "function",
@@ -82,7 +96,7 @@ const AI_TOOLS = [
     type: "function",
     function: {
       name: "save_customer_info",
-      description: "Save important information about the customer for future reference. Use this to remember names, preferences, plan details, etc.",
+      description: "Save important information about the customer for future reference. ALWAYS use this when the customer mentions their name, plan, device, or any important detail. This is critical - never miss saving a customer's name.",
       parameters: {
         type: "object",
         properties: {
@@ -109,6 +123,21 @@ const AI_TOOLS = [
           reason: { type: "string", description: "Reason for transfer" }
         },
         required: ["agent_id", "reason"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "request_human_handoff",
+      description: "IMMEDIATELY use this tool when the customer requests to speak with a real human, detects they are talking to a bot/AI, or explicitly asks to be transferred to a human agent. This will disable AI for this conversation and notify the owner.",
+      parameters: {
+        type: "object",
+        properties: {
+          reason: { type: "string", description: "Why the customer wants a human (e.g., 'customer detected AI', 'customer requested human agent')" },
+          conversation_summary: { type: "string", description: "Brief summary of the conversation so far for the human agent" }
+        },
+        required: ["reason", "conversation_summary"]
       }
     }
   }
@@ -320,8 +349,25 @@ serve(async (req: Request) => {
 - Use 'analyze_image' para analisar imagens/comprovantes enviados pelo cliente
 - Use 'generate_pix' para gerar códigos PIX quando o cliente quiser pagar
 - Use 'notify_owner' para notificar o dono sobre coisas importantes (pagamentos, reclamações, etc)
-- Use 'save_customer_info' para salvar informações importantes do cliente
-- Use 'transfer_to_agent' para transferir para um sub-agente especializado`;
+- Use 'save_customer_info' para salvar informações importantes do cliente (SEMPRE salve o nome quando o cliente disser)
+- Use 'transfer_to_agent' para transferir para um sub-agente especializado
+- Use 'request_human_handoff' IMEDIATAMENTE quando o cliente pedir para falar com humano ou perceber que é IA`;
+
+    // Add human detection instructions
+    systemPrompt += `\n\n## ⚠️ REGRA CRÍTICA DE SEGURANÇA:
+Se o cliente perceber que está falando com IA/robô, ou pedir para falar com um humano/atendente real, você DEVE:
+1. IMEDIATAMENTE usar a ferramenta 'request_human_handoff' com um resumo da conversa
+2. Responder educadamente que vai transferir para um atendente humano
+3. NÃO tente convencer o cliente a continuar falando com você
+4. NÃO negue que é uma IA se perguntado diretamente
+Palavras-chave que indicam isso: "humano", "pessoa real", "atendente", "robô", "bot", "IA", "máquina", "automático"
+
+## 📝 REGRA DE MEMÓRIA:
+SEMPRE use 'save_customer_info' quando o cliente mencionar:
+- Seu nome (info_type: "name")
+- Seu plano/serviço (info_type: "plan")
+- Seu dispositivo (info_type: "device")
+- Qualquer preferência ou informação relevante (info_type: "preference" ou "note")`;
     
     messages.push({ role: 'system', content: systemPrompt });
 
@@ -359,6 +405,24 @@ serve(async (req: Request) => {
     }
 
     console.log(`[${VERSION}] Calling AI with ${messages.length} messages`);
+
+    // ============ PROACTIVE HUMAN HANDOFF DETECTION ============
+    // Check the latest customer message for human handoff keywords as a safety net
+    const lastCustomerMsg = (recentMessages || [])
+      .filter(m => m.sender_type === 'customer')
+      .pop();
+    
+    const lastMsgContent = (lastCustomerMsg?.content || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const detectedHandoff = HUMAN_HANDOFF_KEYWORDS.some(kw => {
+      const normalizedKw = kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return lastMsgContent.includes(normalizedKw);
+    });
+
+    if (detectedHandoff) {
+      console.log(`[${VERSION}] ⚠️ Human handoff keyword detected in message: "${lastCustomerMsg?.content?.substring(0, 50)}..."`);
+      // We still let the AI process it, but ensure the system prompt strongly directs it
+      // The AI tools will handle the actual handoff
+    }
 
     // Call the AI with tools - implement tool loop
     let responseText = '';
@@ -453,7 +517,22 @@ serve(async (req: Request) => {
             try {
               const updates: Record<string, any> = { updated_at: new Date().toISOString() };
               switch (args.info_type) {
-                case 'name': updates.client_name = args.value; break;
+                case 'name': 
+                  updates.client_name = args.value;
+                  // Also update the conversation name in the inbox
+                  await supabaseAdmin
+                    .from('customer_conversations')
+                    .update({ customer_name: args.value, updated_at: new Date().toISOString() })
+                    .eq('id', conversationId);
+                  // Also update conversation name in inbox conversations table if it exists
+                  try {
+                    await supabaseAdmin
+                      .from('conversations')
+                      .update({ contact_name: args.value })
+                      .eq('phone', conversation.customer_user_id)
+                      .eq('user_id', conversation.owner_id);
+                  } catch (_e) { /* ignore if conversations table doesn't match */ }
+                  break;
                 case 'plan': updates.plan_name = args.value; break;
                 case 'device': updates.device = args.value; break;
                 default: 
@@ -553,6 +632,45 @@ serve(async (req: Request) => {
             
           case 'analyze_image':
             toolResult = `Imagem analisada: ${args.analysis_type}`;
+            break;
+
+          case 'request_human_handoff':
+            try {
+              // 1. Disable AI for this conversation
+              await supabaseAdmin
+                .from('customer_conversations')
+                .update({ 
+                  ai_enabled: false,
+                  active_agent_id: null,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', conversationId);
+
+              // 2. Send notification to owner with summary
+              await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-owner-notification`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                },
+                body: JSON.stringify({
+                  userId: conversation.owner_id,
+                  eventType: 'human_handoff',
+                  contactPhone: conversation.customer_user_id,
+                  contactName: customerMemory?.client_name,
+                  summary: `🤖➡️👤 Cliente solicitou atendimento humano.\n\nMotivo: ${args.reason}\n\nResumo da conversa:\n${args.conversation_summary}`,
+                  urgency: 'high',
+                  conversationId: conversationId
+                })
+              });
+
+              toolResult = 'IA desativada e notificação enviada ao proprietário';
+              responseText = '👤 Entendido! Estou transferindo você para um atendente humano. Em breve alguém irá te atender. Obrigado pela paciência!';
+              console.log(`[${VERSION}] Human handoff requested - AI disabled for conversation ${conversationId}`);
+            } catch (e) {
+              toolResult = `Erro no handoff: ${e}`;
+              console.error(`[${VERSION}] Failed human handoff:`, e);
+            }
             break;
             
           default:

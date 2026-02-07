@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Bot, Link, Globe, Smartphone, Palette, Cpu, Brain, Clock, MessageSquare, Settings2, Zap, Database, Layers, ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -1020,16 +1021,22 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
                       <Settings2 className="h-4 w-4 text-muted-foreground" />
                       Limite de Memórias por Cliente
                     </Label>
-                    <Input
-                      type="number"
-                      min={5}
-                      max={100}
-                      value={formData.memory_max_items}
-                      onChange={(e) => setFormData({ ...formData, memory_max_items: parseInt(e.target.value) || 20 })}
-                      className="bg-background/50 border-border/50 w-32"
-                    />
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10000}
+                        value={formData.memory_max_items}
+                        onChange={(e) => setFormData({ ...formData, memory_max_items: parseInt(e.target.value) || 0 })}
+                        className="bg-background/50 border-border/50 w-32"
+                        placeholder="0 = ilimitado"
+                      />
+                      {formData.memory_max_items === 0 && (
+                        <Badge variant="secondary" className="text-xs">∞ Ilimitado</Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Quantidade máxima de informações customizadas salvas por cliente
+                      Quantidade máxima de informações salvas por cliente. Use <strong>0</strong> para ilimitado.
                     </p>
                   </motion.div>
                 </>
