@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Settings, Users, Tag, Zap, Play, ScrollText, Clock, Ban, MessageSquareText, PhoneOff, Bot } from "lucide-react";
+import { ArrowLeft, Settings, Users, Tag, Zap, Play, ScrollText, Clock, Ban, MessageSquareText, PhoneOff, Bot, Shuffle, BarChart3 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,6 +20,9 @@ import { CannedResponsesSettings } from "@/components/Inbox/Settings/CannedRespo
 import { CallSettings } from "@/components/Inbox/Settings/CallSettings";
 import { BotProxySettings } from "@/components/Inbox/Settings/BotProxySettings";
 import { AdvancedSettingsPanel } from "@/components/Inbox/Settings/AdvancedSettingsPanel";
+import { BlacklistManager } from "@/components/Inbox/BlacklistManager";
+import { DistributionSettings } from "@/components/Inbox/DistributionSettings";
+import { CampaignMetrics } from "@/components/Inbox/CampaignMetrics";
 
 type SettingsSection = 
   | "labels"
@@ -33,7 +36,10 @@ type SettingsSection =
   | "canned-responses"
   | "call-settings"
   | "bot-proxy"
-  | "advanced";
+  | "advanced"
+  | "blacklist"
+  | "distribution"
+  | "campaign-metrics";
 
 interface MenuItem {
   id: SettingsSection;
@@ -104,6 +110,24 @@ const menuItems: MenuItem[] = [
     icon: Bot,
   },
   {
+    id: "distribution",
+    title: "Distribuição",
+    description: "Atribuição automática round-robin",
+    icon: Shuffle,
+  },
+  {
+    id: "blacklist",
+    title: "Blacklist Global",
+    description: "Números bloqueados para envio",
+    icon: Ban,
+  },
+  {
+    id: "campaign-metrics",
+    title: "Métricas de Campanhas",
+    description: "Estatísticas de envio em massa",
+    icon: BarChart3,
+  },
+  {
     id: "advanced",
     title: "Avançado",
     description: "SLA, Horário, Triagem e Motivos",
@@ -153,6 +177,9 @@ export default function InboxSettings() {
       'call-settings',
       'bot-proxy',
       'advanced',
+      'blacklist',
+      'distribution',
+      'campaign-metrics',
     ];
 
     if (allowed.includes(section)) setActiveSection(section);
@@ -182,6 +209,12 @@ export default function InboxSettings() {
         return <BotProxySettings />;
       case "advanced":
         return <AdvancedSettingsPanel labels={[]} />;
+      case "blacklist":
+        return <BlacklistManager />;
+      case "distribution":
+        return <DistributionSettings />;
+      case "campaign-metrics":
+        return <CampaignMetrics />;
       case "audit-logs":
         return <AuditLogsSettings />;
       default:

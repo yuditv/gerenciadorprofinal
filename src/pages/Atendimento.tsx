@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { ArrowLeft, RefreshCw, Circle, Lock, AlertTriangle, Zap, Settings, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Circle, Lock, AlertTriangle, Zap, Settings, Trash2, Keyboard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +49,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { KeyboardShortcutsPanel } from "@/components/Inbox/KeyboardShortcutsPanel";
+import { DateRange } from "react-day-picker";
 
 export default function Atendimento() {
   const navigate = useNavigate();
@@ -65,6 +67,8 @@ export default function Atendimento() {
   const [showClientForm, setShowClientForm] = useState(false);
   const [newClientData, setNewClientData] = useState<{ phone: string; name?: string } | null>(null);
   const [defaultAgentId, setDefaultAgentId] = useState<string | null>(null);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const [showCreateCustomerLink, setShowCreateCustomerLink] = useState(false);
 
@@ -661,6 +665,16 @@ export default function Atendimento() {
             </Button>
           )}
 
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8"
+            onClick={() => setShowKeyboardShortcuts(true)}
+            title="Atalhos de Teclado"
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
+
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => refetch()} disabled={subscriptionExpired}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -709,6 +723,8 @@ export default function Atendimento() {
           onTabChange={setActiveTab}
           showCustomerChatTab={!isMember}
           customerUnread={customerUnreadTotal}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
         />
 
         {/* Content Area */}
@@ -947,6 +963,9 @@ export default function Atendimento() {
           device: null
         } : null}
       />
+
+      {/* Keyboard Shortcuts Panel */}
+      <KeyboardShortcutsPanel open={showKeyboardShortcuts} onOpenChange={setShowKeyboardShortcuts} />
     </div>
   );
 }

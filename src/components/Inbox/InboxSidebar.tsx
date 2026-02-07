@@ -26,6 +26,8 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ConversationDateFilter } from "./ConversationDateFilter";
+import { DateRange } from "react-day-picker";
 
 interface WhatsAppInstance {
   id: string;
@@ -51,6 +53,8 @@ interface InboxSidebarProps {
   onTabChange: (tab: 'conversations' | 'customer-chat' | 'dashboard' | 'kanban') => void;
   showCustomerChatTab?: boolean;
   customerUnread?: number;
+  dateRange?: DateRange;
+  onDateRangeChange?: (range: DateRange | undefined) => void;
 }
 
 export function InboxSidebar({
@@ -63,6 +67,8 @@ export function InboxSidebar({
   onTabChange,
   showCustomerChatTab = false,
   customerUnread = 0,
+  dateRange,
+  onDateRangeChange,
 }: InboxSidebarProps) {
   const filterItems = [
     { 
@@ -312,6 +318,14 @@ export function InboxSidebar({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Date Range Filter */}
+            {onDateRangeChange && (
+              <ConversationDateFilter
+                dateRange={dateRange}
+                onDateRangeChange={onDateRangeChange}
+              />
+            )}
 
             {/* Active Filters Pills */}
             {(filter.instanceId || filter.labelId) && (

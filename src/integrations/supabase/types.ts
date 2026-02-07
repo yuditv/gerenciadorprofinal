@@ -2153,6 +2153,33 @@ export type Database = {
         }
         Relationships: []
       }
+      global_blacklist: {
+        Row: {
+          created_at: string
+          id: string
+          phone: string
+          reason: string | null
+          source: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phone: string
+          reason?: string | null
+          source?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phone?: string
+          reason?: string | null
+          source?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_audit_logs: {
         Row: {
           action: string
@@ -2331,6 +2358,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inbox_distribution_config: {
+        Row: {
+          created_at: string
+          id: string
+          is_enabled: boolean
+          last_assigned_index: number | null
+          max_active_per_agent: number | null
+          mode: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_assigned_index?: number | null
+          max_active_per_agent?: number | null
+          mode?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_assigned_index?: number | null
+          max_active_per_agent?: number | null
+          mode?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       inbox_labels: {
         Row: {
