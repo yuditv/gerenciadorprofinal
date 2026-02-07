@@ -60,22 +60,16 @@ serve(async (req: Request) => {
 
     console.log(`[generate-client-pix-v2] User ${user.id} generating checkout for ${client_phone}, R$${amount}`);
 
-    // Fetch user's InfinitePay handle
-    const { data: credentials, error: credError } = await supabase
+    // Fetch user's InfinitePay handle (fallback to system secret)
+    const { data: credentials } = await supabase
       .from("user_payment_credentials")
       .select("infinitepay_handle")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (credError) {
-      console.error("Error fetching credentials:", credError);
-      return new Response(
-        JSON.stringify({ success: false, error: "Erro ao buscar credenciais" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const userHandle = credentials?.infinitepay_handle || Deno.env.get("INFINITEPAY_HANDLE") || "";
 
-    if (!credentials?.infinitepay_handle) {
+    if (!userHandle) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -85,7 +79,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const handle = credentials.infinitepay_handle;
+    const handle = userHandle;
     const orderNsu = crypto.randomUUID();
     const priceInCents = Math.round(Number(amount) * 100);
 
