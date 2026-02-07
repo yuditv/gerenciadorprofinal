@@ -72,7 +72,7 @@ export function GeneratePIXDialog({
   const [isCreating, setIsCreating] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(10 * 60);
+  const [timeLeft, setTimeLeft] = useState(30 * 60);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export function GeneratePIXDialog({
       setCustomAmount('');
       setCustomDescription('');
       setUseCustomValue(false);
-      setTimeLeft(10 * 60);
+      setTimeLeft(30 * 60);
     }
   }, [open]);
 
@@ -129,28 +129,52 @@ export function GeneratePIXDialog({
 
     setIsCreating(true);
     try {
-      const payload: Record<string, unknown> = {
-        action: 'create',
-        conversationId,
-        instanceId,
-        clientPhone,
-      };
+      let planName = 'Valor Personalizado';
+      let amount = 0;
+      let durationDays: number | null = null;
+      let description = customDescription || 'Pagamento via InfinitePay';
 
       if (useCustomValue) {
-        payload.customAmount = parseFloat(customAmount.replace(',', '.'));
-        payload.customDescription = customDescription || 'Pagamento via InfinitePay';
+        amount = parseFloat(customAmount.replace(',', '.'));
       } else {
-        payload.planId = selectedPlanId;
+        const selectedPlan = plans.find(p => p.id === selectedPlanId);
+        if (selectedPlan) {
+          planName = selectedPlan.name;
+          amount = selectedPlan.price;
+          durationDays = selectedPlan.duration_days;
+          description = `Pagamento - ${selectedPlan.name}`;
+        }
       }
 
-      const { data, error } = await supabase.functions.invoke('generate-client-pix', {
+      const payload = {
+        client_phone: clientPhone,
+        plan_name: planName,
+        amount,
+        duration_days: durationDays,
+        description,
+        conversation_id: conversationId,
+        instance_id: instanceId,
+      };
+
+      const { data, error } = await supabase.functions.invoke('generate-client-pix-v2', {
         body: payload
       });
 
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Erro ao gerar cobrança');
 
-      setPayment(data.payment);
-      setTimeLeft(10 * 60);
+      setPayment({
+        id: data.payment.id,
+        plan_name: planName,
+        description,
+        amount: data.payment.amount,
+        duration_days: durationDays,
+        status: 'pending',
+        checkout_url: data.payment.checkout_url,
+        expires_at: data.payment.expires_at,
+        created_at: new Date().toISOString(),
+      });
+      setTimeLeft(30 * 60);
     } catch (error) {
       console.error('Erro ao gerar cobrança:', error);
       toast({
@@ -168,7 +192,7 @@ export function GeneratePIXDialog({
     
     setIsChecking(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-client-pix', {
+      const { data, error } = await supabase.functions.invoke('infinitepay-checkout', {
         body: { action: 'check', paymentId: payment.id }
       });
 
