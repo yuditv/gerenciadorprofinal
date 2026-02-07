@@ -9,40 +9,40 @@
 
 @layer base {
   :root {
-    /* Light theme - Premium Red Glass */
-    --background: 220 15% 97%;
-    --foreground: 220 20% 10%;
+    /* Light theme - Premium Blue/Purple/Red Glass */
+    --background: 230 20% 97%;
+    --foreground: 230 25% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card-foreground: 230 25% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover-foreground: 230 25% 10%;
 
-    --primary: 0 85% 55%;
+    --primary: 255 75% 58%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 94%;
-    --secondary-foreground: 220 20% 25%;
+    --secondary: 230 20% 94%;
+    --secondary-foreground: 230 25% 25%;
 
-    --muted: 220 15% 92%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 230 18% 92%;
+    --muted-foreground: 230 12% 45%;
 
-    --accent: 15 90% 55%;
+    --accent: 340 80% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 95%;
-    --ring: 0 85% 55%;
+    --border: 230 18% 90%;
+    --input: 230 18% 95%;
+    --ring: 255 75% 58%;
 
     --radius: 1rem;
 
     /* Plan colors */
-    --plan-monthly: 350 90% 55%;
-    --plan-quarterly: 15 90% 50%;
+    --plan-monthly: 340 80% 55%;
+    --plan-quarterly: 255 75% 58%;
     --plan-semiannual: 145 70% 45%;
     --plan-annual: 45 90% 50%;
 
@@ -53,11 +53,6 @@
     --glass-blur: 20px;
 
     /* Elegant shadows */
-    /*
-      Subtle extra depth:
-      - soft elevation
-      - faint inner highlight (border-like) to separate surfaces
-    */
     --shadow-sm:
       0 1px 2px hsl(0 0% 0% / 0.05),
       0 1px 0 hsl(0 0% 100% / 0.55) inset;
@@ -73,78 +68,78 @@
       0 26px 70px -32px hsl(0 0% 0% / 0.24),
       0 10px 26px hsl(0 0% 0% / 0.08),
       0 1px 0 hsl(0 0% 100% / 0.55) inset;
-    --shadow-glow: 0 0 40px hsl(0 85% 55% / 0.15);
+    --shadow-glow: 0 0 40px hsl(255 75% 58% / 0.15);
 
     /* Sidebar */
     --sidebar-background: 0 0% 100% / 0.8;
-    --sidebar-foreground: 220 20% 20%;
-    --sidebar-primary: 0 85% 55%;
+    --sidebar-foreground: 230 25% 20%;
+    --sidebar-primary: 255 75% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 96%;
-    --sidebar-accent-foreground: 220 20% 20%;
-    --sidebar-border: 220 15% 92%;
-    --sidebar-ring: 0 85% 55%;
+    --sidebar-accent: 230 18% 96%;
+    --sidebar-accent-foreground: 230 25% 20%;
+    --sidebar-border: 230 18% 92%;
+    --sidebar-ring: 255 75% 58%;
 
     /* Inbox-specific tokens (light mode) */
-    --inbox-bg: 220 15% 97%;
+    --inbox-bg: 230 20% 97%;
     --inbox-sidebar-bg: 0 0% 100%;
-    --inbox-chat-bg: 220 15% 98%;
-    --inbox-message-sent: 220 15% 95%;
+    --inbox-chat-bg: 230 18% 98%;
+    --inbox-message-sent: 230 18% 95%;
     --inbox-message-received: 0 0% 100%;
-    --inbox-message-private: 45 85% 95%;
+    --inbox-message-private: 255 40% 95%;
     --inbox-header-bg: 0 0% 100%;
-    --inbox-input-bg: 220 15% 96%;
-    --inbox-hover: 220 15% 94%;
-    --inbox-active: 220 15% 92%;
-    --inbox-unread: 0 85% 55%;
+    --inbox-input-bg: 230 18% 96%;
+    --inbox-hover: 230 18% 94%;
+    --inbox-active: 230 18% 92%;
+    --inbox-unread: 255 75% 58%;
 
     /* QR surface (kept white for PIX scanning) */
     --qr-surface: 0 0% 100%;
   }
 
   .dark {
-    /* Dark theme - Premium Dark Glass with Transparency */
-    --background: 230 18% 6% / 0.85;
-    --foreground: 220 12% 90%;
+    /* Dark theme - Premium Blue/Purple/Red Dark Glass */
+    --background: 240 22% 6% / 0.85;
+    --foreground: 230 15% 90%;
 
-    --card: 230 16% 10% / 0.75;
-    --card-foreground: 220 12% 90%;
+    --card: 240 20% 10% / 0.75;
+    --card-foreground: 230 15% 90%;
 
-    --popover: 230 16% 10% / 0.9;
-    --popover-foreground: 220 12% 90%;
+    --popover: 240 20% 10% / 0.9;
+    --popover-foreground: 230 15% 90%;
 
-    --primary: 0 75% 58%;
+    --primary: 260 70% 62%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 230 14% 15% / 0.7;
-    --secondary-foreground: 220 12% 85%;
+    --secondary: 240 18% 15% / 0.7;
+    --secondary-foreground: 230 15% 85%;
 
-    --muted: 230 12% 16% / 0.6;
-    --muted-foreground: 220 8% 55%;
+    --muted: 240 16% 16% / 0.6;
+    --muted-foreground: 230 10% 55%;
 
-    --accent: 15 75% 55%;
+    --accent: 340 75% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 230 12% 25% / 0.4;
-    --input: 230 14% 12% / 0.8;
-    --ring: 0 75% 58%;
+    --border: 240 16% 25% / 0.4;
+    --input: 240 18% 12% / 0.8;
+    --ring: 260 70% 62%;
 
     /* Plan colors - vibrant */
-    --plan-monthly: 350 80% 55%;
-    --plan-quarterly: 15 80% 55%;
+    --plan-monthly: 340 80% 55%;
+    --plan-quarterly: 260 70% 62%;
     --plan-semiannual: 145 65% 48%;
     --plan-annual: 45 80% 55%;
 
     /* Dark glass effects - enhanced transparency */
-    --glass-bg: 230 18% 10% / 0.65;
-    --glass-border: 0 75% 58% / 0.15;
-    --glass-shadow: 0 8px 32px hsl(0 0% 0% / 0.35), 0 0 60px hsl(0 75% 55% / 0.08);
+    --glass-bg: 240 22% 10% / 0.65;
+    --glass-border: 260 70% 62% / 0.15;
+    --glass-shadow: 0 8px 32px hsl(0 0% 0% / 0.35), 0 0 60px hsl(260 70% 55% / 0.08);
     --glass-blur: 28px;
 
-    /* Dark shadows - reduced intensity */
+    /* Dark shadows */
     --shadow-sm:
       0 1px 2px hsl(0 0% 0% / 0.18),
       0 1px 0 hsl(var(--foreground) / 0.06) inset;
@@ -160,30 +155,30 @@
       0 30px 84px -40px hsl(0 0% 0% / 0.55),
       0 12px 30px hsl(0 0% 0% / 0.30),
       0 1px 0 hsl(var(--foreground) / 0.06) inset;
-    --shadow-glow: 0 0 50px hsl(0 72% 58% / 0.12);
+    --shadow-glow: 0 0 50px hsl(260 70% 62% / 0.12);
 
-    /* Sidebar - softer */
-    --sidebar-background: 230 18% 11% / 0.95;
-    --sidebar-foreground: 220 12% 85%;
-    --sidebar-primary: 0 72% 58%;
+    /* Sidebar */
+    --sidebar-background: 240 22% 11% / 0.95;
+    --sidebar-foreground: 230 15% 85%;
+    --sidebar-primary: 260 68% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 230 14% 18%;
-    --sidebar-accent-foreground: 220 12% 85%;
-    --sidebar-border: 230 12% 22%;
-    --sidebar-ring: 0 72% 58%;
+    --sidebar-accent: 240 18% 18%;
+    --sidebar-accent-foreground: 230 15% 85%;
+    --sidebar-border: 240 16% 22%;
+    --sidebar-ring: 260 68% 60%;
 
-    /* Inbox-specific tokens for reduced eye strain */
-    --inbox-bg: 230 18% 9%;
-    --inbox-sidebar-bg: 230 16% 11%;
-    --inbox-chat-bg: 230 18% 8%;
-    --inbox-message-sent: 230 14% 16%;
-    --inbox-message-received: 230 12% 13%;
-    --inbox-message-private: 45 30% 15%;
-    --inbox-header-bg: 230 16% 10%;
-    --inbox-input-bg: 230 14% 12%;
-    --inbox-hover: 230 14% 14%;
-    --inbox-active: 230 12% 18%;
-    --inbox-unread: 0 65% 55%;
+    /* Inbox-specific tokens */
+    --inbox-bg: 240 22% 9%;
+    --inbox-sidebar-bg: 240 20% 11%;
+    --inbox-chat-bg: 240 22% 8%;
+    --inbox-message-sent: 240 18% 16%;
+    --inbox-message-received: 240 16% 13%;
+    --inbox-message-private: 260 30% 15%;
+    --inbox-header-bg: 240 20% 10%;
+    --inbox-input-bg: 240 18% 12%;
+    --inbox-hover: 240 18% 14%;
+    --inbox-active: 240 16% 18%;
+    --inbox-unread: 260 70% 62%;
 
     /* QR surface (kept white for PIX scanning) */
     --qr-surface: 0 0% 100%;
@@ -197,48 +192,48 @@
      ============================================ */
   .dark .theme-atendimento {
     /* Core */
-    --background: 210 20% 6%;
+    --background: 240 22% 6%;
     --foreground: 0 0% 96%;
 
     /* Surfaces */
-    --card: 210 18% 9%;
+    --card: 240 20% 9%;
     --card-foreground: 0 0% 96%;
-    --popover: 210 18% 9%;
+    --popover: 240 20% 9%;
     --popover-foreground: 0 0% 96%;
 
-    /* Neon green primary */
-    --primary: 145 85% 42%;
-    --primary-foreground: 210 20% 6%;
+    /* Neon blue-purple primary */
+    --primary: 220 85% 55%;
+    --primary-foreground: 0 0% 100%;
 
     /* Support colors */
-    --secondary: 210 16% 12%;
+    --secondary: 240 18% 12%;
     --secondary-foreground: 0 0% 92%;
-    --muted: 210 14% 14%;
-    --muted-foreground: 220 10% 62%;
-    --accent: 155 88% 38%;
-    --accent-foreground: 210 20% 6%;
+    --muted: 240 16% 14%;
+    --muted-foreground: 230 12% 62%;
+    --accent: 280 80% 55%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 70% 54%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 14% 18%;
-    --input: 210 14% 12%;
-    --ring: 145 85% 42%;
+    --border: 240 16% 18%;
+    --input: 240 16% 12%;
+    --ring: 220 85% 55%;
 
     /* Inbox-specific */
-    --inbox-bg: 210 20% 6%;
-    --inbox-sidebar-bg: 210 18% 8%;
-    --inbox-chat-bg: 210 20% 6%;
-    --inbox-message-sent: 210 16% 12%;
-    --inbox-message-received: 210 14% 10%;
-    --inbox-message-private: 145 35% 10%;
-    --inbox-header-bg: 210 18% 7%;
-    --inbox-input-bg: 210 14% 10%;
-    --inbox-hover: 210 14% 12%;
-    --inbox-active: 210 14% 14%;
-    --inbox-unread: 145 85% 42%;
+    --inbox-bg: 240 22% 6%;
+    --inbox-sidebar-bg: 240 20% 8%;
+    --inbox-chat-bg: 240 22% 6%;
+    --inbox-message-sent: 240 18% 12%;
+    --inbox-message-received: 240 16% 10%;
+    --inbox-message-private: 260 35% 10%;
+    --inbox-header-bg: 240 20% 7%;
+    --inbox-input-bg: 240 16% 10%;
+    --inbox-hover: 240 16% 12%;
+    --inbox-active: 240 16% 14%;
+    --inbox-unread: 220 85% 55%;
 
-    /* Subtle green glow (used by components like glass-card hover) */
+    /* Blue-purple glow */
     --shadow-glow: 0 0 52px hsl(var(--primary) / 0.10);
   }
 }
@@ -252,17 +247,17 @@
     @apply bg-background text-foreground antialiased;
     /* Subtle animated gradient background */
     background-image: 
-      radial-gradient(ellipse 100% 80% at 20% 0%, hsl(0 85% 55% / 0.08), transparent 50%),
-      radial-gradient(ellipse 60% 50% at 80% 100%, hsl(15 90% 55% / 0.06), transparent 50%),
-      radial-gradient(ellipse 80% 60% at 50% 50%, hsl(240 20% 8% / 0.02), transparent);
+      radial-gradient(ellipse 100% 80% at 20% 0%, hsl(255 75% 58% / 0.08), transparent 50%),
+      radial-gradient(ellipse 60% 50% at 80% 100%, hsl(340 80% 55% / 0.06), transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 50%, hsl(220 30% 8% / 0.02), transparent);
     background-attachment: fixed;
   }
 
   .dark body, body.dark {
     background-image: 
-      radial-gradient(ellipse 100% 80% at 20% 0%, hsl(0 90% 50% / 0.12), transparent 50%),
-      radial-gradient(ellipse 60% 50% at 80% 100%, hsl(15 95% 50% / 0.08), transparent 50%),
-      radial-gradient(ellipse 80% 60% at 50% 50%, hsl(260 30% 20% / 0.15), transparent);
+      radial-gradient(ellipse 100% 80% at 20% 0%, hsl(260 80% 50% / 0.14), transparent 50%),
+      radial-gradient(ellipse 60% 50% at 80% 100%, hsl(340 85% 50% / 0.10), transparent 50%),
+      radial-gradient(ellipse 80% 60% at 50% 50%, hsl(220 40% 20% / 0.18), transparent);
   }
 
 
@@ -328,7 +323,7 @@
     inset: 0;
     background: linear-gradient(
       135deg, 
-      hsl(0 75% 55% / 0.08) 0%, 
+      hsl(260 70% 55% / 0.08) 0%, 
       transparent 30%,
       transparent 70%,
       hsl(0 0% 0% / 0.05) 100%
