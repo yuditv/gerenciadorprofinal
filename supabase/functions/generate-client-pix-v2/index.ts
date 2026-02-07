@@ -97,6 +97,7 @@ serve(async (req: Request) => {
       customer: {
         phone_number: client_phone,
       },
+      address_required: false,
     };
 
     console.log("[generate-client-pix-v2] Creating InfinitePay checkout...");
