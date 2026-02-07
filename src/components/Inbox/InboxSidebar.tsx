@@ -10,7 +10,8 @@ import {
   UserCheck,
   UserX,
   CheckCircle2,
-  Mail
+  Mail,
+  Kanban
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -46,8 +47,8 @@ interface InboxSidebarProps {
     unread: number;
     mine: number;
   };
-  activeTab: 'conversations' | 'customer-chat' | 'dashboard';
-  onTabChange: (tab: 'conversations' | 'customer-chat' | 'dashboard') => void;
+  activeTab: 'conversations' | 'customer-chat' | 'dashboard' | 'kanban';
+  onTabChange: (tab: 'conversations' | 'customer-chat' | 'dashboard' | 'kanban') => void;
   showCustomerChatTab?: boolean;
   customerUnread?: number;
 }
@@ -157,6 +158,16 @@ export function InboxSidebar({
               )}
             </Button>
           )}
+
+          <Button
+            variant={activeTab === 'kanban' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => onTabChange('kanban')}
+          >
+            <Kanban className="h-4 w-4" />
+            <span className="hidden sm:inline">Kanban</span>
+          </Button>
 
           <Button
             variant={activeTab === 'dashboard' ? 'secondary' : 'ghost'}

@@ -1398,6 +1398,42 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_contact_reasons: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          reason_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          reason_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          reason_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_contact_reasons_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_contact_reasons_reason_id_fkey"
+            columns: ["reason_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_contact_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_labels: {
         Row: {
           conversation_id: string
@@ -1440,6 +1476,7 @@ export type Database = {
           ai_enabled: boolean | null
           ai_paused_at: string | null
           assigned_to: string | null
+          closed_at: string | null
           contact_avatar: string | null
           contact_name: string | null
           country_code: string | null
@@ -1455,6 +1492,8 @@ export type Database = {
           resolved_at: string | null
           snoozed_until: string | null
           status: string
+          summary: string | null
+          ticket_number: string | null
           transfer_reason: string | null
           transferred_from_agent_id: string | null
           unread_count: number | null
@@ -1466,6 +1505,7 @@ export type Database = {
           ai_enabled?: boolean | null
           ai_paused_at?: string | null
           assigned_to?: string | null
+          closed_at?: string | null
           contact_avatar?: string | null
           contact_name?: string | null
           country_code?: string | null
@@ -1481,6 +1521,8 @@ export type Database = {
           resolved_at?: string | null
           snoozed_until?: string | null
           status?: string
+          summary?: string | null
+          ticket_number?: string | null
           transfer_reason?: string | null
           transferred_from_agent_id?: string | null
           unread_count?: number | null
@@ -1492,6 +1534,7 @@ export type Database = {
           ai_enabled?: boolean | null
           ai_paused_at?: string | null
           assigned_to?: string | null
+          closed_at?: string | null
           contact_avatar?: string | null
           contact_name?: string | null
           country_code?: string | null
@@ -1507,6 +1550,8 @@ export type Database = {
           resolved_at?: string | null
           snoozed_until?: string | null
           status?: string
+          summary?: string | null
+          ticket_number?: string | null
           transfer_reason?: string | null
           transferred_from_agent_id?: string | null
           unread_count?: number | null
@@ -2180,6 +2225,107 @@ export type Database = {
         }
         Relationships: []
       }
+      inbox_business_hours: {
+        Row: {
+          auto_reply_message: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          schedule: Json
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_reply_message?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          schedule?: Json
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_reply_message?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          schedule?: Json
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      inbox_contact_reasons: {
+        Row: {
+          color: string
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      inbox_csat_surveys: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          feedback: string | null
+          id: string
+          rating: number | null
+          responded_at: string | null
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          rating?: number | null
+          responded_at?: string | null
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          rating?: number | null
+          responded_at?: string | null
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_csat_surveys_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_labels: {
         Row: {
           color: string
@@ -2340,6 +2486,42 @@ export type Database = {
         }
         Relationships: []
       }
+      inbox_sla_config: {
+        Row: {
+          created_at: string
+          first_response_minutes: number
+          id: string
+          is_active: boolean
+          name: string
+          priority_multipliers: Json
+          resolution_minutes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          first_response_minutes?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority_multipliers?: Json
+          resolution_minutes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          first_response_minutes?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority_multipliers?: Json
+          resolution_minutes?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_team_members: {
         Row: {
           agent_id: string
@@ -2396,6 +2578,45 @@ export type Database = {
           name?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      inbox_triage_config: {
+        Row: {
+          collect_name: boolean
+          collect_reason: boolean
+          created_at: string
+          departments: Json
+          fallback_message: string | null
+          id: string
+          is_enabled: boolean
+          updated_at: string
+          user_id: string
+          welcome_message: string | null
+        }
+        Insert: {
+          collect_name?: boolean
+          collect_reason?: boolean
+          created_at?: string
+          departments?: Json
+          fallback_message?: string | null
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+          user_id: string
+          welcome_message?: string | null
+        }
+        Update: {
+          collect_name?: boolean
+          collect_reason?: boolean
+          created_at?: string
+          departments?: Json
+          fallback_message?: string | null
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+          welcome_message?: string | null
         }
         Relationships: []
       }
