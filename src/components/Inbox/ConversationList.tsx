@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Conversation } from "@/hooks/useInboxConversations";
 import { useContactAvatar } from "@/hooks/useContactAvatar";
 import { useDebouncedCallback } from "@/hooks/useOptimizedCallbacks";
+import { useInboxSLA } from "@/hooks/useInboxSLA";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,7 @@ export const ConversationList = memo(function ConversationList({
   const [sortBy, setSortBy] = useState<'recent' | 'unread'>('recent');
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const { fetchAvatarsBatch, isLoading: isFetchingAvatars } = useContactAvatar();
+  const { getSLAStatus } = useInboxSLA();
 
   // Debounced search to reduce re-renders during typing
   const debouncedSearch = useDebouncedCallback((value: string) => {
@@ -173,6 +175,7 @@ export const ConversationList = memo(function ConversationList({
                 isSelected={selectedId === conversation.id}
                 defaultAgentId={defaultAgentId}
                 onSelect={handleSelect}
+                getSLAStatus={getSLAStatus}
               />
             ))}
           </div>

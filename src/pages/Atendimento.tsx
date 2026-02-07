@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { motion } from "framer-motion";
+// motion import removed for performance
 import { useAccountContext } from "@/hooks/useAccountContext";
 import { useCustomerChatLinks } from "@/hooks/useCustomerChatLinks";
 import { useCustomerConversations } from "@/hooks/useCustomerConversations";
@@ -293,6 +293,10 @@ export default function Atendimento() {
     }
   }, [isSupported, permission, requestPermission]);
 
+  // Keep a stable ref to conversations to avoid re-subscribing channels
+  const conversationsRef = useRef(conversations);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+
   // Listen for new incoming messages and show notifications
   useEffect(() => {
     const channel = supabase
@@ -308,7 +312,7 @@ export default function Atendimento() {
             lastNotifiedMessageRef.current = newMessage.id;
             
             // Find conversation to get contact name
-            const conv = conversations.find(c => c.id === newMessage.conversation_id);
+            const conv = conversationsRef.current.find(c => c.id === newMessage.conversation_id);
             const contactName = conv?.contact_name || 'Cliente';
             
             // Play new message notification sound
@@ -330,7 +334,7 @@ export default function Atendimento() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversations, permission, showLocalNotification, playNewMessage]);
+  }, [permission, showLocalNotification, playNewMessage]);
 
   // Fetch default agent from routing when instance filter changes
   useEffect(() => {
@@ -411,7 +415,10 @@ export default function Atendimento() {
 
   const { triggerMessageCreated, triggerConversationCreated } = useAutomationTriggers(automationCallbacks);
 
-  // Real-time message listener for automation triggers
+  // Real-time message listener for automation triggers (use ref to avoid re-subscribing)
+  const lastProcessedRef = useRef(lastProcessedMessageId);
+  useEffect(() => { lastProcessedRef.current = lastProcessedMessageId; }, [lastProcessedMessageId]);
+
   useEffect(() => {
     const channel = supabase
       .channel('automation-triggers')
@@ -422,11 +429,11 @@ export default function Atendimento() {
           const newMessage = payload.new as ChatMessage;
           
           // Only trigger for incoming messages from contacts
-          if (newMessage.sender_type === 'contact' && newMessage.id !== lastProcessedMessageId) {
+          if (newMessage.sender_type === 'contact' && newMessage.id !== lastProcessedRef.current) {
             setLastProcessedMessageId(newMessage.id);
             
             // Find the conversation for this message
-            const conversation = conversations.find(c => c.id === newMessage.conversation_id);
+            const conversation = conversationsRef.current.find(c => c.id === newMessage.conversation_id);
             if (conversation) {
               console.log('[Automation] New message received, checking triggers...');
               triggerMessageCreated(conversation, newMessage);
@@ -450,7 +457,7 @@ export default function Atendimento() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversations, triggerMessageCreated, triggerConversationCreated, lastProcessedMessageId, maybePromptAIForConversation]);
+  }, [triggerMessageCreated, triggerConversationCreated, maybePromptAIForConversation]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilter(prev => ({ ...prev, search: searchQuery || undefined }));
@@ -589,10 +596,8 @@ export default function Atendimento() {
     <div className="theme-atendimento h-screen flex flex-col bg-inbox inbox-surface overflow-hidden">
       {/* Subscription Expired Banner */}
       {subscriptionExpired && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-destructive/10 border-b border-destructive/20 px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2"
+        <div
+          className="animate-fade-in bg-destructive/10 border-b border-destructive/20 px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2"
         >
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive shrink-0" />
@@ -612,7 +617,7 @@ export default function Atendimento() {
             <span className="hidden sm:inline">Renovar Agora</span>
             <span className="sm:hidden">Renovar</span>
           </Button>
-        </motion.div>
+        </div>
       )}
 
       {/* Top Header */}
@@ -685,10 +690,8 @@ export default function Atendimento() {
       <div className="flex-1 flex flex-col overflow-hidden relative min-h-0">
         {/* Subscription Expired Overlay */}
         {subscriptionExpired && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-              className="absolute inset-0 bg-inbox/80 backdrop-blur-sm z-50 flex items-center justify-center"
+          <div
+              className="animate-fade-in absolute inset-0 bg-inbox/80 z-50 flex items-center justify-center"
           >
             <div className="text-center p-8 max-w-md">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
@@ -709,7 +712,7 @@ export default function Atendimento() {
                 Ver Planos de Assinatura
               </Button>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Horizontal Navigation Bar (Top) */}
