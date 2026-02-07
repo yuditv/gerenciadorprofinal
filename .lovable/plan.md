@@ -1,167 +1,162 @@
 
-## O que já foi feito (até agora)
-1) Banco de dados criado para o chat cliente↔você (tempo real):
-- `public.customer_chat_links`: guarda os links/convites (token) que você gera e manda para cada cliente.
-- `public.customer_conversations`: guarda a conversa 1:1 (uma por cliente).
-- `public.customer_messages`: guarda as mensagens do chat.
 
-2) Segurança (RLS) aplicada:
-- Só o dono da conta (você) consegue gerenciar os links.
-- O cliente logado só consegue ver a própria conversa/mensagens (por `customer_user_id = auth.uid()`).
-- Inserção de mensagem é permitida conforme `sender_type` (`owner` ou `customer`).
+# Plano: Migrar de Mercado Pago para InfinitePay
 
-3) Trigger/validação:
-- Função `validate_customer_message_sender()` já valida `sender_type` e conteúdo vazio/tamanho.
+## Resumo
 
-4) Frontend:
-- Ainda não existe interface pronta para esse chat no Atendimento nem a “página do cliente”.
-- Por isso você não está “vendo” o chat em lugar nenhum ainda.
+Substituir toda a integracaoo com Mercado Pago pela InfinitePay (Checkout Integrado). A InfinitePay usa um modelo de **link de checkout** (nao gera QR Code PIX diretamente), entao o fluxo muda de "exibir QR Code inline" para "abrir link de pagamento InfinitePay".
 
-## Onde “está o chat” agora
-- Ele já existe no banco, mas falta criar as telas e a lógica no app.
-- Sem a tela do cliente e sem a tela dentro do Atendimento, não tem como usar ainda (só via SQL/SDK).
+## Como funciona a InfinitePay
 
-## Objetivo do que vamos construir
-- Você configura o “perfil do chat” (nome e foto) usando o que já existe em `profiles` (display_name/avatar_url).
-- Você gera um link único por cliente.
-- O cliente abre o link, cria conta (email/senha) com nome obrigatório.
-- Depois disso, ele conversa com você em tempo real (igual WhatsApp).
-- Dentro do `/atendimento`, você terá uma área “Chat do Cliente” para ver a lista de clientes e responder.
+A API e publica e simples:
+- **Criar link de checkout**: `POST https://api.infinitepay.io/invoices/public/checkout/links`
+- **Verificar pagamento**: `POST https://api.infinitepay.io/invoices/public/checkout/payment_check`
+- **Webhook**: InfinitePay envia POST para sua URL quando o pagamento e aprovado
+- Nao precisa de API Key -- usa o **handle** (nome de usuario InfinitePay, ex: `lucas-renda`)
+- Precos em **centavos** (R$ 10,00 = 1000)
 
-Observação importante (pela sua decisão):
-- “Somente eu” atende: vamos esconder/bloquear essa área para atendentes (membros). Só o dono da conta vê.
+---
 
-## Design de rotas (para não misturar com o painel)
-Hoje o app tem:
-- Rotas do painel (protegidas) usando `ProtectedRoute`.
-- `/auth` e `/attendant-auth` (públicas, mas redirecionam se já estiver logado).
+## Fase 1: Banco de Dados
 
-Precisamos adicionar rotas do cliente sem “jogar” ele para o painel:
-- `/c/:token` → página pública do chat (convite), com Login/Cadastro do cliente.
-- `/c/:token/chat` (ou `/customer/chat`) → chat do cliente já logado.
+**Migracao SQL:**
+- Adicionar coluna `infinitepay_handle` na tabela `user_payment_credentials`
+- Adicionar colunas `checkout_url` e `infinitepay_slug` nas tabelas `subscription_payments`, `client_pix_payments` e `wallet_topups`
+- Manter colunas antigas temporariamente para compatibilidade
 
-Vamos criar um “guard” de cliente (CustomerRoute) que:
-- Exige login para a tela do chat do cliente.
-- Se o usuário logado for dono/atendente (painel), redireciona para o painel, evitando confusão.
-- Se for cliente, mantém ele no chat do cliente.
+## Fase 2: Edge Functions (Backend)
 
-## Backend necessário (Edge Functions)
-Pelo RLS atual, o cliente NÃO pode ler `customer_chat_links` (por segurança), então precisamos de edge functions para:
-1) `customer-chat-link-info`
-   - Entrada: `token`
-   - Saída: dados básicos do chat (nome/foto do dono via `profiles`, e se o link está ativo)
-   - Uso: mostrar “Chat com {Seu Nome}” na tela antes do login.
+### 2.1 - Nova funcao `infinitepay-checkout`
+Substitui `mercado-pago-pix`. Dois modos:
+- **create**: Chama `POST /invoices/public/checkout/links` com handle do admin (secret `INFINITEPAY_HANDLE`), items, order_nsu, redirect_url e webhook_url. Salva o link e slug no banco.
+- **check**: Chama `POST /invoices/public/checkout/payment_check` com handle, order_nsu e slug. Se pago, ativa assinatura.
 
-2) `customer-chat-redeem-link`
-   - Requer cliente autenticado
-   - Entrada: `token`, `customer_name`
-   - Faz:
-     - valida token/ativo
-     - “resgata” o link: define `customer_user_id`, `customer_name`, `redeemed_at`
-     - cria (ou reutiliza) `customer_conversations` para (owner_id, customer_user_id)
-     - retorna `conversationId`
-   - Uso: depois do cadastro/login, vincula o cliente ao chat certo.
+### 2.2 - Nova funcao `infinitepay-webhook`
+Substitui `mercado-pago-webhook`. Recebe POST da InfinitePay com:
+```
+{ invoice_slug, amount, paid_amount, capture_method, transaction_nsu, order_nsu, receipt_url, items }
+```
+Logica identica ao webhook atual: marca pagamento como pago, ativa assinatura/renova cliente, envia notificacoes WhatsApp.
 
-Sem essas funções, o cliente não consegue iniciar o chat com segurança.
+### 2.3 - Atualizar `generate-client-pix-v2`
+Em vez de usar `MERCADO_PAGO_ACCESS_TOKEN` do usuario, usa `infinitepay_handle` da tabela `user_payment_credentials`. Chama a API InfinitePay para gerar link de checkout para o cliente.
 
-## Frontend (Cliente) — telas e comportamento
-### 1) Página do convite `/c/:token`
-Componentes/fluxo:
-- Carrega `customer-chat-link-info` para mostrar:
-  - seu nome e sua foto (do `profiles`)
-  - “Entre para conversar”
-- Tabs: “Entrar” e “Criar conta”
-- Cadastro exige:
-  - nome (obrigatório)
-  - email
-  - senha
-- Ao finalizar login/cadastro:
-  - chama `customer-chat-redeem-link` (com token e nome)
-  - redireciona para `/c/:token/chat`
+### 2.4 - Atualizar `wallet-pix`
+Mesma logica: substituir chamada Mercado Pago por InfinitePay. Gera link de checkout para recarga de creditos.
 
-### 2) Chat do cliente `/c/:token/chat`
-- Busca a conversa do cliente (pelo retorno do redeem ou por query “minha conversa desse owner”).
-- Lista de mensagens (estilo WhatsApp: bolhas, horário, alinhamento direita/esquerda).
-- Envio:
-  - Insert direto em `customer_messages` com `sender_type='customer'` (RLS permite).
-- Tempo real:
-  - `supabase.channel(...).on('postgres_changes', INSERT/UPDATE)` em `customer_messages` filtrando `conversation_id`.
-- Leitura:
-  - Ao abrir o chat, marcar mensagens como lidas (atualizar `is_read_by_customer=true` em mensagens recebidas do owner).
-  - (Opcional) atualizar `unread_customer_count` no `customer_conversations` quando for necessário.
+### 2.5 - Atualizar `ai-agent-chat` e `customer-chat-ai`
+Substituir blocos de geracao de PIX via Mercado Pago pela API InfinitePay. Em vez de enviar QR Code, envia o link de checkout.
 
-## Frontend (Atendimento) — “Chat do Cliente” dentro do painel
-### 1) Adicionar uma nova área no `/atendimento`
-- No topo (onde hoje alterna “conversations/dashboard”), adicionar mais uma opção:
-  - “WhatsApp”
-  - “Chat do Cliente”
-  - “Dashboard”
-- Quando “Chat do Cliente” estiver selecionado:
-  - Coluna esquerda: lista de conversas com clientes (`customer_conversations` do owner)
-  - Área principal: painel de chat com mensagens + composer
-  - Barra superior: dados do cliente (nome, avatar se tiver) + status online (opcional futuro)
+## Fase 3: Frontend
 
-### 2) Restrições (Somente você)
-- Usar `useAccountContext()`:
-  - Se `isMember === true`, esconder a aba “Chat do Cliente” e/ou mostrar aviso “Apenas o dono da conta pode acessar”.
-- (Recomendado) Também validar no backend/RLS (já usamos `account_owner_id(auth.uid())`, mas aqui é decisão de UI).
+### 3.1 - `CredentialsSettings.tsx`
+Trocar de "Mercado Pago Access Token" para "InfinitePay Handle". Campo simples de texto (ex: `lucas-renda`). Salva na coluna `infinitepay_handle`.
 
-### 3) Gerador de link por cliente (dentro do Atendimento)
-- Criar um painel simples “Gerenciar links”:
-  - Botão “Criar link”
-  - Campo “Nome do cliente”
-  - Botão “Copiar link”
-  - Lista de links criados (ativo/inativo)
-  - Botão “Desativar link”
-- Link gerado:
-  - `https://SEU_DOMINIO/c/{token}`
-- Token: gerado no frontend (ex.: `crypto.randomUUID()` ou string randômica) e inserido em `customer_chat_links`.
+### 3.2 - `PIXPaymentDialog.tsx` (assinaturas)
+Em vez de exibir QR Code, exibir:
+- Botao "Abrir Checkout InfinitePay" que abre o link em nova aba
+- Timer de expiracao
+- Botao "Verificar Pagamento" que consulta o status
+- Estado de sucesso quando confirmado
 
-## Hooks e componentes novos (padrão do projeto)
-Vamos seguir o padrão existente (`useInboxMessages`, `useInboxConversations`) criando:
-- `useCustomerChatLinks()`
-  - list/create/deactivate links
-- `useCustomerConversations()`
-  - fetch conversas do owner
-  - realtime de novas mensagens para atualizar `last_message_at` e ordenar
-- `useCustomerMessages(conversationId)`
-  - fetch mensagens
-  - send message (owner)
-  - realtime insert/update
-- Componentes UI:
-  - `CustomerChatSidebar` (lista)
-  - `CustomerChatPanel` (mensagens + envio)
-  - `CreateCustomerChatLinkDialog` (criar e copiar link)
-- Páginas:
-  - `CustomerChatInvite.tsx` (rota `/c/:token`)
-  - `CustomerChatRoom.tsx` (rota `/c/:token/chat`)
+### 3.3 - `GeneratePIXDialog.tsx` (cobrar clientes)
+Mesma abordagem: gerar link, exibir para copiar/enviar ao cliente via WhatsApp. Botao "Enviar Link" em vez de "Enviar QR Code".
 
-## Ajustes necessários no roteamento
-- Atualizar `src/App.tsx` para registrar:
-  - `<Route path="/c/:token" element={<CustomerChatInvite/>} />`
-  - `<Route path="/c/:token/chat" element={<CustomerChatRoom/>} />`
-- Implementar um guard de cliente que:
-  - não use `PublicRoute` (porque `PublicRoute` redireciona usuários logados pro painel)
-  - valide se o usuário é cliente (ex.: detectando se ele é “member” ou “owner” e redirecionando para `/` se for)
-  - mantém o cliente no chat
+### 3.4 - `useWalletTopup.ts`
+Mudar invocacao de `wallet-pix` (mesma interface, so muda o backend).
 
-## Testes (checklist prático)
-1) Dono cria link no Atendimento e copia.
-2) Abrir link em janela anônima.
-3) Cliente cria conta com nome obrigatório.
-4) Cliente envia mensagem → aparece em tempo real no Atendimento (aba Chat do Cliente).
-5) Dono responde → aparece em tempo real no chat do cliente.
-6) Recarregar ambas telas → histórico permanece.
-7) Confirmar que atendente (member) não vê a aba Chat do Cliente.
+### 3.5 - `useSubscription.ts`
+Atualizar referencia de `mercado-pago-pix` para `infinitepay-checkout`.
 
-## Riscos / pontos de atenção
-- Misturar “cliente logado” com “painel logado” no mesmo navegador pode confundir (porque Supabase Auth é compartilhado).
-  - Mitigação: guard + redirecionamentos claros + sugestão de usar janela anônima para testar como cliente.
-- Contadores de não lidas:
-  - Podemos começar simples (sem contador perfeito) e adicionar depois via triggers ou updates no app.
+## Fase 4: Secrets e Configuracao
 
-## Entregáveis (o que você vai ver quando pronto)
-- No `/atendimento`: uma nova aba “Chat do Cliente” (somente você).
-- Um botão para criar e copiar link por cliente.
-- Para o cliente: uma página tipo WhatsApp com login/cadastro e chat em tempo real.
+- Adicionar secret `INFINITEPAY_HANDLE` (handle do admin do sistema)
+- A secret `MERCADO_PAGO_ACCESS_TOKEN` pode ser removida depois
+- Cada usuario configura seu proprio handle em Configuracoes > Credenciais
+
+---
+
+## Detalhes Tecnicos
+
+### Payload de criacao do checkout:
+```json
+{
+  "handle": "lucas-renda",
+  "items": [
+    { "quantity": 1, "price": 5000, "description": "Plano Premium - 30 dias" }
+  ],
+  "order_nsu": "sub_uuid_123",
+  "redirect_url": "https://app.com/payment-success",
+  "webhook_url": "https://supabase.co/functions/v1/infinitepay-webhook",
+  "customer": {
+    "name": "Joao Silva",
+    "email": "joao@email.com",
+    "phone_number": "+5511999887766"
+  }
+}
+```
+
+### Payload de verificacao:
+```json
+{
+  "handle": "lucas-renda",
+  "order_nsu": "sub_uuid_123",
+  "slug": "codigo-da-fatura"
+}
+```
+
+### Resposta de verificacao:
+```json
+{
+  "success": true,
+  "paid": true,
+  "amount": 5000,
+  "paid_amount": 5010,
+  "installments": 1,
+  "capture_method": "pix"
+}
+```
+
+### Webhook recebido (pagamento aprovado):
+```json
+{
+  "invoice_slug": "abc123",
+  "amount": 5000,
+  "paid_amount": 5010,
+  "installments": 1,
+  "capture_method": "credit_card",
+  "transaction_nsu": "UUID",
+  "order_nsu": "sub_uuid_123",
+  "receipt_url": "https://comprovante.com/123",
+  "items": [...]
+}
+```
+
+## Arquivos Impactados
+
+| Arquivo | Acao |
+|---------|------|
+| `supabase/migrations/new.sql` | Adicionar colunas |
+| `supabase/functions/infinitepay-checkout/index.ts` | Criar (substitui mercado-pago-pix) |
+| `supabase/functions/infinitepay-webhook/index.ts` | Criar (substitui mercado-pago-webhook) |
+| `supabase/functions/generate-client-pix-v2/index.ts` | Editar |
+| `supabase/functions/wallet-pix/index.ts` | Editar |
+| `supabase/functions/ai-agent-chat/index.ts` | Editar (linhas 1212-1288) |
+| `supabase/functions/customer-chat-ai/index.ts` | Editar (linhas 481-517) |
+| `src/components/CredentialsSettings.tsx` | Editar |
+| `src/components/PIXPaymentDialog.tsx` | Editar |
+| `src/components/Inbox/GeneratePIXDialog.tsx` | Editar |
+| `src/hooks/useWalletTopup.ts` | Editar |
+| `src/hooks/useSubscription.ts` | Editar |
+| `src/integrations/supabase/types.ts` | Atualizar tipos |
+
+## Ordem de Execucao
+
+1. Migracao SQL (adicionar colunas)
+2. Criar `infinitepay-checkout` e `infinitepay-webhook`
+3. Atualizar `generate-client-pix-v2` e `wallet-pix`
+4. Atualizar componentes frontend
+5. Atualizar funcoes de IA
+6. Solicitar secret `INFINITEPAY_HANDLE`
+7. Deploy e teste
 
