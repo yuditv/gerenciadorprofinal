@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, memo } from "react";
-import { Users, Bot, Flame, Crown, Headset, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, Wallet, LayoutGrid } from "lucide-react";
+import { Users, Bot, Flame, Crown, Headset, User, Settings, LogOut, BarChart3, CreditCard, Smartphone, ChevronDown, LayoutGrid } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
@@ -310,12 +310,6 @@ export const FloatingSidebar = memo(function FloatingSidebar({ activeSection, on
                       <CreditCard className="h-4 w-4 mr-2 text-primary" />
                       Histórico de Pagamentos
                     </DropdownMenuItem>
-                    {isAdmin && (
-                      <DropdownMenuItem onClick={() => navigate('/carteira')} className="hover:bg-primary/10">
-                        <Wallet className="h-4 w-4 mr-2 text-primary" />
-                        Carteira
-                      </DropdownMenuItem>
-                    )}
                     <DropdownMenuItem onClick={() => navigate('/my-dashboard')} className="hover:bg-primary/10">
                       <BarChart3 className="h-4 w-4 mr-2 text-primary" />
                       Meu Dashboard
