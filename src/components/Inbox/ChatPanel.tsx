@@ -648,14 +648,14 @@ export function ChatPanel({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Client Info Button - visible on screens < 2xl (where side panel may cut off) */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="2xl:hidden"
+                className="2xl:hidden h-8 w-8"
                 onClick={() => setShowClientSheet(true)}
               >
                 <User className="h-4 w-4" />
@@ -664,10 +664,10 @@ export function ChatPanel({
             <TooltipContent>Dados do Cliente</TooltipContent>
           </Tooltip>
 
-          {/* IPTV Test Generator Button */}
+          {/* IPTV Test Generator Button - hidden on mobile */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" onClick={() => setShowIPTVChoice(true)}>
+              <Button variant="outline" size="sm" onClick={() => setShowIPTVChoice(true)} className="hidden sm:inline-flex">
                 <Tv className="h-4 w-4 mr-1" />
                 IPTV
               </Button>
@@ -675,10 +675,10 @@ export function ChatPanel({
             <TooltipContent>Gerar Teste IPTV</TooltipContent>
           </Tooltip>
 
-          {/* VPN Test Generator Button */}
+          {/* VPN Test Generator Button - hidden on mobile */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" onClick={() => setShowVPNTestGenerator(true)}>
+              <Button variant="outline" size="sm" onClick={() => setShowVPNTestGenerator(true)} className="hidden sm:inline-flex">
                 <Wifi className="h-4 w-4 mr-1" />
                 VPN
               </Button>
@@ -686,10 +686,10 @@ export function ChatPanel({
             <TooltipContent>Gerar Teste VPN / Internet</TooltipContent>
           </Tooltip>
 
-          {/* Schedule Message */}
+          {/* Schedule Message - hidden on mobile */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="sm" onClick={() => setShowScheduleMessage(true)}>
+              <Button variant="outline" size="sm" onClick={() => setShowScheduleMessage(true)} className="hidden sm:inline-flex">
                 <Clock className="h-4 w-4 mr-1" />
                 Agendar
               </Button>
@@ -697,12 +697,10 @@ export function ChatPanel({
             <TooltipContent>Agendar mensagem</TooltipContent>
           </Tooltip>
 
-          {/* Quick Messages Panel toggle removed - management moved to Settings */}
-
-          {/* Search Button */}
+          {/* Search Button - hidden on mobile */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" onClick={() => setShowSearchDialog(true)}>
+              <Button variant="outline" size="icon" onClick={() => setShowSearchDialog(true)} className="hidden sm:inline-flex h-8 w-8">
                 <Search className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -712,7 +710,7 @@ export function ChatPanel({
           {/* AI Toggle with pause indicator */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors", conversation.ai_enabled ? "bg-primary/10 border border-primary/30" : conversation.ai_paused_at ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted")}>
+              <div className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md transition-colors", conversation.ai_enabled ? "bg-primary/10 border border-primary/30" : conversation.ai_paused_at ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted")}>
                 <Bot className={cn("h-4 w-4", conversation.ai_enabled ? "text-primary" : conversation.ai_paused_at ? "text-amber-500" : "text-muted-foreground")} />
                 <Switch checked={conversation.ai_enabled} onCheckedChange={onToggleAI} className="scale-75" />
                 {!conversation.ai_enabled && conversation.ai_paused_at && <Clock className="h-3 w-3 text-amber-500 animate-pulse" />}
@@ -725,17 +723,17 @@ export function ChatPanel({
             </TooltipContent>
           </Tooltip>
 
-          {/* Assign to me */}
-          {!conversation.assigned_to && <Button variant="outline" size="sm" onClick={onAssignToMe}>
+          {/* Assign to me - hidden on mobile */}
+          {!conversation.assigned_to && <Button variant="outline" size="sm" onClick={onAssignToMe} className="hidden sm:inline-flex">
               <UserPlus className="h-4 w-4 mr-1" />
               Assumir
             </Button>}
 
-          {/* Resolve/Reopen */}
-          {conversation.status === 'open' || conversation.status === 'pending' ? <Button variant="outline" size="sm" onClick={onResolve}>
+          {/* Resolve/Reopen - hidden on mobile */}
+          {conversation.status === 'open' || conversation.status === 'pending' ? <Button variant="outline" size="sm" onClick={onResolve} className="hidden sm:inline-flex">
               <Check className="h-4 w-4 mr-1" />
               Resolver
-            </Button> : <Button variant="outline" size="sm" onClick={onReopen}>
+            </Button> : <Button variant="outline" size="sm" onClick={onReopen} className="hidden sm:inline-flex">
               <RotateCcw className="h-4 w-4 mr-1" />
               Reabrir
             </Button>}
@@ -743,11 +741,47 @@ export function ChatPanel({
           {/* More Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* Mobile-only items */}
+              <DropdownMenuItem onClick={() => setShowIPTVChoice(true)} className="sm:hidden">
+                <Tv className="h-4 w-4 mr-2" />
+                Gerar Teste IPTV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowVPNTestGenerator(true)} className="sm:hidden">
+                <Wifi className="h-4 w-4 mr-2" />
+                Gerar Teste VPN
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowScheduleMessage(true)} className="sm:hidden">
+                <Clock className="h-4 w-4 mr-2" />
+                Agendar mensagem
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowSearchDialog(true)} className="sm:hidden">
+                <Search className="h-4 w-4 mr-2" />
+                Buscar mensagens
+              </DropdownMenuItem>
+              {!conversation.assigned_to && (
+                <DropdownMenuItem onClick={onAssignToMe} className="sm:hidden">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Assumir conversa
+                </DropdownMenuItem>
+              )}
+              {(conversation.status === 'open' || conversation.status === 'pending') ? (
+                <DropdownMenuItem onClick={onResolve} className="sm:hidden">
+                  <Check className="h-4 w-4 mr-2" />
+                  Resolver
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={onReopen} className="sm:hidden">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reabrir
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator className="sm:hidden" />
+
               <DropdownMenuItem
                 onClick={async () => {
                   if (!conversation?.active_agent_id) {
