@@ -625,7 +625,7 @@ export default function Atendimento() {
         <div className="flex items-center gap-2 sm:gap-4">
           <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => {
             try { localStorage.setItem('app-active-section', JSON.stringify('clients')); } catch {}
-            navigate('/');
+            navigate('/?section=clients', { replace: true });
           }}>
             <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
