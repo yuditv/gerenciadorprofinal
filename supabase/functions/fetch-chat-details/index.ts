@@ -122,8 +122,9 @@ serve(async (req) => {
       );
     }
 
-    // Use global UAZAPI token
-    const token = UAZAPI_TOKEN;
+    // Use instance_key as token (same pattern as send-inbox-message)
+    // Fallback to global UAZAPI_TOKEN if instance_key is not available
+    const token = instance.instance_key || UAZAPI_TOKEN;
     
     if (!token) {
       return new Response(
