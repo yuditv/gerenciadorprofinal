@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -56,6 +56,7 @@ import { VPNTestGeneratorDialog } from "./VPNTestGeneratorDialog";
 import { GeneratePIXDialog } from "./GeneratePIXDialog";
 import { ScheduleMessageDialog } from "./ScheduleMessageDialog";
 import { useAutoCorrect } from "@/hooks/useAutoCorrect";
+import { useAIAgents } from "@/hooks/useAIAgents";
 interface ChatPanelProps {
   conversation: Conversation | null;
   messages: ChatMessage[];
@@ -68,7 +69,7 @@ interface ChatPanelProps {
   onAssignToMe: () => void;
   onResolve: () => void;
   onReopen: () => void;
-  onToggleAI: (enabled: boolean) => void;
+  onToggleAI: (enabled: boolean, agentId?: string | null) => void;
   onAssignLabel: (labelId: string) => void;
   onRemoveLabel: (labelId: string) => void;
   onMarkAsRead: () => void;
@@ -153,6 +154,10 @@ export function ChatPanel({
 
   // Auto-correct hook
   const { isEnabled: autoCorrectEnabled, toggleEnabled: toggleAutoCorrect, processText: autoCorrectText } = useAutoCorrect();
+
+  // AI agents for selector
+  const { agents: allAIAgents } = useAIAgents();
+  const whatsAppActiveAgents = allAIAgents.filter(a => a.is_active && a.is_whatsapp_enabled);
 
   // Fetch client by phone
   const {
@@ -706,21 +711,67 @@ export function ChatPanel({
             <TooltipContent>Buscar mensagens</TooltipContent>
           </Tooltip>
 
-          {/* AI Toggle with pause indicator */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md transition-colors", conversation.ai_enabled ? "bg-primary/10 border border-primary/30" : conversation.ai_paused_at ? "bg-amber-500/10 border border-amber-500/30" : "bg-muted")}>
+          {/* AI Toggle with agent selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md transition-colors cursor-pointer border", conversation.ai_enabled ? "bg-primary/10 border-primary/30" : conversation.ai_paused_at ? "bg-amber-500/10 border-amber-500/30" : "bg-muted border-transparent")}>
                 <Bot className={cn("h-4 w-4", conversation.ai_enabled ? "text-primary" : conversation.ai_paused_at ? "text-amber-500" : "text-muted-foreground")} />
-                <Switch checked={conversation.ai_enabled} onCheckedChange={onToggleAI} className="scale-75" />
+                <span className={cn("text-xs font-medium hidden sm:inline max-w-[80px] truncate", conversation.ai_enabled ? "text-primary" : "text-muted-foreground")}>
+                  {conversation.ai_enabled 
+                    ? (conversation.active_agent?.name || 'IA') 
+                    : 'IA'}
+                </span>
+                <ChevronDown className={cn("h-3 w-3", conversation.ai_enabled ? "text-primary" : "text-muted-foreground")} />
                 {!conversation.ai_enabled && conversation.ai_paused_at && <Clock className="h-3 w-3 text-amber-500 animate-pulse" />}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              {conversation.ai_enabled ? 'IA ativada - clique para pausar' : conversation.ai_paused_at ? `IA pausada - reativa automaticamente em ${formatDistanceToNow(new Date(new Date(conversation.ai_paused_at).getTime() + 60 * 60 * 1000), {
-                locale: ptBR
-              })}` : 'IA desativada - clique para ativar'}
-            </TooltipContent>
-          </Tooltip>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {conversation.ai_enabled ? (
+                <>
+                  <DropdownMenuItem onClick={() => onToggleAI(false)} className="text-destructive">
+                    <Ban className="h-4 w-4 mr-2" />
+                    Desativar IA
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Trocar agente:</p>
+                  {whatsAppActiveAgents.map((agent) => (
+                    <DropdownMenuItem
+                      key={agent.id}
+                      onClick={() => onToggleAI(true, agent.id)}
+                      className="gap-2"
+                    >
+                      <div className="p-1 rounded" style={{ backgroundColor: `${agent.color || '#666'}20` }}>
+                        <Bot className="h-3 w-3" style={{ color: agent.color || '#666' }} />
+                      </div>
+                      <span className="flex-1 truncate">{agent.name}</span>
+                      {conversation.active_agent_id === agent.id && (
+                        <Check className="h-3.5 w-3.5 text-primary" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Ativar IA com agente:</p>
+                  {whatsAppActiveAgents.length === 0 && (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum agente WhatsApp ativo</p>
+                  )}
+                  {whatsAppActiveAgents.map((agent) => (
+                    <DropdownMenuItem
+                      key={agent.id}
+                      onClick={() => onToggleAI(true, agent.id)}
+                      className="gap-2"
+                    >
+                      <div className="p-1 rounded" style={{ backgroundColor: `${agent.color || '#666'}20` }}>
+                        <Bot className="h-3 w-3" style={{ color: agent.color || '#666' }} />
+                      </div>
+                      <span className="flex-1 truncate">{agent.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Assign to me - hidden on mobile */}
           {!conversation.assigned_to && <Button variant="outline" size="sm" onClick={onAssignToMe} className="hidden sm:inline-flex">
