@@ -525,34 +525,50 @@ function getNumericMenuFromAgent(consultationContext: string | null): {
 // Fetch contact avatar from UAZAPI using /chat/details endpoint
 async function fetchContactAvatar(
   uazapiUrl: string,
-  phone: string
+  phone: string,
+  instanceKey?: string
 ): Promise<string | null> {
   try {
     const uazapiToken = Deno.env.get('UAZAPI_TOKEN');
-    if (!uazapiToken) {
-      console.log('[Avatar] UAZAPI_TOKEN not configured, skipping');
+    // Use instance_key as token (same pattern as send-inbox-message and other functions)
+    const tokenToUse = instanceKey || uazapiToken;
+    
+    if (!tokenToUse) {
+      console.log('[Avatar] No token available (instance_key or UAZAPI_TOKEN), skipping');
       return null;
     }
 
-    console.log(`[Avatar] Fetching avatar for phone: ${phone}`);
+    console.log(`[Avatar] Fetching avatar for phone: ${phone}, using ${instanceKey ? 'instance_key' : 'global'} token`);
     
-    // Use /chat/details endpoint (same as fetch-chat-details edge function)
-    const response = await fetch(`${uazapiUrl}/chat/details`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'token': uazapiToken
-      },
-      body: JSON.stringify({
-        number: phone,
-        preview: true // preview = smaller/faster image
-      })
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'token': tokenToUse
+    };
+    const body = JSON.stringify({
+      number: phone,
+      preview: true
     });
+
+    // Try primary endpoint first
+    let response = await fetch(`${uazapiUrl}/chat/details`, {
+      method: 'POST',
+      headers,
+      body
+    });
+
+    // Fallback: try with instance key in URL (like fetch-chat-details does)
+    if (!response.ok && instanceKey) {
+      console.log(`[Avatar] Primary endpoint failed (${response.status}), trying with instance key in URL...`);
+      response = await fetch(`${uazapiUrl}/instance/${instanceKey}/chat/details`, {
+        method: 'POST',
+        headers,
+        body
+      });
+    }
 
     if (response.ok) {
       const data = await response.json();
-      // Match the same fields used in fetch-chat-details edge function
       const avatarUrl = data.imagePreview || data.image || data.url || data.profilePicUrl || null;
       console.log(`[Avatar] Result for ${phone}:`, avatarUrl ? 'found' : 'not found');
       return avatarUrl;
@@ -1498,7 +1514,7 @@ serve(async (req: Request) => {
       let contactAvatar: string | null = null;
       const avatarUazapiUrl = Deno.env.get("UAZAPI_URL") || "https://zynk2.uazapi.com";
       
-      contactAvatar = await fetchContactAvatar(avatarUazapiUrl, normalizedPhone);
+      contactAvatar = await fetchContactAvatar(avatarUazapiUrl, normalizedPhone, instance.instance_key);
 
       // Detect country code from phone number
       const countryCode = detectCountryCode(normalizedPhone);
