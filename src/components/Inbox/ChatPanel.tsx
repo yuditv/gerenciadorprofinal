@@ -731,7 +731,7 @@ export function ChatPanel({
           {/* Resolve/Reopen - hidden on mobile */}
           {conversation.status === 'open' || conversation.status === 'pending' ? <Button variant="outline" size="sm" onClick={onResolve} className="hidden sm:inline-flex">
               <Check className="h-4 w-4 mr-1" />
-              Finalizado
+              Finalizar
             </Button> : <Button variant="outline" size="sm" onClick={onReopen} className="hidden sm:inline-flex">
               <RotateCcw className="h-4 w-4 mr-1" />
               Reabrir
@@ -771,7 +771,7 @@ export function ChatPanel({
               {(conversation.status === 'open' || conversation.status === 'pending') ? (
                 <DropdownMenuItem onClick={onResolve} className="sm:hidden">
                   <Check className="h-4 w-4 mr-2" />
-                  Finalizado
+                  Finalizar
                 </DropdownMenuItem>
               ) : (
                 <DropdownMenuItem onClick={onReopen} className="sm:hidden">
