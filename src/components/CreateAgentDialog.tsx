@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Bot, Link, Globe, Smartphone, Palette, Cpu, Brain, Clock, MessageSquare, Settings2, Zap, Database, Layers, ShieldCheck } from "lucide-react";
+import { Bot, Link, Globe, Smartphone, Palette, Cpu, Brain, Clock, MessageSquare, Settings2, Zap, Database, Layers, ShieldCheck, Key } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAIAgents, type AIAgent, type CreateAgentInput } from "@/hooks/useAIAgents";
+import { useApiCredentials, PROVIDERS as API_PROVIDERS } from "@/hooks/useApiCredentials";
 
 interface CreateAgentDialogProps {
   open: boolean;
@@ -52,6 +53,7 @@ const DEFAULT_LOVABLE_MODEL = 'google/gemini-3-flash-preview';
 
 export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAgentDialogProps) {
   const { createAgent, updateAgent } = useAIAgents();
+  const { credentials: apiCredentials } = useApiCredentials();
   const isEditing = !!editingAgent;
 
   const [formData, setFormData] = useState<CreateAgentInput>({
@@ -93,6 +95,7 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
     agent_type: 'principal',
     specialization: '',
     consultation_context: '',
+    api_credential_id: null,
   });
 
   useEffect(() => {
@@ -136,6 +139,7 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
         agent_type: editingAgent.agent_type ?? 'principal',
         specialization: editingAgent.specialization ?? '',
         consultation_context: editingAgent.consultation_context ?? '',
+        api_credential_id: (editingAgent as any).api_credential_id ?? null,
       });
     } else {
       setFormData({
@@ -171,6 +175,7 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
         agent_type: 'principal',
         specialization: '',
         consultation_context: '',
+        api_credential_id: null,
       });
     }
   }, [editingAgent, open]);
@@ -465,6 +470,53 @@ export function CreateAgentDialog({ open, onOpenChange, editingAgent }: CreateAg
                       </SelectContent>
                     </Select>
                   </motion.div>
+
+                  {/* API Credential Selection */}
+                  {apiCredentials.length > 0 && (
+                    <motion.div 
+                      custom={3.5}
+                      variants={formItemVariants}
+                      initial="hidden"
+                      animate="visible"
+                      className="space-y-2"
+                    >
+                      <Label className="flex items-center gap-2">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        Credencial de API (opcional)
+                      </Label>
+                      <Select
+                        value={formData.api_credential_id || "__none__"}
+                        onValueChange={(value) => setFormData({ ...formData, api_credential_id: value === "__none__" ? null : value })}
+                      >
+                        <SelectTrigger className="bg-background/50 border-border/50">
+                          <SelectValue placeholder="Usar IA padrão (Lovable)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            <div className="flex items-center gap-2">
+                              <span>🔮</span>
+                              <span>Usar IA padrão (Lovable Gateway)</span>
+                            </div>
+                          </SelectItem>
+                          {apiCredentials.filter(c => c.is_active).map((cred) => {
+                            const providerInfo = API_PROVIDERS.find(p => p.value === cred.provider_name);
+                            return (
+                              <SelectItem key={cred.id} value={cred.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{providerInfo?.icon || "🔧"}</span>
+                                  <span>{cred.api_label}</span>
+                                  <span className="text-xs text-muted-foreground">({providerInfo?.label || cred.provider_name})</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Vincule uma API Key personalizada ou use a IA padrão do sistema
+                      </p>
+                    </motion.div>
+                  )}
 
                   {/* System Prompt */}
                   <motion.div 

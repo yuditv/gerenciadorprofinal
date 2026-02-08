@@ -46,6 +46,8 @@ export interface AIAgent {
   agent_type: string | null;
   specialization: string | null;
   consultation_context: string | null;
+  // API credential
+  api_credential_id: string | null;
 }
 
 export interface AIChatMessage {
@@ -108,6 +110,8 @@ export interface CreateAgentInput {
   agent_type?: string;
   specialization?: string;
   consultation_context?: string;
+  // API credential
+  api_credential_id?: string | null;
 }
 
 export interface UpdateAgentInput extends Partial<CreateAgentInput> {

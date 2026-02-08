@@ -225,6 +225,7 @@ export type Database = {
           agent_type: string | null
           ai_model: string | null
           anti_hallucination_enabled: boolean | null
+          api_credential_id: string | null
           buffer_max_messages: number | null
           buffer_wait_seconds: number | null
           color: string | null
@@ -263,6 +264,7 @@ export type Database = {
           agent_type?: string | null
           ai_model?: string | null
           anti_hallucination_enabled?: boolean | null
+          api_credential_id?: string | null
           buffer_max_messages?: number | null
           buffer_wait_seconds?: number | null
           color?: string | null
@@ -301,6 +303,7 @@ export type Database = {
           agent_type?: string | null
           ai_model?: string | null
           anti_hallucination_enabled?: boolean | null
+          api_credential_id?: string | null
           buffer_max_messages?: number | null
           buffer_wait_seconds?: number | null
           color?: string | null
@@ -335,7 +338,15 @@ export type Database = {
           use_native_ai?: boolean | null
           webhook_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_api_credential_id_fkey"
+            columns: ["api_credential_id"]
+            isOneToOne: false
+            referencedRelation: "user_api_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_chat_messages: {
         Row: {
@@ -3093,6 +3104,145 @@ export type Database = {
         }
         Relationships: []
       }
+      raffle_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          numbers: number[]
+          raffle_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          numbers: number[]
+          raffle_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          numbers?: number[]
+          raffle_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raffle_payments_raffle_id_fkey"
+            columns: ["raffle_id"]
+            isOneToOne: false
+            referencedRelation: "raffles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raffle_tickets: {
+        Row: {
+          id: string
+          number: number
+          purchased_at: string
+          raffle_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          number: number
+          purchased_at?: string
+          raffle_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          number?: number
+          purchased_at?: string
+          raffle_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raffle_tickets_raffle_id_fkey"
+            columns: ["raffle_id"]
+            isOneToOne: false
+            referencedRelation: "raffles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raffles: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          drawn_at: string | null
+          end_date: string
+          id: string
+          price: number
+          prize: string
+          prize_image_url: string | null
+          sold_numbers: number
+          status: string
+          title: string
+          total_numbers: number
+          updated_at: string
+          user_id: string
+          winner_number: number | null
+          winner_user_id: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          drawn_at?: string | null
+          end_date?: string
+          id?: string
+          price?: number
+          prize: string
+          prize_image_url?: string | null
+          sold_numbers?: number
+          status?: string
+          title: string
+          total_numbers?: number
+          updated_at?: string
+          user_id: string
+          winner_number?: number | null
+          winner_user_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          drawn_at?: string | null
+          end_date?: string
+          id?: string
+          price?: number
+          prize?: string
+          prize_image_url?: string | null
+          sold_numbers?: number
+          status?: string
+          title?: string
+          total_numbers?: number
+          updated_at?: string
+          user_id?: string
+          winner_number?: number | null
+          winner_user_id?: string | null
+        }
+        Relationships: []
+      }
       registration_ips: {
         Row: {
           created_at: string
@@ -3697,6 +3847,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_api_credentials: {
+        Row: {
+          api_key_enc: string
+          api_label: string
+          base_url: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          model_default: string | null
+          provider_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key_enc: string
+          api_label: string
+          base_url?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          model_default?: string | null
+          provider_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key_enc?: string
+          api_label?: string
+          base_url?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          model_default?: string | null
+          provider_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_daily_dispatches: {
         Row: {
           created_at: string
@@ -4241,6 +4430,11 @@ export type Database = {
     }
     Functions: {
       account_owner_id: { Args: { p_user_id: string }; Returns: string }
+      buy_raffle_numbers: {
+        Args: { p_numbers: number[]; p_raffle_id: string; p_user_id: string }
+        Returns: Json
+      }
+      draw_raffle_winner: { Args: { p_raffle_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
