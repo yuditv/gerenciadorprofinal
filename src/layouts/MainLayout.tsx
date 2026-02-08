@@ -5,6 +5,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useToast } from "@/hooks/use-toast";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
+import { cn } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/usePersistedState";
 
 // Lazy load heavy components
@@ -81,8 +82,10 @@ export function MainLayout() {
       {/* Subscription Expiration Banner */}
       <SubscriptionBanner />
       
-      {/* Top Navigation Bar */}
-      <FloatingSidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
+      {/* Top Navigation Bar - hidden on mobile when in atendimento */}
+      <div className={cn(activeSection === "atendimento" && "hidden md:block")}>
+        <FloatingSidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
