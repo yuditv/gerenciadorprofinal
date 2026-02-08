@@ -339,10 +339,10 @@ export function useInboxConversations() {
     toast({ title: 'Conversa reaberta' });
   };
 
-  const toggleAI = async (conversationId: string, enabled: boolean) => {
+  const toggleAI = async (conversationId: string, enabled: boolean, agentId?: string | null) => {
     // When enabling AI, clear assigned_to and ai_paused_at to allow automation
     // When disabling AI, record the pause timestamp
-    const updates: Partial<Conversation> = {
+    const updates: Partial<Conversation> & { active_agent_id?: string | null } = {
       ai_enabled: enabled,
       ai_paused_at: enabled ? null : new Date().toISOString(),
     };
@@ -350,9 +350,13 @@ export function useInboxConversations() {
     // Clear human assignment when AI is explicitly enabled
     if (enabled) {
       updates.assigned_to = null;
+      // Set the chosen agent if provided
+      if (agentId !== undefined) {
+        updates.active_agent_id = agentId;
+      }
     }
     
-    await updateConversation(conversationId, updates);
+    await updateConversation(conversationId, updates as Partial<Conversation>);
     toast({ title: enabled ? 'IA ativada' : 'IA desativada' });
   };
 

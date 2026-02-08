@@ -501,9 +501,9 @@ export default function Atendimento() {
     }
   };
 
-  const handleToggleAI = (enabled: boolean) => {
+  const handleToggleAI = (enabled: boolean, agentId?: string | null) => {
     if (selectedConversation) {
-      toggleAI(selectedConversation.id, enabled);
+      toggleAI(selectedConversation.id, enabled, agentId);
     }
   };
 
