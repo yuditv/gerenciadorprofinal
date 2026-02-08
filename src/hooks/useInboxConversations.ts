@@ -74,6 +74,7 @@ export function useInboxConversations() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [resolvedCount, setResolvedCount] = useState(0);
   const [labels, setLabels] = useState<InboxLabel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<ConversationFilter>({
@@ -109,6 +110,9 @@ export function useInboxConversations() {
       // Apply filters
       if (filter.status && filter.status !== 'all') {
         query = query.eq('status', filter.status);
+      } else if (filter.status === 'all') {
+        // Exclude resolved (Compra Finalizada) from "Todas" view
+        query = query.neq('status', 'resolved');
       }
 
       if (filter.instanceId) {
@@ -156,6 +160,13 @@ export function useInboxConversations() {
       }));
 
       setConversations(mappedData as Conversation[]);
+
+      // Fetch resolved count separately (since resolved is excluded from "all")
+      const { count: rCount } = await supabase
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'resolved');
+      setResolvedCount(rCount || 0);
     } catch (error) {
       console.error('Error fetching conversations:', error);
     }
@@ -543,14 +554,14 @@ export function useInboxConversations() {
 
   // Memoized metrics to prevent unnecessary downstream re-renders
   const metrics = useMemo(() => ({
-    total: conversations.length,
+    total: conversations.filter(c => c.status !== 'resolved').length,
     open: conversations.filter(c => c.status === 'open').length,
     pending: conversations.filter(c => c.status === 'pending').length,
-    resolved: conversations.filter(c => c.status === 'resolved').length,
+    resolved: resolvedCount,
     unassigned: conversations.filter(c => !c.assigned_to && c.status === 'open').length,
     unread: conversations.filter(c => c.unread_count > 0).length,
     mine: conversations.filter(c => c.assigned_to === user?.id).length
-  }), [conversations, user?.id]);
+  }), [conversations, resolvedCount, user?.id]);
 
   return {
     conversations,
