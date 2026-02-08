@@ -102,7 +102,7 @@ export function InboxSidebar({
     },
     { 
       id: 'resolved', 
-      label: 'Resolvidas', 
+      label: 'Compra Finalizada', 
       icon: CheckCircle2, 
       count: metrics.resolved,
       filter: { status: 'resolved' as const, assignedTo: 'all' as const, instanceId: undefined, labelId: undefined }
