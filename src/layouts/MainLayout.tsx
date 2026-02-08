@@ -83,9 +83,9 @@ export function MainLayout() {
       <SubscriptionBanner />
       
       {/* Top Navigation Bar - hidden on mobile when in atendimento */}
-      <div className={cn(activeSection === "atendimento" && "hidden md:block")}>
+      {activeSection !== "atendimento" && (
         <FloatingSidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
-      </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
