@@ -62,7 +62,7 @@ export function InboxDashboard({ conversations, agents, metrics }: InboxDashboar
     return [
       { name: 'Abertas', value: metrics.open, color: 'hsl(var(--chart-1))' },
       { name: 'Pendentes', value: metrics.pending, color: 'hsl(var(--chart-2))' },
-      { name: 'Resolvidas', value: metrics.resolved, color: 'hsl(var(--chart-3))' },
+      { name: 'Compra Finalizada', value: metrics.resolved, color: 'hsl(var(--chart-3))' },
     ].filter(d => d.value > 0);
   }, [metrics]);
 
@@ -179,7 +179,7 @@ export function InboxDashboard({ conversations, agents, metrics }: InboxDashboar
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Resolvidas</p>
+                  <p className="text-sm text-muted-foreground">Compra Finalizada</p>
                   <p className="text-3xl font-bold text-green-500">{metrics.resolved}</p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-500 opacity-80" />

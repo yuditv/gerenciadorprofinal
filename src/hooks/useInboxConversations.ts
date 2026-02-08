@@ -317,7 +317,7 @@ export function useInboxConversations() {
       status: 'resolved',
       resolved_at: new Date().toISOString()
     });
-    toast({ title: 'Conversa resolvida' });
+    toast({ title: 'Compra Finalizada' });
   };
 
   const reopenConversation = async (conversationId: string) => {

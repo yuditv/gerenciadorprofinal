@@ -120,7 +120,7 @@ export function ClientHistoryPanel({ phone, currentConversationId }: ClientHisto
                         </span>
                       )}
                       <Badge variant="outline" className={cn("text-[10px]", statusColors[conv.status])}>
-                        {conv.status === 'open' ? 'Aberta' : conv.status === 'resolved' ? 'Resolvida' : conv.status}
+                        {conv.status === 'open' ? 'Aberta' : conv.status === 'resolved' ? 'Compra Finalizada' : conv.status}
                       </Badge>
                     </div>
                     <span className="text-[10px] text-muted-foreground">
