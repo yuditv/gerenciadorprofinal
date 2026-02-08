@@ -618,37 +618,36 @@ export function ChatPanel({
         "border-b border-border/50",
         "bg-card/20 backdrop-blur-md"
       )}>
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <Avatar className="h-8 w-8 sm:h-10 sm:w-10 shrink-0">
             <AvatarImage src={contactAvatarUrl || conversation.contact_avatar || undefined} />
-            <AvatarFallback className="bg-primary/10 text-primary">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
               {getInitials(conversation.contact_name, conversation.phone)}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <h3 className="font-semibold tracking-tight">
+          <div className="min-w-0">
+            <h3 className="font-semibold tracking-tight truncate text-sm sm:text-base">
               {conversation.contact_name || formatPhone(conversation.phone)}
             </h3>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{formatPhone(conversation.phone)}</span>
-              <span>•</span>
-              <Badge variant="outline" className={cn("text-xs", conversation.status === 'open' && "border-green-500 text-green-500", conversation.status === 'resolved' && "border-muted-foreground text-muted-foreground")}>
+            <div className="flex items-center gap-1 sm:gap-2 text-xs text-muted-foreground overflow-hidden">
+              <span className="hidden sm:inline">{formatPhone(conversation.phone)}</span>
+              <span className="hidden sm:inline">•</span>
+              <Badge variant="outline" className={cn("text-[10px] sm:text-xs shrink-0", conversation.status === 'open' && "border-green-500 text-green-500", conversation.status === 'resolved' && "border-muted-foreground text-muted-foreground")}>
                 {conversation.status === 'open' ? 'Aberta' : conversation.status === 'pending' ? 'Pendente' : conversation.status === 'resolved' ? 'Resolvida' : 'Adiada'}
               </Badge>
-              {isContactBlocked && <Badge variant="outline" className="text-xs border-destructive text-destructive">
+              {isContactBlocked && <Badge variant="outline" className="text-[10px] sm:text-xs border-destructive text-destructive shrink-0">
                   <Ban className="h-3 w-3 mr-1" />
                   Bloqueado
                 </Badge>}
-              {conversation.instance && <>
-                  <span>•</span>
-                  <span>{conversation.instance.instance_name}</span>
-                </>}
+              {conversation.instance && <span className="hidden sm:inline truncate">
+                  • {conversation.instance.instance_name}
+                </span>}
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Client Info Button - visible on screens < 2xl (where side panel may cut off) */}
           <Tooltip>
             <TooltipTrigger asChild>
