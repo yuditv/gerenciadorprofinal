@@ -79,7 +79,7 @@ export const getExpirationStatus = (expiresAt: Date): ExpirationStatus => {
   const daysUntilExpiration = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   
   if (daysUntilExpiration < 0) return 'expired';
-  if (daysUntilExpiration <= 7) return 'expiring';
+  if (daysUntilExpiration <= 3) return 'expiring';
   return 'active';
 };
 
