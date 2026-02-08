@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +12,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, Type, Image, Video, Mic, Loader2 } from 'lucide-react';
+import { CalendarIcon, Type, Image, Video, Mic, Loader2, Upload, Link, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CreateScheduleInput } from '@/hooks/useStatusSchedules';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface WhatsAppInstance {
   id: string;
@@ -67,12 +69,22 @@ const WEEK_DAYS = [
   { value: 6, label: 'Sáb' },
 ];
 
+const ACCEPTED_TYPES: Record<string, string> = {
+  image: 'image/jpeg,image/png,image/webp,image/gif',
+  video: 'video/mp4,video/webm,video/quicktime',
+  audio: 'audio/mpeg,audio/ogg,audio/wav,audio/aac,audio/mp4',
+};
+
 export function StatusScheduleDialog({ open, onOpenChange, onSave, instances }: StatusScheduleDialogProps) {
   const [statusType, setStatusType] = useState<'text' | 'image' | 'video' | 'audio'>('text');
   const [textContent, setTextContent] = useState('');
   const [backgroundColor, setBackgroundColor] = useState(1);
   const [fontStyle, setFontStyle] = useState(0);
   const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaMode, setMediaMode] = useState<'upload' | 'url'>('upload');
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedInstances, setSelectedInstances] = useState<Set<string>>(new Set());
   const [scheduledDate, setScheduledDate] = useState<Date>();
   const [scheduledTime, setScheduledTime] = useState('10:00');
@@ -107,6 +119,54 @@ export function StatusScheduleDialog({ open, onOpenChange, onSave, instances }: 
     } else {
       setRecurrenceDays([...recurrenceDays, day].sort());
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+      toast.error('Arquivo muito grande. Máximo: 25MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Usuário não autenticado');
+        return;
+      }
+
+      const ext = file.name.split('.').pop() || 'bin';
+      const filePath = `${user.id}/status-${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('dispatch-media')
+        .upload(filePath, file, { contentType: file.type, upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('dispatch-media')
+        .getPublicUrl(filePath);
+
+      setMediaUrl(urlData.publicUrl);
+      setUploadedFileName(file.name);
+      toast.success('Mídia enviada com sucesso!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Erro ao enviar mídia');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeUploadedFile = () => {
+    setMediaUrl('');
+    setUploadedFileName(null);
   };
 
   const generateTimeOptions = () => {
@@ -159,6 +219,8 @@ export function StatusScheduleDialog({ open, onOpenChange, onSave, instances }: 
       // Reset form
       setTextContent('');
       setMediaUrl('');
+      setUploadedFileName(null);
+      setMediaMode('upload');
       setSelectedInstances(new Set());
       setScheduledDate(undefined);
       setRecurrenceType('none');
@@ -252,16 +314,90 @@ export function StatusScheduleDialog({ open, onOpenChange, onSave, instances }: 
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label>URL da Mídia</Label>
-                <Input
-                  value={mediaUrl}
-                  onChange={(e) => setMediaUrl(e.target.value)}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Insira a URL pública do arquivo de mídia
-                </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Mídia</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      variant={mediaMode === 'upload' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => { setMediaMode('upload'); setMediaUrl(''); setUploadedFileName(null); }}
+                      className="h-7 text-xs"
+                    >
+                      <Upload className="h-3 w-3 mr-1" />
+                      Upload
+                    </Button>
+                    <Button
+                      variant={mediaMode === 'url' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => { setMediaMode('url'); setMediaUrl(''); setUploadedFileName(null); }}
+                      className="h-7 text-xs"
+                    >
+                      <Link className="h-3 w-3 mr-1" />
+                      URL
+                    </Button>
+                  </div>
+                </div>
+
+                {mediaMode === 'upload' ? (
+                  <div className="space-y-2">
+                    {uploadedFileName ? (
+                      <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                        {statusType === 'image' && mediaUrl && (
+                          <img src={mediaUrl} alt="Preview" className="h-14 w-14 rounded object-cover flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{uploadedFileName}</p>
+                          <p className="text-xs text-muted-foreground">Arquivo enviado</p>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={removeUploadedFile}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex flex-col items-center justify-center gap-2 p-6 rounded-lg border-2 border-dashed cursor-pointer transition-colors",
+                          isUploading ? "border-primary/50 bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/50"
+                        )}
+                        onClick={() => !isUploading && fileInputRef.current?.click()}
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Enviando...</p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-8 w-8 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                              Clique para selecionar {statusType === 'image' ? 'uma imagem' : statusType === 'video' ? 'um vídeo' : 'um áudio'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Máximo: 25MB</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={ACCEPTED_TYPES[statusType] || '*/*'}
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      placeholder="https://exemplo.com/imagem.jpg"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Insira a URL pública do arquivo de mídia
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
