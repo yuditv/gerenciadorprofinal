@@ -522,30 +522,38 @@ function getNumericMenuFromAgent(consultationContext: string | null): {
   return { enabled: true, prompt, options };
 }
 
-// Fetch contact avatar from UAZAPI
+// Fetch contact avatar from UAZAPI using /chat/details endpoint
 async function fetchContactAvatar(
   uazapiUrl: string,
-  instanceKey: string,
   phone: string
 ): Promise<string | null> {
   try {
+    const uazapiToken = Deno.env.get('UAZAPI_TOKEN');
+    if (!uazapiToken) {
+      console.log('[Avatar] UAZAPI_TOKEN not configured, skipping');
+      return null;
+    }
+
     console.log(`[Avatar] Fetching avatar for phone: ${phone}`);
     
-    const response = await fetch(`${uazapiUrl}/user/avatar`, {
+    // Use /chat/details endpoint (same as fetch-chat-details edge function)
+    const response = await fetch(`${uazapiUrl}/chat/details`, {
       method: 'POST',
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'token': instanceKey
+        'token': uazapiToken
       },
       body: JSON.stringify({
-        Phone: phone,
-        Preview: false // false = full resolution
+        number: phone,
+        preview: true // preview = smaller/faster image
       })
     });
 
     if (response.ok) {
       const data = await response.json();
-      const avatarUrl = data.url || data.URL || data.imgUrl || data.profilePicUrl || data.avatar || null;
+      // Match the same fields used in fetch-chat-details edge function
+      const avatarUrl = data.imagePreview || data.image || data.url || data.profilePicUrl || null;
       console.log(`[Avatar] Result for ${phone}:`, avatarUrl ? 'found' : 'not found');
       return avatarUrl;
     }
@@ -1488,11 +1496,9 @@ serve(async (req: Request) => {
     if (!conversation) {
       // Fetch avatar before creating conversation
       let contactAvatar: string | null = null;
-      const uazapiUrl = Deno.env.get("UAZAPI_URL") || "https://zynk2.uazapi.com";
+      const avatarUazapiUrl = Deno.env.get("UAZAPI_URL") || "https://zynk2.uazapi.com";
       
-      if (instance.instance_key) {
-        contactAvatar = await fetchContactAvatar(uazapiUrl, instance.instance_key, normalizedPhone);
-      }
+      contactAvatar = await fetchContactAvatar(avatarUazapiUrl, normalizedPhone);
 
       // Detect country code from phone number
       const countryCode = detectCountryCode(normalizedPhone);
