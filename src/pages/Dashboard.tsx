@@ -189,10 +189,13 @@ export default function Dashboard() {
           return expiresAt >= start && expiresAt <= end && expiresAt < new Date();
         }).length;
 
+        // Count clients that existed up to this month's end
+        const clientsUpToMonth = clients.filter(c => new Date(c.createdAt) <= end).length;
+
         monthlyStats.push({
           month: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
           fullMonth: fullMonthLabel.charAt(0).toUpperCase() + fullMonthLabel.slice(1),
-          clients: clients.length,
+          clients: clientsUpToMonth,
           renewals: renewals?.length || 0,
           messages: sentMessages?.length || 0,
           revenue: monthRevenue,
