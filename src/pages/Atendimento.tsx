@@ -623,10 +623,17 @@ export default function Atendimento() {
       {/* Top Header */}
       <header className="h-12 sm:h-14 border-b border-border/50 bg-inbox-header flex items-center justify-between px-2 sm:px-4 shrink-0">
         <div className="flex items-center gap-2 sm:gap-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9" onClick={() => {
-            try { localStorage.setItem('app-active-section', JSON.stringify('clients')); } catch {}
-            navigate('/?section=clients', { replace: true });
-          }}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 sm:h-9 sm:w-9" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              try { localStorage.setItem('app-active-section', JSON.stringify('clients')); } catch {}
+              navigate('/?section=clients', { replace: true });
+            }}
+          >
             <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           <h1 className="text-sm sm:text-lg font-semibold truncate">Central de Atendimento</h1>
