@@ -574,6 +574,48 @@ export type Database = {
           },
         ]
       }
+      automation_flows: {
+        Row: {
+          actions_config: Json
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          name: string
+          trigger_config: Json
+          trigger_count: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actions_config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name: string
+          trigger_config?: Json
+          trigger_count?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actions_config?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          name?: string
+          trigger_config?: Json
+          trigger_count?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       blocked_users: {
         Row: {
           blocked_at: string

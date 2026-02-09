@@ -32,12 +32,12 @@ import {
   Edit,
   Settings,
   AlertTriangle,
-  ArrowRight,
   Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAccountContext } from '@/hooks/useAccountContext';
 import { toast } from 'sonner';
 
 interface AutomationFlow {
@@ -82,7 +82,8 @@ const ACTION_TYPES = [
 ];
 
 export function AutomationFlowBuilder() {
-  const { user, accountOwnerId } = useAuth();
+  const { user } = useAuth();
+  const { ownerId } = useAccountContext();
   const [flows, setFlows] = useState<AutomationFlow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -97,19 +98,19 @@ export function AutomationFlowBuilder() {
 
   useEffect(() => {
     fetchFlows();
-  }, [user]);
+  }, [user, ownerId]);
 
   const fetchFlows = async () => {
     if (!user) return;
     
     setIsLoading(true);
     try {
-      const ownerId = accountOwnerId || user.id;
+      const resolvedOwnerId = ownerId || user.id;
       
       const { data, error } = await supabase
         .from('automation_flows')
         .select('*')
-        .eq('user_id', ownerId)
+        .eq('user_id', resolvedOwnerId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -118,8 +119,8 @@ export function AutomationFlowBuilder() {
         id: flow.id,
         name: flow.name,
         description: flow.description || '',
-        trigger: flow.trigger_config as TriggerConfig || { type: 'new_conversation', conditions: {} },
-        actions: flow.actions_config as ActionConfig[] || [],
+        trigger: (flow.trigger_config as TriggerConfig) || { type: 'new_conversation', conditions: {} },
+        actions: (flow.actions_config as ActionConfig[]) || [],
         isActive: flow.is_active,
         createdAt: flow.created_at,
         lastTriggered: flow.last_triggered_at,
@@ -150,7 +151,7 @@ export function AutomationFlowBuilder() {
     }
 
     try {
-      const ownerId = accountOwnerId || user.id;
+      const resolvedOwnerId = ownerId || user.id;
       
       if (editingFlow) {
         const { error } = await supabase
@@ -158,8 +159,8 @@ export function AutomationFlowBuilder() {
           .update({
             name: formName,
             description: formDescription,
-            trigger_config: formTrigger,
-            actions_config: formActions,
+            trigger_config: formTrigger as any,
+            actions_config: formActions as any,
             is_active: formIsActive,
             updated_at: new Date().toISOString(),
           })
@@ -171,11 +172,11 @@ export function AutomationFlowBuilder() {
         const { error } = await supabase
           .from('automation_flows')
           .insert({
-            user_id: ownerId,
+            user_id: resolvedOwnerId,
             name: formName,
             description: formDescription,
-            trigger_config: formTrigger,
-            actions_config: formActions,
+            trigger_config: formTrigger as any,
+            actions_config: formActions as any,
             is_active: formIsActive,
           });
 

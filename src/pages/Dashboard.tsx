@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useClients } from "@/hooks/useClients";
+import { useKanbanLeads } from "@/hooks/useKanbanLeads";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,10 @@ import {
 } from "lucide-react";
 import { ClientCharts } from "@/components/ClientCharts";
 import { RetentionMetrics } from "@/components/RetentionMetrics";
+import { ConversionFunnel } from "@/components/Dashboard/ConversionFunnel";
+import { ClientHealthScore } from "@/components/Dashboard/ClientHealthScore";
+import { AttendantPerformance } from "@/components/Dashboard/AttendantPerformance";
+import { AutomationFlowBuilder } from "@/components/Dashboard/AutomationFlowBuilder";
 import { 
   BarChart, 
   Bar, 
@@ -92,6 +97,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { clients, isLoading: clientsLoading } = useClients();
+  const { leads } = useKanbanLeads();
   const [messageStats, setMessageStats] = useState<MessageStats>({
     total: 0,
     pending: 0,
@@ -676,6 +682,24 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* New Advanced Analytics Section */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Conversion Funnel */}
+          <ConversionFunnel leads={leads} />
+          
+          {/* Client Health Score */}
+          <ClientHealthScore clients={clients} />
+        </div>
+
+        {/* Performance & Automation */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Attendant Performance */}
+          <AttendantPerformance />
+          
+          {/* Automation Flow Builder */}
+          <AutomationFlowBuilder />
         </div>
 
         {/* Client Charts */}
