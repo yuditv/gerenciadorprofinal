@@ -61,8 +61,6 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
     const priceStr = client.price != null
       ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(client.price)
       : '';
-    const signatureLine = "\n\n*Responda aqui para renovar.*";
-
     return [
       {
         id: 'expiring',
@@ -70,8 +68,7 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
         value:
           `Olá ${client.name}! Tudo bem? 🙂\n` +
           `Seu plano *${planLabel}* vence em *${expiresAtStr}* (${days} dia(s)).\n` +
-          `Posso gerar sua renovação agora para você não ficar sem acesso?` +
-          signatureLine,
+          `Posso gerar sua renovação agora para você não ficar sem acesso?`,
       },
       {
         id: 'expired',
@@ -79,15 +76,13 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
         value:
           `Olá ${client.name}!\n` +
           `Seu acesso *venceu em ${expiresAtStr}*.\n` +
-          `Se quiser, eu já faço sua renovação agora pra liberar novamente.` +
-          signatureLine,
+          `Se quiser, eu já faço sua renovação agora pra liberar novamente.`,
       },
       {
         id: 'renew_short',
         label: '🔄 Renovação (curta)',
         value:
-          `Oi ${client.name}! Sua renovação está disponível. Quer renovar agora?` +
-          signatureLine,
+          `Oi ${client.name}! Sua renovação está disponível. Quer renovar agora?`,
       },
       {
         id: 'renew_with_price',
@@ -95,8 +90,7 @@ export function SendWhatsAppDialog({ client, instances, open, onOpenChange }: Se
         value:
           `Olá ${client.name}!\n` +
           `Renovação do plano *${planLabel}*${priceStr ? ` por *${priceStr}*` : ''}.\n` +
-          `Quer que eu envie o pagamento para renovar?` +
-          signatureLine,
+          `Quer que eu envie o pagamento para renovar?`,
       },
       {
         id: 'pix_payment',
