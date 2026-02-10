@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -332,8 +333,9 @@ export default function AdminPanel() {
                 </CardTitle>
               </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
+            <ScrollArea className="w-full" type="always">
+              <div className="min-w-[1200px]">
+                <Table>
                 <TableHeader>
                   <TableRow className="border-primary/10 hover:bg-transparent">
                     <TableHead className="text-muted-foreground">Usuário</TableHead>
@@ -619,6 +621,8 @@ export default function AdminPanel() {
                 </TableBody>
               </Table>
             </div>
+            <ScrollBar orientation="horizontal" className="h-3" />
+            </ScrollArea>
           </CardContent>
         </Card>
           </TabsContent>
