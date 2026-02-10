@@ -568,22 +568,17 @@ export function BulkDispatcher() {
       </motion.div>
 
       {/* Main Content - Studio Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_300px] gap-4">
-        {/* Left - Instance Sidebar */}
+      <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr_280px] gap-4">
+        {/* Left - Phone Preview */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
-          className="hidden xl:block"
+          className="hidden xl:flex items-start justify-center pt-4"
         >
-          <InstanceSidebar
-            instances={instances}
-            selectedIds={config.instanceIds}
-            balancingMode={config.balancingMode}
-            onSelectionChange={(ids) => updateConfig({ instanceIds: ids })}
-            onBalancingModeChange={(mode) => updateConfig({ balancingMode: mode })}
-            onRefresh={handleManualRefresh}
-            isLoading={instancesLoading || isRefreshingStatus}
+          <PhonePreview 
+            message={config.messages[0]}
+            contactName={contacts[0]?.name || "João Silva"}
           />
         </motion.div>
 
@@ -601,16 +596,21 @@ export function BulkDispatcher() {
           />
         </motion.div>
 
-        {/* Right - Phone Preview */}
+        {/* Right - Instance Sidebar */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
-          className="hidden xl:flex items-start justify-center pt-4"
+          className="hidden xl:block"
         >
-          <PhonePreview 
-            message={config.messages[0]}
-            contactName={contacts[0]?.name || "João Silva"}
+          <InstanceSidebar
+            instances={instances}
+            selectedIds={config.instanceIds}
+            balancingMode={config.balancingMode}
+            onSelectionChange={(ids) => updateConfig({ instanceIds: ids })}
+            onBalancingModeChange={(mode) => updateConfig({ balancingMode: mode })}
+            onRefresh={handleManualRefresh}
+            isLoading={instancesLoading || isRefreshingStatus}
           />
         </motion.div>
       </div>
