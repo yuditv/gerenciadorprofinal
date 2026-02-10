@@ -255,10 +255,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!responseData) {
       console.error("Failed to send. Error:", lastError);
+      
+      // Check if it's an invalid WhatsApp number error
+      const isInvalidNumber = lastError.toLowerCase().includes('not on whatsapp') || 
+                               lastError.toLowerCase().includes('não está no whatsapp') ||
+                               lastError.toLowerCase().includes('invalid number');
+      
       return new Response(
-        JSON.stringify({ error: lastError || "Failed to send message" }),
+        JSON.stringify({ 
+          error: isInvalidNumber 
+            ? "Número não encontrado no WhatsApp" 
+            : (lastError || "Failed to send message"),
+          invalid_number: isInvalidNumber 
+        }),
         {
-          status: 500,
+          status: isInvalidNumber ? 400 : 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         }
       );
