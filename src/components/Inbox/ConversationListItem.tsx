@@ -187,8 +187,23 @@ export const ConversationListItem = memo(function ConversationListItem({
           )}
         </div>
 
-        {/* Labels, Agent Badge & Unread badge row */}
+        {/* Labels, Agent Badge, Instance & Unread badge row */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Instance indicator */}
+          {conversation.instance && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted/60 text-muted-foreground border border-border/40">
+                    📱 {conversation.instance.instance_name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Mensagem recebida via {conversation.instance.instance_name}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {conversation.ai_enabled && conversation.active_agent && 
            conversation.active_agent_id !== defaultAgentId && (
             <TooltipProvider delayDuration={100}>
@@ -277,6 +292,7 @@ export const ConversationListItem = memo(function ConversationListItem({
     prevProps.conversation.ai_enabled === nextProps.conversation.ai_enabled &&
     prevProps.conversation.active_agent_id === nextProps.conversation.active_agent_id &&
     prevProps.conversation.assigned_to === nextProps.conversation.assigned_to &&
+    prevProps.conversation.instance_id === nextProps.conversation.instance_id &&
     JSON.stringify(prevProps.conversation.labels) === JSON.stringify(nextProps.conversation.labels)
   );
 });
