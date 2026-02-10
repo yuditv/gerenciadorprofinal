@@ -70,6 +70,7 @@ interface ConversationListItemProps {
   conversation: Conversation;
   isSelected: boolean;
   defaultAgentId?: string | null;
+  isAdmin?: boolean;
   onSelect: (conversation: Conversation) => void;
   getSLAStatus?: (createdAt: string, firstReplyAt: string | null, priority: string) => SLAStatus | null;
 }
@@ -78,6 +79,7 @@ export const ConversationListItem = memo(function ConversationListItem({
   conversation,
   isSelected,
   defaultAgentId,
+  isAdmin,
   onSelect,
   getSLAStatus,
 }: ConversationListItemProps) {
@@ -232,6 +234,22 @@ export const ConversationListItem = memo(function ConversationListItem({
             </span>
           )}
           
+          {/* Instance badge (admin only) */}
+          {isAdmin && conversation.instance?.instance_name && (
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[100px] bg-muted/50 text-muted-foreground border border-border/50">
+                    📱 {conversation.instance.instance_name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Instância: {conversation.instance.instance_name}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           {/* SLA Badge */}
           <SLABadge slaStatus={slaStatus} />
 
@@ -268,6 +286,7 @@ export const ConversationListItem = memo(function ConversationListItem({
   return (
     prevProps.isSelected === nextProps.isSelected &&
     prevProps.defaultAgentId === nextProps.defaultAgentId &&
+    prevProps.isAdmin === nextProps.isAdmin &&
     prevProps.conversation.id === nextProps.conversation.id &&
     prevProps.conversation.unread_count === nextProps.conversation.unread_count &&
     prevProps.conversation.last_message_at === nextProps.conversation.last_message_at &&

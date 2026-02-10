@@ -888,6 +888,7 @@ export default function Atendimento() {
                   searchQuery={searchQuery}
                   onSearchChange={setSearchQuery}
                   defaultAgentId={defaultAgentId}
+                  isAdmin={isAdmin}
                 />
               </div>
 

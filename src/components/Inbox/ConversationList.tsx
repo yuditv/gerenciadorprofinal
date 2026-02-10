@@ -31,6 +31,7 @@ interface ConversationListProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   defaultAgentId?: string | null;
+  isAdmin?: boolean;
 }
 
 export const ConversationList = memo(function ConversationList({
@@ -40,7 +41,8 @@ export const ConversationList = memo(function ConversationList({
   isLoading,
   searchQuery,
   onSearchChange,
-  defaultAgentId
+  defaultAgentId,
+  isAdmin
 }: ConversationListProps) {
   const [sortBy, setSortBy] = useState<'recent' | 'unread'>('recent');
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -174,6 +176,7 @@ export const ConversationList = memo(function ConversationList({
                 conversation={conversation}
                 isSelected={selectedId === conversation.id}
                 defaultAgentId={defaultAgentId}
+                isAdmin={isAdmin}
                 onSelect={handleSelect}
                 getSLAStatus={getSLAStatus}
               />
