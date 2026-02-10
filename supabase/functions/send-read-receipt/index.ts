@@ -76,61 +76,116 @@ serve(async (req) => {
     }
 
     const formattedPhone = formatPhoneNumber(conversation.phone);
+    const remoteJid = `${formattedPhone}@s.whatsapp.net`;
 
-    console.log(`[ReadReceipt] Sending read receipt to ${formattedPhone} via ${instance.instance_name}`);
-
-    const requestBody = {
-      number: formattedPhone,
-    };
+    console.log(`[ReadReceipt] Sending read receipt for ${remoteJid} via ${instance.instance_name}`);
 
     const headers = {
       'Content-Type': 'application/json',
       'token': instance.instance_key,
     };
 
-    // Try primary endpoint
-    let res = await fetch(`${uazapiUrl}/message/readMessages`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-    });
+    // Get the last few unread messages from this conversation to mark as read
+    const { data: lastMessages } = await supabase
+      .from('chat_inbox_messages')
+      .select('id, metadata')
+      .eq('conversation_id', conversationId)
+      .eq('sender_type', 'contact')
+      .order('created_at', { ascending: false })
+      .limit(5);
 
-    // Fallback if 405
-    if (res.status === 405) {
-      console.warn('[ReadReceipt] Primary endpoint returned 405, trying fallback');
-      res = await fetch(`${uazapiUrl}/send/readMessages`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-      });
+    // Extract UAZAPI message IDs from metadata
+    const messageIds: Array<{ remoteJid: string; fromMe: boolean; id: string }> = [];
+    if (lastMessages) {
+      for (const msg of lastMessages) {
+        const meta = msg.metadata as Record<string, unknown> | null;
+        const uazapiId = (meta?.messageId || meta?.message_id || meta?.wa_id || meta?.id) as string | undefined;
+        if (uazapiId) {
+          messageIds.push({
+            remoteJid,
+            fromMe: false,
+            id: uazapiId,
+          });
+        }
+      }
     }
 
-    // Another fallback with chat/readMessages
-    if (res.status === 405 || res.status === 404) {
-      console.warn('[ReadReceipt] Trying chat/readMessages fallback');
-      res = await fetch(`${uazapiUrl}/chat/readMessages`, {
-        method: 'POST',
+    let responseText: string;
+    let statusCode: number;
+
+    if (messageIds.length > 0) {
+      // Method 1: Mark specific messages as read (preferred - sends blue ticks)
+      console.log(`[ReadReceipt] Marking ${messageIds.length} specific messages as read`);
+
+      const res = await fetch(`${uazapiUrl}/chat/markMessageAsRead`, {
+        method: 'PUT',
         headers,
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ readMessages: messageIds }),
       });
+      statusCode = res.status;
+      responseText = await res.text();
+
+      // Fallback with POST if PUT returns 405
+      if (statusCode === 405) {
+        console.warn('[ReadReceipt] PUT returned 405, trying POST');
+        const res2 = await fetch(`${uazapiUrl}/chat/markMessageAsRead`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ readMessages: messageIds }),
+        });
+        statusCode = res2.status;
+        responseText = await res2.text();
+      }
+    } else {
+      // Method 2: Fallback - try to mark by phone number
+      console.log('[ReadReceipt] No message IDs found, trying by phone number');
+      
+      // Try multiple endpoint patterns
+      const endpoints = [
+        { url: `${uazapiUrl}/chat/markMessageAsRead`, method: 'PUT', body: { readMessages: [{ remoteJid, fromMe: false, id: '' }] } },
+        { url: `${uazapiUrl}/message/readMessages`, method: 'POST', body: { number: formattedPhone } },
+        { url: `${uazapiUrl}/send/readMessages`, method: 'POST', body: { number: formattedPhone } },
+        { url: `${uazapiUrl}/chat/read`, method: 'POST', body: { number: formattedPhone } },
+      ];
+
+      statusCode = 0;
+      responseText = '';
+
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep.url, {
+            method: ep.method,
+            headers,
+            body: JSON.stringify(ep.body),
+          });
+          statusCode = res.status;
+          responseText = await res.text();
+          
+          if (res.ok) {
+            console.log(`[ReadReceipt] Success with ${ep.url}`);
+            break;
+          }
+          console.warn(`[ReadReceipt] ${ep.url} returned ${res.status}`);
+        } catch (e) {
+          console.warn(`[ReadReceipt] ${ep.url} failed:`, e);
+        }
+      }
     }
 
-    const responseText = await res.text();
-    console.log(`[ReadReceipt] Response (${res.status}):`, responseText);
+    console.log(`[ReadReceipt] Response (${statusCode}):`, responseText);
 
-    if (!res.ok) {
+    if (statusCode && statusCode >= 200 && statusCode < 300) {
+      let result;
+      try { result = JSON.parse(responseText); } catch { result = { raw: responseText }; }
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to send read receipt', status: res.status }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: true, phone: formattedPhone, result }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    let result;
-    try { result = JSON.parse(responseText); } catch { result = { raw: responseText }; }
-
     return new Response(
-      JSON.stringify({ success: true, phone: formattedPhone, result }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: 'Failed to send read receipt', status: statusCode }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: unknown) {
