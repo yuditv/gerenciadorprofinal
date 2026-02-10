@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -139,7 +140,9 @@ export function KanbanTableView({
 
       {/* Table */}
       <div className="border rounded-lg overflow-hidden">
-        <Table>
+        <ScrollArea className="w-full" type="always">
+          <div className="min-w-[900px]">
+            <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12">
@@ -322,7 +325,10 @@ export function KanbanTableView({
               );
             })}
           </TableBody>
-        </Table>
+          </Table>
+          </div>
+          <ScrollBar orientation="horizontal" className="h-3" />
+        </ScrollArea>
       </div>
     </div>
   );

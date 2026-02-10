@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -346,7 +346,8 @@ export function CommissionPayments({ resellers, planPrices }: CommissionPayments
               <p className="text-sm">Clique em "Novo Pagamento" para registrar uma comissão</p>
             </div>
           ) : (
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[400px]" type="always">
+              <div className="min-w-[900px]">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -423,6 +424,8 @@ export function CommissionPayments({ resellers, planPrices }: CommissionPayments
                   ))}
                 </TableBody>
               </Table>
+              </div>
+              <ScrollBar orientation="horizontal" className="h-3" />
             </ScrollArea>
           )}
         </CardContent>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -232,8 +233,9 @@ export function AdminSubscriptionManager({
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <ScrollArea className="w-full" type="always">
+            <div className="min-w-[700px]">
+              <Table>
               <TableHeader>
                 <TableRow className="border-primary/10 hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Usuário</TableHead>
@@ -297,7 +299,9 @@ export function AdminSubscriptionManager({
                 )}
               </TableBody>
             </Table>
-          </div>
+            </div>
+            <ScrollBar orientation="horizontal" className="h-3" />
+          </ScrollArea>
         </CardContent>
       </Card>
 
