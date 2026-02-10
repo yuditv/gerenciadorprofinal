@@ -44,8 +44,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Users, Download, FileSpreadsheet, History, FileText, Sparkles, Zap, ArrowUpDown, ChevronLeft, ChevronRight, LayoutGrid, List, CheckSquare, Square, X, RefreshCw as RefreshCwIcon, Trash2, Send, Upload, Search, MessageSquare, Lock } from 'lucide-react';
+import { Plus, Users, Download, FileSpreadsheet, History, FileText, Sparkles, Zap, ArrowUpDown, ChevronLeft, ChevronRight, LayoutGrid, List, CheckSquare, Square, X, RefreshCw as RefreshCwIcon, Trash2, Send, Upload, Search, MessageSquare, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { VerifyClientsWhatsAppDialog } from '@/components/VerifyClientsWhatsAppDialog';
 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -108,6 +109,7 @@ const Index = () => {
   const [whatsappClient, setWhatsappClient] = useState<Client | null>(null);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
+  const [verifyWhatsAppOpen, setVerifyWhatsAppOpen] = useState(false);
   const clientsPerPage = viewMode === 'grid' ? 12 : 20;
 
   // Show subscription dialog when trying to use blocked feature
@@ -561,6 +563,11 @@ const Index = () => {
                     <FileText className="h-4 w-4 mr-2 text-plan-annual" />
                     Relatório Completo (PDF)
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-border/50" />
+                  <DropdownMenuItem onClick={() => setVerifyWhatsAppOpen(true)} className="hover:bg-primary/10">
+                    <ShieldCheck className="h-4 w-4 mr-2 text-emerald-500" />
+                    Verificar WhatsApp dos Clientes
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -942,6 +949,12 @@ const Index = () => {
       <SubscriptionPlansDialog
         open={subscriptionDialogOpen}
         onOpenChange={setSubscriptionDialogOpen}
+      />
+      {/* Verify WhatsApp Dialog */}
+      <VerifyClientsWhatsAppDialog
+        open={verifyWhatsAppOpen}
+        onOpenChange={setVerifyWhatsAppOpen}
+        clients={clients}
       />
       </div>
     </>
