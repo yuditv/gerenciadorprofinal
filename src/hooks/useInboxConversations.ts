@@ -355,6 +355,23 @@ export function useInboxConversations() {
         updates.active_agent_id = agentId;
       }
     }
+
+    // Optimistically update local state so UI reflects immediately
+    setConversations(prev =>
+      prev.map(c =>
+        c.id === conversationId
+          ? {
+              ...c,
+              ai_enabled: enabled,
+              ai_paused_at: updates.ai_paused_at ?? null,
+              ...(enabled ? { assigned_to: null } : {}),
+              ...(agentId !== undefined ? { active_agent_id: agentId ?? null } : {}),
+              // Clear active_agent reference when disabling
+              ...(!enabled ? { active_agent: null } : {}),
+            }
+          : c
+      )
+    );
     
     await updateConversation(conversationId, updates as Partial<Conversation>);
     toast({ title: enabled ? 'IA ativada' : 'IA desativada' });
