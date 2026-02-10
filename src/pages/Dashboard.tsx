@@ -333,7 +333,7 @@ export default function Dashboard() {
       }}>
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="hover:bg-primary/10">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/?section=clients')} className="hover:bg-primary/10">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
