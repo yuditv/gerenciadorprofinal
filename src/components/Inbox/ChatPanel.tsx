@@ -255,10 +255,16 @@ export function ChatPanel({
     }
   }, [messages, isTyping]);
 
-  // Mark as read when conversation is selected
+  // Mark as read when conversation is selected + send read receipt to WhatsApp
   useEffect(() => {
-    if (conversation && conversation.unread_count > 0) {
-      onMarkAsRead();
+    if (conversation) {
+      if (conversation.unread_count > 0) {
+        onMarkAsRead();
+      }
+      // Send read receipt to UAZAPI so blue ticks appear on sender's WhatsApp
+      supabase.functions.invoke('send-read-receipt', {
+        body: { conversationId: conversation.id }
+      }).catch(() => {});
     }
   }, [conversation?.id]);
 

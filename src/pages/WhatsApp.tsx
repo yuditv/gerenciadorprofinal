@@ -68,6 +68,7 @@ import { InstanceSettingsDialog } from '@/components/InstanceSettingsDialog';
 import { PlanLimitAlert } from '@/components/PlanLimitAlert';
 import { motion } from 'framer-motion';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { GroupContactExtractor } from '@/components/GroupContactExtractor';
 
 // Lazy load pages
 const Contacts = lazy(() => import('@/pages/Contacts'));
@@ -464,7 +465,7 @@ export default function WhatsApp() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-          <TabsList className="w-max min-w-full sm:w-full sm:max-w-5xl grid grid-cols-9 gap-0">
+          <TabsList className="w-max min-w-full sm:w-full sm:max-w-5xl grid grid-cols-10 gap-0">
             <TabsTrigger value="dispatch" className="gap-1 sm:gap-2 px-2 sm:px-3">
               <Zap className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs sm:text-sm">Disparo</span>
@@ -497,9 +498,13 @@ export default function WhatsApp() {
               <CalendarDays className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs sm:text-sm">Agendar</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-1 sm:gap-2 px-2 sm:px-3">
+           <TabsTrigger value="history" className="gap-1 sm:gap-2 px-2 sm:px-3">
               <History className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs sm:text-sm">Histórico</span>
+            </TabsTrigger>
+            <TabsTrigger value="extract" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Extrair</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -920,6 +925,17 @@ export default function WhatsApp() {
         {/* History Tab */}
         <TabsContent value="history" className="space-y-6">
           <DispatchHistoryPanel />
+        </TabsContent>
+
+        {/* Extract Group Contacts Tab */}
+        <TabsContent value="extract" className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <GroupContactExtractor />
+          </motion.div>
         </TabsContent>
 
         {/* Status Tab */}
