@@ -90,11 +90,6 @@ export function useInboxConversations() {
         .from('conversations')
         .select(`
           *,
-          instance:whatsapp_instances!conversations_instance_id_fkey(
-            id,
-            instance_name,
-            status
-          ),
           labels:conversation_labels(
             id,
             label:inbox_labels(
@@ -162,7 +157,6 @@ export function useInboxConversations() {
         ...conv,
         status: conv.status as 'open' | 'pending' | 'resolved' | 'snoozed',
         priority: conv.priority as 'low' | 'medium' | 'high' | 'urgent',
-        instance: Array.isArray(conv.instance) ? conv.instance[0] ?? undefined : conv.instance ?? undefined,
       }));
 
       setConversations(mappedData as Conversation[]);

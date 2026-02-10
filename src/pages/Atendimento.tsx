@@ -148,6 +148,13 @@ export default function Atendimento() {
   const { isAdmin, isLoading: isPermissionsLoading } = useUserPermissions();
   // Admins bypass subscription check; evita “flash” aguardando permissão/assinatura resolverem.
   const subscriptionExpired = !isPermissionsLoading && !isSubscriptionLoading && !isAdmin && !isActive();
+  
+  // Map instance_id -> instance_name for admin badge display
+  const instancesMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    instances.forEach(inst => { map[inst.id] = inst.instance_name; });
+    return map;
+  }, [instances]);
   const { agents, myStatus, updateStatus } = useAgentStatus();
   
   const {
@@ -889,6 +896,7 @@ export default function Atendimento() {
                   onSearchChange={setSearchQuery}
                   defaultAgentId={defaultAgentId}
                   isAdmin={isAdmin}
+                  instancesMap={instancesMap}
                 />
               </div>
 

@@ -71,6 +71,7 @@ interface ConversationListItemProps {
   isSelected: boolean;
   defaultAgentId?: string | null;
   isAdmin?: boolean;
+  instanceName?: string;
   onSelect: (conversation: Conversation) => void;
   getSLAStatus?: (createdAt: string, firstReplyAt: string | null, priority: string) => SLAStatus | null;
 }
@@ -80,6 +81,7 @@ export const ConversationListItem = memo(function ConversationListItem({
   isSelected,
   defaultAgentId,
   isAdmin,
+  instanceName,
   onSelect,
   getSLAStatus,
 }: ConversationListItemProps) {
@@ -235,16 +237,16 @@ export const ConversationListItem = memo(function ConversationListItem({
           )}
           
           {/* Instance badge (admin only) */}
-          {isAdmin && conversation.instance?.instance_name && (
+          {isAdmin && instanceName && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[100px] bg-muted/50 text-muted-foreground border border-border/50">
-                    📱 {conversation.instance.instance_name}
+                    📱 {instanceName}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
-                  Instância: {conversation.instance.instance_name}
+                  Instância: {instanceName}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
