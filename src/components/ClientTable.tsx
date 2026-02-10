@@ -1,4 +1,5 @@
 import { Client, planLabels, getExpirationStatus, formatCurrency, getDaysUntilExpiration } from '@/types/client';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,7 +73,9 @@ export function ClientTable({
 
   return (
     <div className="glass-card rounded-xl overflow-hidden">
-      <Table>
+      <ScrollArea className="w-full" type="always">
+        <div className="min-w-[800px]">
+          <Table>
         <TableHeader>
           <TableRow className="border-border/50 hover:bg-transparent">
             {onToggleSelection && (
@@ -184,7 +187,10 @@ export function ClientTable({
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+        </Table>
+        </div>
+        <ScrollBar orientation="horizontal" className="h-3" />
+      </ScrollArea>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Client, PlanType, planLabels, planDurations, formatCurrency, getExpirationStatus } from '@/types/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -279,8 +280,9 @@ export function FinancialReport({ clients }: FinancialReportProps) {
           <CardTitle className="text-lg">Detalhes por Plano</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <ScrollArea className="w-full" type="always">
+            <div className="min-w-[600px]">
+              <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Plano</th>
@@ -334,7 +336,9 @@ export function FinancialReport({ clients }: FinancialReportProps) {
                 </tr>
               </tfoot>
             </table>
-          </div>
+            </div>
+            <ScrollBar orientation="horizontal" className="h-3" />
+          </ScrollArea>
         </CardContent>
       </Card>
     </div>

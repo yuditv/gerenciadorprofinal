@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -164,7 +164,8 @@ export function CommissionReport({ resellers, clients, planPrices }: CommissionR
               <p className="text-sm">Cadastre revendedores para ver o relatório de comissões</p>
             </div>
           ) : (
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[400px]" type="always">
+              <div className="min-w-[800px]">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -227,6 +228,8 @@ export function CommissionReport({ resellers, clients, planPrices }: CommissionR
                   ))}
                 </TableBody>
               </Table>
+              </div>
+              <ScrollBar orientation="horizontal" className="h-3" />
             </ScrollArea>
           )}
         </CardContent>
