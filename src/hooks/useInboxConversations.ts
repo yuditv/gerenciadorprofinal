@@ -340,11 +340,11 @@ export function useInboxConversations() {
   };
 
   const toggleAI = async (conversationId: string, enabled: boolean, agentId?: string | null) => {
-    // When enabling AI, clear assigned_to and ai_paused_at to allow automation
-    // When disabling AI, record the pause timestamp
+    // When disabling AI, clear ai_paused_at so the UI doesn't show
+    // an amber "paused" indicator – the user explicitly turned it off.
     const updates: Partial<Conversation> & { active_agent_id?: string | null } = {
       ai_enabled: enabled,
-      ai_paused_at: enabled ? null : new Date().toISOString(),
+      ai_paused_at: null,
     };
     
     // Clear human assignment when AI is explicitly enabled
