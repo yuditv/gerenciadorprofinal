@@ -196,16 +196,31 @@ export function InstanceSelector({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="automatic">
-                      <span className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-primary" />
-                        Automático (Inteligente)
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-primary" />
+                          Automático (Inteligente)
+                        </span>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          Distribui mensagens entre as instâncias automaticamente, priorizando as menos utilizadas
+                        </span>
+                      </div>
                     </SelectItem>
                     <SelectItem value="round-robin">
-                      🔄 Round Robin (Alternado)
+                      <div className="flex flex-col gap-0.5">
+                        <span>🔄 Round Robin (Alternado)</span>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          Alterna o envio entre as instâncias selecionadas, uma por vez, em sequência
+                        </span>
+                      </div>
                     </SelectItem>
                     <SelectItem value="single">
-                      1️⃣ Única Instância
+                      <div className="flex flex-col gap-0.5">
+                        <span>1️⃣ Única Instância</span>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          Usa apenas uma instância para todos os envios
+                        </span>
+                      </div>
                     </SelectItem>
                   </SelectContent>
                 </Select>
