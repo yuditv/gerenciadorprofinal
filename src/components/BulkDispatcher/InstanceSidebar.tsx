@@ -211,13 +211,32 @@ export function InstanceSidebar({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="automatic">
-              <span className="flex items-center gap-2">
-                <Zap className="w-3 h-3 text-primary" />
-                Automático
-              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className="flex items-center gap-2">
+                  <Zap className="w-3 h-3 text-primary" />
+                  Automático
+                </span>
+                <span className="text-[10px] text-muted-foreground font-normal leading-tight">
+                  Distribui automaticamente priorizando instâncias menos utilizadas
+                </span>
+              </div>
             </SelectItem>
-            <SelectItem value="round-robin">🔄 Alternado</SelectItem>
-            <SelectItem value="single">1️⃣ Única</SelectItem>
+            <SelectItem value="round-robin">
+              <div className="flex flex-col gap-0.5">
+                <span>🔄 Alternado</span>
+                <span className="text-[10px] text-muted-foreground font-normal leading-tight">
+                  Alterna o envio entre instâncias, uma por vez em sequência
+                </span>
+              </div>
+            </SelectItem>
+            <SelectItem value="single">
+              <div className="flex flex-col gap-0.5">
+                <span>1️⃣ Única</span>
+                <span className="text-[10px] text-muted-foreground font-normal leading-tight">
+                  Usa apenas uma instância para todos os envios
+                </span>
+              </div>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
