@@ -347,20 +347,29 @@ function detectNotifiableEvent(
 ): DetectedEvent {
   const lowerMessage = (messageContent || '').toLowerCase();
   
-  // Payment proof detection (image + payment keywords)
+  // Payment proof detection
   const paymentKeywords = ['paguei', 'comprovante', 'pix', 'transferi', 'pagamento', 'pago', 'deposito', 'depositei', 'boleto'];
   const hasPaymentKeyword = paymentKeywords.some(kw => lowerMessage.includes(kw));
   
-  if (mediaType === 'image' && (hasPaymentKeyword || lowerMessage.length < 50)) {
-    // Image with payment keyword or short message = likely payment proof
-    if (hasPaymentKeyword || lowerMessage === '' || lowerMessage.length < 20) {
-      return {
-        shouldNotify: true,
-        eventType: 'payment_proof',
-        summary: `Cliente enviou imagem${hasPaymentKeyword ? ' com menção a pagamento' : ' (possível comprovante)'}`,
-        urgency: 'medium'
-      };
-    }
+  // PDFs/documents are always treated as payment proof
+  if (mediaType === 'document') {
+    return {
+      shouldNotify: true,
+      eventType: 'payment_proof',
+      summary: `Cliente enviou documento${hasPaymentKeyword ? ' com menção a pagamento' : ' (possível comprovante)'}`,
+      urgency: 'medium'
+    };
+  }
+  
+  // For images: only notify if message text explicitly mentions payment
+  // The actual image content will be analyzed by AI separately and may trigger a late notification
+  if (mediaType === 'image' && hasPaymentKeyword) {
+    return {
+      shouldNotify: true,
+      eventType: 'payment_proof',
+      summary: `Cliente enviou imagem com menção a pagamento`,
+      urgency: 'medium'
+    };
   }
   
   // Complaint detection
@@ -767,12 +776,12 @@ async function describeImageViaGateway(imageUrl: string): Promise<string | null>
           {
             role: 'system',
             content:
-              'Você descreve imagens de forma objetiva e curta em pt-BR. Se houver texto, faça OCR e transcreva. Se for comprovante/pagamento, extraia valor, data, nome e status se aparecer.',
+              'Você descreve imagens de forma objetiva e curta em pt-BR. Se houver texto, faça OCR e transcreva. IMPORTANTE: Se a imagem for um comprovante de pagamento, transferência bancária, PIX ou boleto, comece sua resposta EXATAMENTE com "[COMPROVANTE]" seguido dos dados extraídos (valor, data, nome, banco, status). Se NÃO for um comprovante de pagamento, descreva normalmente sem essa tag.',
           },
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Descreva a imagem e transcreva qualquer texto que houver.' },
+              { type: 'text', text: 'Descreva a imagem e transcreva qualquer texto que houver. Se for um comprovante de pagamento, comece com [COMPROVANTE].' },
               { type: 'image_url', image_url: { url: imageUrl } },
             ],
           },
@@ -2271,6 +2280,23 @@ serve(async (req: Request) => {
             let imageDesc: string | null = null;
             if (isIncomingImage && mediaUrl) {
               imageDesc = await describeImageViaGateway(mediaUrl);
+              // Late payment proof detection: only notify if AI confirms it's a receipt
+              if (imageDesc && imageDesc.startsWith('[COMPROVANTE]')) {
+                const supabaseUrlForNotif = Deno.env.get('SUPABASE_URL') || '';
+                const supabaseServiceKeyForNotif = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+                sendOwnerNotification(
+                  supabaseUrlForNotif,
+                  supabaseServiceKeyForNotif,
+                  instance.user_id,
+                  'payment_proof',
+                  normalizedPhone,
+                  conversation.contact_name,
+                  `Comprovante confirmado por IA: ${imageDesc.substring(14, 120)}...`,
+                  conversation.id,
+                  instance.id,
+                  'medium'
+                );
+              }
             }
 
             const effectiveTextForAI = transcriptText?.trim()
@@ -2358,6 +2384,23 @@ serve(async (req: Request) => {
             let imageDesc: string | null = null;
             if (isIncomingImage && mediaUrl) {
               imageDesc = await describeImageViaGateway(mediaUrl);
+              // Late payment proof detection: only notify if AI confirms it's a receipt
+              if (imageDesc && imageDesc.startsWith('[COMPROVANTE]')) {
+                const supabaseUrlForNotif = Deno.env.get('SUPABASE_URL') || '';
+                const supabaseServiceKeyForNotif = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+                sendOwnerNotification(
+                  supabaseUrlForNotif,
+                  supabaseServiceKeyForNotif,
+                  instance.user_id,
+                  'payment_proof',
+                  normalizedPhone,
+                  conversation.contact_name,
+                  `Comprovante confirmado por IA: ${imageDesc.substring(14, 120)}...`,
+                  conversation.id,
+                  instance.id,
+                  'medium'
+                );
+              }
             }
 
             const effectiveTextForAI = transcriptText?.trim()
