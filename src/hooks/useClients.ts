@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Client, PlanType, ServiceType, RenewalRecord, getExpirationStatus, planDurations, planLabels } from '@/types/client';
+import { Client, PlanType, ServiceType, RenewalRecord, getExpirationStatus, getDaysUntilExpiration, planDurations, planLabels } from '@/types/client';
 import { addMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from './useAuth';
@@ -357,7 +357,11 @@ export function useClients() {
   }, [clients]);
 
   const expiredClients = useMemo(() => {
-    return clients.filter(c => getExpirationStatus(c.expiresAt) === 'expired');
+    return clients.filter(c => {
+      if (getExpirationStatus(c.expiresAt) !== 'expired') return false;
+      const days = Math.abs(getDaysUntilExpiration(c.expiresAt));
+      return days >= 1 && days <= 7;
+    });
   }, [clients]);
 
   return {
