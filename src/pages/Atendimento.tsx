@@ -627,11 +627,9 @@ export default function Atendimento() {
             variant="ghost" 
             size="icon" 
             className="h-8 w-8 sm:h-9 sm:w-9" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onClick={() => {
               try { localStorage.setItem('app-active-section', JSON.stringify('clients')); } catch {}
-              navigate('/?section=clients', { replace: true });
+              window.location.href = '/?section=clients';
             }}
           >
             <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
