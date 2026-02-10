@@ -90,7 +90,7 @@ export function useInboxConversations() {
         .from('conversations')
         .select(`
           *,
-          instance:whatsapp_instances!conversations_instance_id_fkey(
+          instance:whatsapp_instances!left(
             id,
             instance_name,
             status
