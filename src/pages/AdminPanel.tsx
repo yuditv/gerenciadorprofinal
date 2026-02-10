@@ -339,10 +339,12 @@ export default function AdminPanel() {
                     <TableHead className="text-muted-foreground">Usuário</TableHead>
                     <TableHead className="text-muted-foreground">Email</TableHead>
                     <TableHead className="text-muted-foreground">WhatsApp</TableHead>
-                    <TableHead className="text-muted-foreground">Role</TableHead>
-                    <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-muted-foreground">Criado em</TableHead>
-                    <TableHead className="text-muted-foreground">Último acesso</TableHead>
+                     <TableHead className="text-muted-foreground">Role</TableHead>
+                     <TableHead className="text-muted-foreground">Plano</TableHead>
+                     <TableHead className="text-muted-foreground">Status</TableHead>
+                     <TableHead className="text-muted-foreground">Criado em</TableHead>
+                     <TableHead className="text-muted-foreground">Vencimento</TableHead>
+                     <TableHead className="text-muted-foreground">Último acesso</TableHead>
                     <TableHead className="text-muted-foreground text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -350,6 +352,7 @@ export default function AdminPanel() {
                   {users.map((u) => {
                     const RoleIcon = roleConfig[u.role]?.icon || User;
                     const isCurrentUser = u.id === user?.id;
+                    const userSub = subscriptions.find(s => s.user_id === u.id);
                     
                     return (
                       <TableRow 
@@ -421,20 +424,43 @@ export default function AdminPanel() {
                           </Select>
                         </TableCell>
                         <TableCell>
+                          <Badge variant="outline" className="text-xs">
+                            {userSub?.plan?.name || 'Sem plano'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           {u.is_blocked ? (
                             <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30">
                               <Ban className="h-3 w-3 mr-1" />
                               Bloqueado
                             </Badge>
+                          ) : userSub ? (
+                            <Badge className={
+                              userSub.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                              userSub.status === 'trial' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                              userSub.status === 'expired' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                              'bg-muted text-muted-foreground'
+                            }>
+                              {userSub.status === 'active' ? 'Ativo' :
+                               userSub.status === 'trial' ? 'Trial' :
+                               userSub.status === 'expired' ? 'Expirado' :
+                               userSub.status === 'cancelled' ? 'Cancelado' : userSub.status}
+                            </Badge>
                           ) : (
-                            <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                              <ShieldCheck className="h-3 w-3 mr-1" />
-                              Ativo
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              Sem assinatura
                             </Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {u.created_at ? format(new Date(u.created_at), "dd/MM/yyyy", { locale: ptBR }) : '-'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {userSub?.status === 'trial' && userSub.trial_ends_at
+                            ? format(new Date(userSub.trial_ends_at), "dd/MM/yyyy", { locale: ptBR })
+                            : userSub?.current_period_end
+                              ? format(new Date(userSub.current_period_end), "dd/MM/yyyy", { locale: ptBR })
+                              : '-'}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {u.last_sign_in_at 
@@ -585,7 +611,7 @@ export default function AdminPanel() {
                   })}
                   {users.length === 0 && !isLoading && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         Nenhum usuário encontrado
                       </TableCell>
                     </TableRow>
