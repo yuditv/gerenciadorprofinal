@@ -189,7 +189,7 @@ export const ConversationListItem = memo(function ConversationListItem({
 
         {/* Labels, Agent Badge & Unread badge row */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {conversation.active_agent && 
+          {conversation.ai_enabled && conversation.active_agent && 
            conversation.active_agent_id !== defaultAgentId && (
             <TooltipProvider delayDuration={100}>
               <Tooltip>
