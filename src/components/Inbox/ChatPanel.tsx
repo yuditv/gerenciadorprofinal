@@ -714,15 +714,14 @@ export function ChatPanel({
           {/* AI Toggle with agent selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md transition-colors cursor-pointer border", conversation.ai_enabled ? "bg-primary/10 border-primary/30" : conversation.ai_paused_at ? "bg-amber-500/10 border-amber-500/30" : "bg-muted border-transparent")}>
-                <Bot className={cn("h-4 w-4", conversation.ai_enabled ? "text-primary" : conversation.ai_paused_at ? "text-amber-500" : "text-muted-foreground")} />
+              <button className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-md transition-colors cursor-pointer border", conversation.ai_enabled ? "bg-primary/10 border-primary/30" : "bg-muted border-transparent")}>
+                <Bot className={cn("h-4 w-4", conversation.ai_enabled ? "text-primary" : "text-muted-foreground")} />
                 <span className={cn("text-xs font-medium hidden sm:inline max-w-[80px] truncate", conversation.ai_enabled ? "text-primary" : "text-muted-foreground")}>
                   {conversation.ai_enabled 
                     ? (conversation.active_agent?.name || 'IA') 
                     : 'IA'}
                 </span>
                 <ChevronDown className={cn("h-3 w-3", conversation.ai_enabled ? "text-primary" : "text-muted-foreground")} />
-                {!conversation.ai_enabled && conversation.ai_paused_at && <Clock className="h-3 w-3 text-amber-500 animate-pulse" />}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
