@@ -7,6 +7,7 @@ import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { NotificationPermissionBanner } from "@/components/NotificationPermissionBanner";
 import { cn } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { useGlobalInboxNotifications } from "@/hooks/useGlobalInboxNotifications";
 
 // Lazy load heavy components
 const Index = lazy(() => import("@/pages/Index"));
@@ -28,6 +29,9 @@ const ContentLoader = () => <div className="flex items-center justify-center h-f
 export function MainLayout() {
   const [activeSection, setActiveSection] = usePersistedState<AppSection>("app-active-section", "clients");
   const [searchParams] = useSearchParams();
+  
+  // Global inbox notifications - plays loud sounds for new messages on ANY page
+  useGlobalInboxNotifications();
   const {
     toast
   } = useToast();
