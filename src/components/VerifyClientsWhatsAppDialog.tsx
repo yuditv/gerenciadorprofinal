@@ -129,7 +129,7 @@ export function VerifyClientsWhatsAppDialog({ open, onOpenChange, clients }: Ver
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
@@ -140,7 +140,7 @@ export function VerifyClientsWhatsAppDialog({ open, onOpenChange, clients }: Ver
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
           {/* Instance selector */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Instância WhatsApp</label>
@@ -162,10 +162,10 @@ export function VerifyClientsWhatsAppDialog({ open, onOpenChange, clients }: Ver
           </div>
 
           {/* Info */}
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>{clients.length} clientes para verificar</span>
             {hasRun && (
-              <div className="flex gap-3">
+              <div className="flex gap-2 flex-wrap">
                 <Badge variant="outline" className="border-emerald-500/50 text-emerald-500">
                   <CheckCircle2 className="h-3 w-3 mr-1" /> {validResults.length} ativos
                 </Badge>
@@ -203,9 +203,8 @@ export function VerifyClientsWhatsAppDialog({ open, onOpenChange, clients }: Ver
           {/* Results */}
           {hasRun && !isVerifying && results.length > 0 && (
             <div className="space-y-3">
-              {/* Actions for inactive */}
               {invalidResults.length > 0 && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={exportInactive}>
                     <Download className="h-3.5 w-3.5" />
                     Exportar Inativos
@@ -217,14 +216,14 @@ export function VerifyClientsWhatsAppDialog({ open, onOpenChange, clients }: Ver
                 </div>
               )}
 
-              <ScrollArea className="h-[300px] rounded-lg border border-border/30">
+              <ScrollArea className="h-[250px] rounded-lg border border-border/30">
                 <div className="p-2 space-y-1">
                   {results.map((r, i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted/30 transition-colors"
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-muted/30 transition-colors"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         {r.exists ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                         ) : (
@@ -232,12 +231,12 @@ export function VerifyClientsWhatsAppDialog({ open, onOpenChange, clients }: Ver
                         )}
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{r.clientName}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{r.originalPhone}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate">{r.originalPhone}</p>
                         </div>
                       </div>
                       <Badge
                         variant="outline"
-                        className={r.exists ? "border-emerald-500/50 text-emerald-500" : "border-destructive/50 text-destructive"}
+                        className={`shrink-0 ${r.exists ? "border-emerald-500/50 text-emerald-500" : "border-destructive/50 text-destructive"}`}
                       >
                         {r.exists ? "Ativo" : "Inativo"}
                       </Badge>
