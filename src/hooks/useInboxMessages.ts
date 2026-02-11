@@ -59,7 +59,7 @@ export function useInboxMessages(conversationId: string | null) {
     }
   }, [conversationId]);
 
-  const sendMessage = async (content: string, isPrivate = false, mediaUrl?: string, mediaType?: string, fileName?: string, retryId?: string) => {
+  const sendMessage = async (content: string, isPrivate = false, mediaUrl?: string, mediaType?: string, fileName?: string, retryId?: string, overrideInstanceId?: string) => {
     if (!conversationId || (!content.trim() && !mediaUrl)) return false;
 
     // If retrying, remove the failed message first
@@ -105,7 +105,8 @@ export function useInboxMessages(conversationId: string | null) {
             isPrivate,
             mediaUrl,
             mediaType,
-            fileName
+            fileName,
+            overrideInstanceId
           })
         }
       );

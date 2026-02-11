@@ -486,8 +486,8 @@ export default function Atendimento() {
     setSelectedConversation(conversation);
   };
 
-  const handleSendMessage = async (content: string, isPrivate?: boolean, mediaUrl?: string, mediaType?: string, fileName?: string) => {
-    return sendMessage(content, isPrivate || false, mediaUrl, mediaType, fileName);
+  const handleSendMessage = async (content: string, isPrivate?: boolean, mediaUrl?: string, mediaType?: string, fileName?: string, overrideInstanceId?: string) => {
+    return sendMessage(content, isPrivate || false, mediaUrl, mediaType, fileName, undefined, overrideInstanceId);
   };
 
   const handleAssignToMe = () => {
@@ -940,6 +940,8 @@ export default function Atendimento() {
                   onDeleteMessage={deleteMessage}
                   onSaveContact={saveContactToWhatsApp}
                   onRenameContact={renameContact}
+                  isAdmin={isAdmin}
+                  availableInstances={isAdmin ? instances.map(i => ({ id: i.id, instance_name: i.instance_name })) : undefined}
                 />
               </div>
             </>

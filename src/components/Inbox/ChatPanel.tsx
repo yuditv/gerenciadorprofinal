@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 // framer-motion import removed for performance
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode, X, SpellCheck } from "lucide-react";
+import { Send, MoreVertical, Bot, User, Check, Clock, Tag, UserPlus, Archive, RotateCcw, Lock, PanelRightOpen, PanelRightClose, PanelLeftOpen, PanelLeftClose, Play, RefreshCw, Camera, Trash2, MessageSquareText, Ban, UserCheck, Search, ChevronDown, Settings, Pencil, BookUser, SquareStack, GalleryHorizontal, Tv, Wifi, QrCode, X, SpellCheck, Smartphone } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,11 @@ import { GeneratePIXDialog } from "./GeneratePIXDialog";
 import { ScheduleMessageDialog } from "./ScheduleMessageDialog";
 import { useAutoCorrect } from "@/hooks/useAutoCorrect";
 import { useAIAgents } from "@/hooks/useAIAgents";
+interface WhatsAppInstanceInfo {
+  id: string;
+  instance_name: string;
+}
+
 interface ChatPanelProps {
   conversation: Conversation | null;
   messages: ChatMessage[];
@@ -65,7 +70,7 @@ interface ChatPanelProps {
   isSending: boolean;
   isSyncing?: boolean;
   isDeleting?: boolean;
-  onSendMessage: (content: string, isPrivate?: boolean, mediaUrl?: string, mediaType?: string, fileName?: string) => Promise<boolean>;
+  onSendMessage: (content: string, isPrivate?: boolean, mediaUrl?: string, mediaType?: string, fileName?: string, overrideInstanceId?: string) => Promise<boolean>;
   onAssignToMe: () => void;
   onResolve: () => void;
   onReopen: () => void;
@@ -80,6 +85,8 @@ interface ChatPanelProps {
   onDeleteMessage?: (messageId: string, deleteForEveryone: boolean) => Promise<boolean>;
   onSaveContact?: (conversationId: string, name?: string) => Promise<boolean>;
   onRenameContact?: (conversationId: string, name: string) => Promise<boolean>;
+  isAdmin?: boolean;
+  availableInstances?: WhatsAppInstanceInfo[];
 }
 interface AttachmentState {
   url: string;
@@ -109,7 +116,9 @@ export function ChatPanel({
   onDeleteConversation,
   onDeleteMessage,
   onSaveContact,
-  onRenameContact
+  onRenameContact,
+  isAdmin,
+  availableInstances
 }: ChatPanelProps) {
   const {
     user
@@ -149,6 +158,7 @@ export function ChatPanel({
   const [showScheduleMessage, setShowScheduleMessage] = useState(false);
   const [isStartingNumericMenu, setIsStartingNumericMenu] = useState(false);
   const [showClientSheet, setShowClientSheet] = useState(false);
+  const [overrideInstanceId, setOverrideInstanceId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -358,11 +368,11 @@ export function ChatPanel({
         const att = attachmentsToSend[i];
         // Primeira mensagem leva o texto, as demais só a mídia
         const textToSend = i === 0 ? messageToSend : "";
-        await onSendMessage(textToSend, privateToSend, att.url, att.type, att.fileName);
+        await onSendMessage(textToSend, privateToSend, att.url, att.type, att.fileName, overrideInstanceId || undefined);
       }
     } else {
       // Apenas texto
-      await onSendMessage(messageToSend, privateToSend);
+      await onSendMessage(messageToSend, privateToSend, undefined, undefined, undefined, overrideInstanceId || undefined);
     }
   };
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1236,6 +1246,33 @@ export function ChatPanel({
             }} onKeyDown={handleKeyDown} spellCheck={true} className={cn("min-h-[44px] max-h-32 resize-none inbox-input-field", "bg-inbox-input dark:bg-inbox-input", isPrivate && "!border-amber-500/50 dark:!border-amber-500/40")} rows={1} />
           </div>
           
+          {/* Instance selector for admins */}
+          {isAdmin && availableInstances && availableInstances.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" title="Enviar por instância">
+                  <Smartphone className={cn("h-4 w-4", overrideInstanceId ? "text-primary" : "text-muted-foreground")} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Enviar pela instância:</p>
+                <DropdownMenuItem onClick={() => setOverrideInstanceId(null)} className="gap-2">
+                  <Smartphone className="h-4 w-4" />
+                  <span className="flex-1 truncate">Padrão (da conversa)</span>
+                  {!overrideInstanceId && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {availableInstances.map((inst) => (
+                  <DropdownMenuItem key={inst.id} onClick={() => setOverrideInstanceId(inst.id)} className="gap-2">
+                    <Smartphone className="h-4 w-4" />
+                    <span className="flex-1 truncate">{inst.instance_name}</span>
+                    {overrideInstanceId === inst.id && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <Button onClick={handleSend} disabled={!message.trim() && attachments.length === 0 || isSending} className="h-11 shadow-[var(--shadow-sm)]">
             <Send className="h-4 w-4" />
           </Button>

@@ -30,6 +30,7 @@ interface SendMessageRequest {
   mediaUrl?: string;
   mediaType?: string;
   fileName?: string;
+  overrideInstanceId?: string;
 }
 
 function getMediaType(mimeType: string): string {
@@ -103,7 +104,7 @@ serve(async (req: Request) => {
     }
 
     const body: SendMessageRequest = await req.json();
-    const { conversationId, content, isPrivate = false, mediaUrl, mediaType, fileName } = body;
+    const { conversationId, content, isPrivate = false, mediaUrl, mediaType, fileName, overrideInstanceId } = body;
 
     if (!conversationId) {
       return new Response(
@@ -138,12 +139,14 @@ serve(async (req: Request) => {
     }
 
     // Get instance separately (no JOIN needed)
+    // If admin provided an override instance, use that instead
+    const effectiveInstanceId = overrideInstanceId || conversation.instance_id;
     let instance = null;
-    if (conversation.instance_id) {
+    if (effectiveInstanceId) {
       const { data: instanceData, error: instanceError } = await supabaseAdmin
         .from('whatsapp_instances')
         .select('*')
-        .eq('id', conversation.instance_id)
+        .eq('id', effectiveInstanceId)
         .single();
       
       if (instanceError) {
