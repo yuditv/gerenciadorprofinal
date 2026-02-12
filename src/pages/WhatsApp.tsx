@@ -162,10 +162,10 @@ export default function WhatsApp() {
     refetchInstances();
   }, [instances, refetchInstances]);
 
-  // Auto-monitor instance status when on instances tab
+  // Auto-monitor instance status globally (not just on instances tab)
   useInstanceStatusMonitor(
     instanceIds,
-    activeTab === 'instances' && !subscriptionExpired && instances.length > 0,
+    !subscriptionExpired && instances.length > 0,
     handleStatusChange
   );
 

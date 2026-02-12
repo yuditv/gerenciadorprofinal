@@ -864,16 +864,28 @@ serve(async (req: Request): Promise<Response> => {
             
             // Determine connection status from multiple indicators
             // UAZAPI returns: { instance: { status, owner, profileName }, status: { connected, loggedIn } }
-            const isConnected = 
-              statusData.status?.connected === true ||   // Direct flag
-              statusData.status?.loggedIn === true ||    // Logged in flag
-              (statusData.instance?.owner && statusData.instance?.profileName); // Has profile = connected
+            // IMPORTANT: Prioritize explicit boolean flags over cached profile data.
+            // When a user disconnects from their phone/UAZAPI, the `connected` flag becomes false
+            // but `owner` and `profileName` may still be cached.
+            const hasExplicitFlag = statusData.status?.connected !== undefined || statusData.status?.loggedIn !== undefined;
+            const explicitConnected = statusData.status?.connected === true || statusData.status?.loggedIn === true;
+            
+            // Only use profile heuristic if no explicit flags are available
+            const isConnected = hasExplicitFlag
+              ? explicitConnected
+              : !!(statusData.instance?.owner && statusData.instance?.profileName);
+            
+            // Also check UAZAPI instance.status string for disconnected states
+            const instanceStatus = (statusData.instance?.status || '').toLowerCase();
+            const isExplicitlyDisconnected = instanceStatus === 'disconnected' || instanceStatus === 'close' || instanceStatus === 'closed';
             
             // Map UAZAPI status to our status
             let newStatus = "disconnected";
-            if (isConnected) {
+            if (isExplicitlyDisconnected) {
+              newStatus = "disconnected";
+            } else if (isConnected) {
               newStatus = "connected";
-            } else if (statusData.instance?.status === "connecting" || statusData.instance?.qrcode) {
+            } else if (instanceStatus === "connecting" || statusData.instance?.qrcode) {
               newStatus = "connecting";
             }
             
