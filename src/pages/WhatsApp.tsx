@@ -470,6 +470,10 @@ export default function WhatsApp() {
               <Zap className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs sm:text-sm">Disparo</span>
             </TabsTrigger>
+            <TabsTrigger value="instances" className="gap-1 sm:gap-2 px-2 sm:px-3">
+              <Smartphone className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline text-xs sm:text-sm">Instâncias</span>
+            </TabsTrigger>
             <TabsTrigger value="contacts" className="gap-1 sm:gap-2 px-2 sm:px-3">
               <Database className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs sm:text-sm">Contatos</span>
@@ -481,10 +485,6 @@ export default function WhatsApp() {
             <TabsTrigger value="status" className="gap-1 sm:gap-2 px-2 sm:px-3">
               <CircleDot className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline text-xs sm:text-sm">Status</span>
-            </TabsTrigger>
-            <TabsTrigger value="instances" className="gap-1 sm:gap-2 px-2 sm:px-3">
-              <Smartphone className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline text-xs sm:text-sm">Instâncias</span>
             </TabsTrigger>
             <TabsTrigger value="campaigns" className="gap-1 sm:gap-2 px-2 sm:px-3">
               <Megaphone className="h-4 w-4 shrink-0" />
