@@ -6,7 +6,7 @@ function safeGetRandomValues(bytes: Uint8Array) {
   // Some environments may not expose `crypto.getRandomValues`.
   // Fallback keeps the feature usable offline (not for security purposes).
   if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
+    globalThis.crypto.getRandomValues(bytes as unknown as Uint8Array<ArrayBuffer>);
     return;
   }
   for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
