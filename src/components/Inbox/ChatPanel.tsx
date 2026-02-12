@@ -52,6 +52,7 @@ import { DeleteMessageDialog } from "./DeleteMessageDialog";
 import { TestGeneratorDialog } from "./TestGeneratorDialog";
 import { IPTVTestChoiceDialog } from "./IPTVTestChoiceDialog";
 import { GextvTestGeneratorDialog } from "./GextvTestGeneratorDialog";
+import { ServerplayTestGeneratorDialog } from "./ServerplayTestGeneratorDialog";
 import { VPNTestGeneratorDialog } from "./VPNTestGeneratorDialog";
 import { GeneratePIXDialog } from "./GeneratePIXDialog";
 import { ScheduleMessageDialog } from "./ScheduleMessageDialog";
@@ -153,6 +154,7 @@ export function ChatPanel({
   const [showIPTVChoice, setShowIPTVChoice] = useState(false);
   const [showIPTVSportplay, setShowIPTVSportplay] = useState(false);
   const [showIPTVGextv, setShowIPTVGextv] = useState(false);
+  const [showIPTVServerplay, setShowIPTVServerplay] = useState(false);
   const [showVPNTestGenerator, setShowVPNTestGenerator] = useState(false);
   const [showPIXDialog, setShowPIXDialog] = useState(false);
   const [showScheduleMessage, setShowScheduleMessage] = useState(false);
@@ -1464,11 +1466,13 @@ export function ChatPanel({
         onOpenChange={setShowIPTVChoice}
         onChooseGextv={() => setShowIPTVGextv(true)}
         onChooseSportplay={() => setShowIPTVSportplay(true)}
+        onChooseServerplay={() => setShowIPTVServerplay(true)}
       />
 
       {/* IPTV Test Generator Dialogs */}
       <TestGeneratorDialog open={showIPTVSportplay} onOpenChange={setShowIPTVSportplay} />
       <GextvTestGeneratorDialog open={showIPTVGextv} onOpenChange={setShowIPTVGextv} />
+      <ServerplayTestGeneratorDialog open={showIPTVServerplay} onOpenChange={setShowIPTVServerplay} />
 
       {/* VPN Test Generator Dialog */}
       <VPNTestGeneratorDialog open={showVPNTestGenerator} onOpenChange={setShowVPNTestGenerator} />

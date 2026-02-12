@@ -12,6 +12,7 @@ interface IPTVTestChoiceDialogProps {
   onOpenChange: (open: boolean) => void;
   onChooseSportplay: () => void;
   onChooseGextv: () => void;
+  onChooseServerplay: () => void;
 }
 
 export function IPTVTestChoiceDialog({
@@ -19,6 +20,7 @@ export function IPTVTestChoiceDialog({
   onOpenChange,
   onChooseSportplay,
   onChooseGextv,
+  onChooseServerplay,
 }: IPTVTestChoiceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,6 +52,17 @@ export function IPTVTestChoiceDialog({
             className="w-full"
           >
             TESTE SPORTPLAY
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              onChooseServerplay();
+            }}
+            className="w-full"
+          >
+            TESTE SERVERPLAY
           </Button>
         </div>
       </DialogContent>
