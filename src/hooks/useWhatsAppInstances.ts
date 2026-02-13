@@ -412,6 +412,23 @@ export function useWhatsAppInstances() {
     }
   }, [user, fetchInstances]);
 
+  const syncFromUazapi = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('whatsapp-instances', {
+        body: { action: 'sync' },
+      });
+      if (error) throw error;
+      if (data?.success === false) throw new Error(data?.error || 'Erro ao sincronizar');
+      toast.success(data?.message || 'Sincronização concluída!');
+      await fetchInstances();
+      return data;
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast.error(error.message || 'Erro ao sincronizar instâncias');
+      return null;
+    }
+  };
+
   return {
     instances,
     isLoading,
@@ -432,5 +449,6 @@ export function useWhatsAppInstances() {
     updateProfileImage,
     refetch: fetchInstances,
     refreshAllStatus,
+    syncFromUazapi,
   };
 }
