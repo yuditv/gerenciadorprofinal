@@ -69,6 +69,9 @@ import { PlanLimitAlert } from '@/components/PlanLimitAlert';
 import { motion } from 'framer-motion';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { GroupContactExtractor } from '@/components/GroupContactExtractor';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 // Lazy load pages
 const Contacts = lazy(() => import('@/pages/Contacts'));
@@ -577,190 +580,175 @@ export default function WhatsApp() {
               </CardContent>
             </Card>
           ) : (
-            <motion.div 
-              className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              {instances.map((instance) => (
-                <motion.div key={instance.id} variants={itemVariants}>
-                  <Card className="glass-card group">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          {/* Profile Picture */}
-                          <div className="relative shrink-0">
-                            {instance.profile_picture_url ? (
-                              <img 
-                                src={instance.profile_picture_url} 
-                                alt={instance.name}
-                                className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center border-2 border-muted-foreground/20">
-                                <User className="w-6 h-6 text-muted-foreground" />
-                              </div>
-                            )}
-                            {instance.status === 'connected' && (
-                              <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-background rounded-full" />
-                            )}
-                          </div>
-                          <div className="space-y-1 min-w-0">
-                            <CardTitle className="text-lg group-hover:text-primary transition-colors truncate">
-                              {instance.name}
-                            </CardTitle>
-                            <CardDescription className="flex flex-col gap-0.5">
-                              {instance.profile_name && (
-                                <span className="font-medium text-foreground/80 truncate">
-                                  {instance.profile_name}
-                                </span>
-                              )}
-                              {instance.phone_connected ? (
-                                <span className="flex items-center gap-1">
-                                  <Smartphone className="w-3 h-3" />
-                                  {instance.phone_connected}
-                                </span>
+            <ScrollArea className="w-full">
+              <div className="min-w-[1100px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[250px]">Instância</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Presença</TableHead>
+                      <TableHead>Limite Diário</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {instances.map((instance) => (
+                      <TableRow key={instance.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="relative shrink-0">
+                              {instance.profile_picture_url ? (
+                                <img 
+                                  src={instance.profile_picture_url} 
+                                  alt={instance.name}
+                                  className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
+                                />
                               ) : (
-                                <span>Não conectado</span>
+                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border-2 border-muted-foreground/20">
+                                  <User className="w-5 h-5 text-muted-foreground" />
+                                </div>
                               )}
-                            </CardDescription>
+                              {instance.status === 'connected' && (
+                                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{instance.name}</p>
+                              {instance.profile_name && (
+                                <p className="text-xs text-muted-foreground truncate">{instance.profile_name}</p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        {getInstanceStatusBadge(instance.status)}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Limite diário:</span>
-                        <span className="font-semibold">{instance.daily_limit || 500} msgs</span>
-                      </div>
-                      {instance.status === 'connected' && (
-                        <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                          <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                            <span>Webhook ativo - pronto para receber mensagens</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {instance.phone_connected || '—'}
+                          </span>
+                        </TableCell>
+                        <TableCell>{getInstanceStatusBadge(instance.status)}</TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={instance.presence_status === 'available' 
+                              ? 'border-green-500/30 text-green-500' 
+                              : 'border-red-500/30 text-red-500'}
+                          >
+                            {instance.presence_status === 'available' ? 'Online' : 'Offline'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold text-sm">{instance.daily_limit || 500}</span>
+                          <span className="text-xs text-muted-foreground ml-1">msgs</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
+                            <TooltipProvider delayDuration={300}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleShowQRCode(instance)}>
+                                    <QrCode className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>QR Code</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCheckStatus(instance.id)} disabled={checkingStatus === instance.id}>
+                                    <RefreshCw className={`w-4 h-4 ${checkingStatus === instance.id ? 'animate-spin' : ''}`} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Verificar Status</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenRename(instance)}>
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Renomear</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleTogglePresence(instance)}>
+                                    <Radio className={`w-4 h-4 ${instance.presence_status === 'available' ? 'text-green-500' : 'text-red-500'}`} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>{instance.presence_status === 'available' ? 'Ficar Offline' : 'Ficar Online'}</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenSettings(instance, 'privacy')}>
+                                    <Shield className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Privacidade</TooltipContent>
+                              </Tooltip>
+
+                              {(instance.status === 'connected' || instance.status === 'connecting') && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDisconnect(instance)}>
+                                      <LogOut className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Desconectar</TooltipContent>
+                                </Tooltip>
+                              )}
+
+                              {instance.status === 'connected' && (
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleConfigureWebhook(instance.id)} disabled={configuringWebhook === instance.id}>
+                                        <Link className={`w-4 h-4 ${configuringWebhook === instance.id ? 'animate-pulse' : ''}`} />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Webhook</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => handleTestWebhook(instance.id)} disabled={testingWebhook === instance.id}>
+                                        <TestTube2 className={`w-4 h-4 ${testingWebhook === instance.id ? 'animate-spin' : ''}`} />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Testar Webhook</TooltipContent>
+                                  </Tooltip>
+                                </>
+                              )}
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenSettings(instance, 'general')}>
+                                    <Settings className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Configurações</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteInstance(instance.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Excluir</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Clique em "Webhook" para re-sincronizar se não estiver recebendo mensagens
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex gap-2 flex-wrap">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleShowQRCode(instance)}
-                          className="gap-1.5"
-                        >
-                          <QrCode className="w-4 h-4" />
-                          QR Code
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleCheckStatus(instance.id)}
-                          disabled={checkingStatus === instance.id}
-                          className="gap-1.5"
-                        >
-                          <RefreshCw className={`w-4 h-4 ${checkingStatus === instance.id ? 'animate-spin' : ''}`} />
-                          Status
-                        </Button>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenRename(instance)}
-                            className="gap-1.5"
-                            title="Renomear instância"
-                          >
-                            <Pencil className="w-4 h-4" />
-                            Renomear
-                          </Button>
-
-                        {/* Presence (Online/Offline) Toggle */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTogglePresence(instance)}
-                          className="gap-1.5"
-                          title={instance.presence_status === 'available' ? 'Online (clique para Offline)' : 'Offline (clique para Online)'}
-                        >
-                          <Radio className={instance.presence_status === 'available' ? 'text-green-500' : 'text-red-500'} />
-                          {instance.presence_status === 'available' ? 'Online' : 'Offline'}
-                        </Button>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenSettings(instance, 'privacy')}
-                            className="gap-1.5"
-                            title="Configurações de privacidade"
-                          >
-                            <Shield className="w-4 h-4" />
-                            Privacidade
-                          </Button>
-
-                          {(instance.status === 'connected' || instance.status === 'connecting') && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDisconnect(instance)}
-                              className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              title="Desconectar (logout)"
-                            >
-                              <LogOut className="w-4 h-4" />
-                              Desconectar
-                            </Button>
-                          )}
-                        {instance.status === 'connected' && (
-                          <>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleConfigureWebhook(instance.id)}
-                              disabled={configuringWebhook === instance.id}
-                              className="gap-1.5"
-                              title="Sincronizar webhook para receber mensagens"
-                            >
-                              <Link className={`w-4 h-4 ${configuringWebhook === instance.id ? 'animate-pulse' : ''}`} />
-                              Webhook
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleTestWebhook(instance.id)}
-                              disabled={testingWebhook === instance.id}
-                              className="gap-1.5 text-primary hover:text-primary"
-                              title="Enviar mensagem de teste para verificar se o webhook está funcionando"
-                            >
-                              <TestTube2 className={`w-4 h-4 ${testingWebhook === instance.id ? 'animate-spin' : ''}`} />
-                              Testar
-                            </Button>
-                          </>
-                         )}
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleOpenSettings(instance, 'general')}
-                          title="Configurações avançadas"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDeleteInstance(instance.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </motion.div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <ScrollBar orientation="horizontal" className="h-3" />
+            </ScrollArea>
           )}
         </TabsContent>
 
