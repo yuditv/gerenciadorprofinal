@@ -2700,6 +2700,140 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    // SYNC - Import instances from UAZAPI into database
+    if (action === "sync") {
+      if (!uazapiAdminToken) {
+        return fail("UAZAPI_TOKEN não configurado. Não é possível sincronizar.");
+      }
+
+      try {
+        console.log("Fetching all instances from UAZAPI...");
+        const listResponse = await fetch(`${uazapiUrl}/instance/list`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "admintoken": uazapiAdminToken,
+          },
+        });
+
+        console.log("UAZAPI list response status:", listResponse.status);
+
+        if (!listResponse.ok) {
+          const errText = await listResponse.text();
+          console.error("UAZAPI list error:", errText);
+          return fail("Falha ao listar instâncias da UAZAPI", { details: errText });
+        }
+
+        const listData = await listResponse.json();
+        console.log("UAZAPI list response:", JSON.stringify(listData));
+
+        // UAZAPI may return array directly or { instances: [...] }
+        const uazapiInstances: any[] = Array.isArray(listData) 
+          ? listData 
+          : (listData.instances || listData.data || []);
+
+        if (uazapiInstances.length === 0) {
+          return ok({ imported: 0, skipped: 0, message: "Nenhuma instância encontrada na UAZAPI" });
+        }
+
+        // Get existing instances for this user
+        const { data: existingInstances } = await supabase
+          .from("whatsapp_instances")
+          .select("instance_name, instance_key")
+          .eq("user_id", user.id);
+
+        const existingNames = new Set((existingInstances || []).map(i => i.instance_name));
+        const existingKeys = new Set((existingInstances || []).map(i => i.instance_key).filter(Boolean));
+
+        let imported = 0;
+        let skipped = 0;
+        const importedNames: string[] = [];
+
+        for (const uazInstance of uazapiInstances) {
+          const instanceName = uazInstance.name || uazInstance.instance_name || uazInstance.instanceName || "";
+          const instanceToken = uazInstance.token || uazInstance.instance_key || uazInstance.key || "";
+
+          if (!instanceName && !instanceToken) {
+            skipped++;
+            continue;
+          }
+
+          // Skip if already exists
+          if (existingNames.has(instanceName) || (instanceToken && existingKeys.has(instanceToken))) {
+            skipped++;
+            continue;
+          }
+
+          // Try to get status for this instance
+          let status = "disconnected";
+          let phoneConnected: string | null = null;
+          let profileName: string | null = null;
+          let profilePictureUrl: string | null = null;
+
+          if (instanceToken) {
+            try {
+              const statusResp = await fetch(`${uazapiUrl}/instance/status`, {
+                headers: { "token": instanceToken },
+              });
+              if (statusResp.ok) {
+                const statusData = await statusResp.json();
+                const inst = statusData.instance || statusData;
+                
+                const isConnected = inst.connected === true || inst.loggedIn === true || 
+                  String(inst.state || inst.status || "").toLowerCase() === "connected" ||
+                  String(inst.state || inst.status || "").toLowerCase() === "open";
+                
+                status = isConnected ? "connected" : "disconnected";
+                phoneConnected = inst.owner || inst.phone || inst.wid || null;
+                if (phoneConnected) {
+                  phoneConnected = phoneConnected.replace(/@.*$/, "");
+                }
+                profileName = inst.pushname || inst.pushName || inst.profileName || null;
+                profilePictureUrl = inst.profilePicUrl || inst.profilePictureUrl || null;
+              } else {
+                await statusResp.text(); // consume body
+              }
+            } catch (e) {
+              console.error(`Error checking status for ${instanceName}:`, e);
+            }
+          }
+
+          // Insert into database
+          const { error: insertError } = await supabase
+            .from("whatsapp_instances")
+            .insert({
+              user_id: user.id,
+              instance_name: instanceName || `uazapi_${Date.now()}_${imported}`,
+              instance_key: instanceToken || null,
+              status,
+              phone_connected: phoneConnected,
+              profile_name: profileName,
+              profile_picture_url: profilePictureUrl,
+              daily_limit: 200,
+            });
+
+          if (insertError) {
+            console.error(`Error importing instance ${instanceName}:`, insertError);
+            skipped++;
+          } else {
+            imported++;
+            importedNames.push(instanceName);
+          }
+        }
+
+        return ok({ 
+          imported, 
+          skipped, 
+          total: uazapiInstances.length,
+          importedNames,
+          message: `${imported} instância(s) importada(s), ${skipped} ignorada(s)` 
+        });
+      } catch (e) {
+        console.error("UAZAPI sync error:", e);
+        return fail(`Erro ao sincronizar: ${String(e)}`);
+      }
+    }
+
     // LIST instances
     if (action === "list" || !action) {
       const { data: instances, error } = await supabase
