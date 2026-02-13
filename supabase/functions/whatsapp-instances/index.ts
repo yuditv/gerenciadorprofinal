@@ -2707,30 +2707,52 @@ serve(async (req: Request): Promise<Response> => {
       }
 
       try {
-        console.log("Fetching all instances from UAZAPI...");
-        const listResponse = await fetch(`${uazapiUrl}/instance/list`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "admintoken": uazapiAdminToken,
-          },
-        });
+        // Try multiple endpoints to find the right one for listing instances
+        const endpoints = [
+          '/admin/listusers',
+          '/admin/users', 
+          '/admin/instances',
+          '/instance/list',
+        ];
 
-        console.log("UAZAPI list response status:", listResponse.status);
+        let listData: any = null;
+        let listSuccess = false;
 
-        if (!listResponse.ok) {
-          const errText = await listResponse.text();
-          console.error("UAZAPI list error:", errText);
-          return fail("Falha ao listar instâncias da UAZAPI", { details: errText });
+        for (const endpoint of endpoints) {
+          console.log(`Trying ${endpoint}...`);
+          try {
+            const resp = await fetch(`${uazapiUrl}${endpoint}`, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                "admintoken": uazapiAdminToken,
+              },
+            });
+
+            console.log(`${endpoint} response status:`, resp.status);
+
+            if (resp.ok) {
+              listData = await resp.json();
+              console.log(`${endpoint} response:`, JSON.stringify(listData));
+              listSuccess = true;
+              break;
+            } else {
+              const errText = await resp.text();
+              console.log(`${endpoint} failed:`, errText);
+            }
+          } catch (e) {
+            console.error(`${endpoint} error:`, e);
+          }
         }
 
-        const listData = await listResponse.json();
-        console.log("UAZAPI list response:", JSON.stringify(listData));
+        if (!listSuccess || !listData) {
+          return fail("Não foi possível listar instâncias da UAZAPI. Nenhum endpoint de listagem respondeu com sucesso.");
+        }
 
-        // UAZAPI may return array directly or { instances: [...] }
+        // UAZAPI/WuzAPI may return array directly, { instances: [...] }, { users: [...] }, or { data: [...] }
         const uazapiInstances: any[] = Array.isArray(listData) 
           ? listData 
-          : (listData.instances || listData.data || []);
+          : (listData.instances || listData.users || listData.data || (listData.Users ? listData.Users : []));
 
         if (uazapiInstances.length === 0) {
           return ok({ imported: 0, skipped: 0, message: "Nenhuma instância encontrada na UAZAPI" });
