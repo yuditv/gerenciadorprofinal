@@ -373,6 +373,65 @@ Deno.serve(async (req) => {
       });
     }
 
+    // POST - Update user email
+    if (req.method === 'POST' && action === 'update-email') {
+      const { userId, email } = await req.json();
+
+      if (!userId || !email) {
+        return new Response(JSON.stringify({ error: 'userId e email são obrigatórios' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { email });
+
+      if (updateError) {
+        console.error('Error updating email:', updateError);
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // POST - Update user password
+    if (req.method === 'POST' && action === 'update-password') {
+      const { userId, password } = await req.json();
+
+      if (!userId || !password) {
+        return new Response(JSON.stringify({ error: 'userId e senha são obrigatórios' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (password.length < 6) {
+        return new Response(JSON.stringify({ error: 'Senha deve ter no mínimo 6 caracteres' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
+
+      if (updateError) {
+        console.error('Error updating password:', updateError);
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
