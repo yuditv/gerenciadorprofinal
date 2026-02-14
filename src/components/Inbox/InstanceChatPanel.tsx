@@ -1,19 +1,26 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Phone, RefreshCw, Smartphone, Loader2 } from "lucide-react";
+import { Send, RefreshCw, Smartphone, Loader2, Search, ArrowLeft, MessageSquare, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
-interface WhatsAppInstance {
+const UAZAPI_URL = "https://zynk2.uazapi.com";
+const INSTANCE_TOKEN = "1c173ba3-f126-47e1-8f96-f9c857c16e90";
+
+interface UazapiChat {
   id: string;
-  instance_name: string;
-  instance_key: string;
-  status: string;
+  phone: string;
+  name: string;
+  image?: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount?: number;
+  isGroup?: boolean;
 }
 
 interface UazapiMessage {
@@ -26,22 +33,23 @@ interface UazapiMessage {
 }
 
 interface InstanceChatPanelProps {
-  instances: WhatsAppInstance[];
+  instances: any[];
 }
 
 export function InstanceChatPanel({ instances }: InstanceChatPanelProps) {
   const { toast } = useToast();
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
-  const [phone, setPhone] = useState("");
-  const [chatActive, setChatActive] = useState(false);
+  const [chats, setChats] = useState<UazapiChat[]>([]);
+  const [filteredChats, setFilteredChats] = useState<UazapiChat[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedChat, setSelectedChat] = useState<UazapiChat | null>(null);
   const [messages, setMessages] = useState<UazapiMessage[]>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [text, setText] = useState("");
+  const [newPhone, setNewPhone] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const selectedInstance = instances.find(i => i.id === selectedInstanceId);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -57,22 +65,103 @@ export function InstanceChatPanel({ instances }: InstanceChatPanelProps) {
     };
   }, []);
 
-  const fetchMessages = useCallback(async () => {
-    if (!selectedInstance?.instance_key || !phone) return;
+  // Filter chats by search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredChats(chats);
+    } else {
+      const q = searchQuery.toLowerCase();
+      setFilteredChats(chats.filter(c =>
+        c.name.toLowerCase().includes(q) || c.phone.includes(q)
+      ));
+    }
+  }, [searchQuery, chats]);
 
-    const formattedPhone = phone.replace(/\D/g, "");
-    const chatId = `${formattedPhone}@s.whatsapp.net`;
+  // Fetch all chats from UAZAPI on mount
+  const fetchChats = useCallback(async () => {
+    setIsLoadingChats(true);
+    try {
+      // Try /chat/list endpoint
+      const response = await fetch(`${UAZAPI_URL}/chat/list`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "token": INSTANCE_TOKEN,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        console.error("Chat list error:", await response.text());
+        toast({ title: "Erro ao carregar conversas", variant: "destructive" });
+        setIsLoadingChats(false);
+        return;
+      }
+
+      const data = await response.json();
+      const rawChats = Array.isArray(data) ? data : (data.chats || data.data || []);
+
+      const parsed: UazapiChat[] = rawChats.map((chat: any) => {
+        const chatId = chat.id || chat.chatid || chat.jid || "";
+        const phone = chatId.replace("@s.whatsapp.net", "").replace("@g.us", "");
+        const isGroup = chatId.includes("@g.us");
+        const name = chat.name || chat.wa_name || chat.pushName || chat.contact?.name || phone;
+        const image = chat.image || chat.imagePreview || chat.profilePicture || null;
+        const lastMsg = chat.lastMessage?.conversation ||
+          chat.lastMessage?.extendedTextMessage?.text ||
+          chat.wa_lastMessageTextVote ||
+          chat.lastMessageText ||
+          "";
+        const lastTime = chat.wa_lastMsgTimestamp
+          ? new Date(Number(chat.wa_lastMsgTimestamp) * 1000).toISOString()
+          : chat.lastMessageTime || null;
+        const unread = chat.wa_unreadCount || chat.unreadCount || 0;
+
+        return {
+          id: chatId,
+          phone,
+          name,
+          image,
+          lastMessage: lastMsg,
+          lastMessageTime: lastTime,
+          unreadCount: unread,
+          isGroup,
+        };
+      });
+
+      // Sort by last message time (most recent first)
+      parsed.sort((a, b) => {
+        if (!a.lastMessageTime) return 1;
+        if (!b.lastMessageTime) return -1;
+        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+      });
+
+      setChats(parsed);
+    } catch (err) {
+      console.error("Error fetching chats:", err);
+      toast({ title: "Erro ao carregar conversas", variant: "destructive" });
+    } finally {
+      setIsLoadingChats(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
+
+  const fetchMessages = useCallback(async (chatId?: string) => {
+    const targetChatId = chatId || selectedChat?.id;
+    if (!targetChatId) return;
 
     try {
-      const UAZAPI_URL = "https://zynk2.uazapi.com";
       const response = await fetch(`${UAZAPI_URL}/message/find`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "token": selectedInstance.instance_key,
+          "token": INSTANCE_TOKEN,
         },
         body: JSON.stringify({
-          chatid: chatId,
+          chatid: targetChatId,
           limit: 50,
           offset: 0,
         }),
@@ -122,62 +211,68 @@ export function InstanceChatPanel({ instances }: InstanceChatPanelProps) {
         return { id: messageId, content, mediaUrl, mediaType, fromMe: isFromMe, timestamp };
       }).filter((m: UazapiMessage) => m.content || m.mediaUrl);
 
-      // Sort oldest first
       parsed.sort((a: UazapiMessage, b: UazapiMessage) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
       setMessages(parsed);
     } catch (err) {
       console.error("Error fetching messages:", err);
     }
-  }, [selectedInstance?.instance_key, phone]);
+  }, [selectedChat?.id]);
 
-  const startChat = async () => {
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (!cleanPhone || !selectedInstanceId) {
-      toast({ title: "Selecione uma instância e digite um número", variant: "destructive" });
-      return;
-    }
-
-    setChatActive(true);
+  const selectChat = async (chat: UazapiChat) => {
+    setSelectedChat(chat);
+    setMessages([]);
     setIsLoadingMessages(true);
-    await fetchMessages();
+
+    // Stop old polling
+    if (pollingRef.current) clearInterval(pollingRef.current);
+
+    await fetchMessages(chat.id);
     setIsLoadingMessages(false);
 
-    // Start polling every 5 seconds
-    if (pollingRef.current) clearInterval(pollingRef.current);
-    pollingRef.current = setInterval(fetchMessages, 5000);
+    // Start polling
+    pollingRef.current = setInterval(() => fetchMessages(chat.id), 5000);
+  };
+
+  const startNewChat = () => {
+    const cleanPhone = newPhone.replace(/\D/g, "");
+    if (!cleanPhone) return;
+
+    const chatId = `${cleanPhone}@s.whatsapp.net`;
+    const newChat: UazapiChat = {
+      id: chatId,
+      phone: cleanPhone,
+      name: cleanPhone,
+    };
+
+    selectChat(newChat);
+    setNewPhone("");
   };
 
   const handleSend = async () => {
     const content = text.trim();
-    if (!content || !selectedInstance?.instance_key || !phone) return;
+    if (!content || !selectedChat) return;
 
     setIsSending(true);
     setText("");
 
     try {
-      const formattedPhone = phone.replace(/\D/g, "");
-      const UAZAPI_URL = "https://zynk2.uazapi.com";
-
       const response = await fetch(`${UAZAPI_URL}/message/send-text`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "token": selectedInstance.instance_key,
+          "token": INSTANCE_TOKEN,
         },
         body: JSON.stringify({
-          phone: formattedPhone,
+          phone: selectedChat.phone,
           message: content,
         }),
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error("Send error:", errText);
-        toast({ title: "Erro ao enviar mensagem", description: errText, variant: "destructive" });
-        setText(content); // restore
+        toast({ title: "Erro ao enviar", description: errText, variant: "destructive" });
+        setText(content);
       } else {
-        // Add optimistic message
         setMessages(prev => [...prev, {
           id: `local-${Date.now()}`,
           content,
@@ -197,7 +292,7 @@ export function InstanceChatPanel({ instances }: InstanceChatPanelProps) {
   };
 
   const handleBack = () => {
-    setChatActive(false);
+    setSelectedChat(null);
     setMessages([]);
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -205,161 +300,220 @@ export function InstanceChatPanel({ instances }: InstanceChatPanelProps) {
     }
   };
 
-  const connectedInstances = instances.filter(i => i.status === "connected");
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      if (isToday) return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    } catch {
+      return "";
+    }
+  };
 
-  if (!chatActive) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-inbox p-6">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-              <Smartphone className="h-8 w-8 text-primary" />
+  return (
+    <div className="flex-1 flex overflow-hidden min-h-0">
+      {/* Chat List Sidebar */}
+      <div className={cn(
+        "w-80 border-r border-border/50 flex flex-col bg-inbox-sidebar shrink-0",
+        selectedChat ? "hidden md:flex" : "flex flex-1 md:flex-none"
+      )}>
+        {/* Header */}
+        <div className="p-3 border-b border-border/50 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Smartphone className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Chat Instância</span>
             </div>
-            <h2 className="text-xl font-bold">Chat Instância</h2>
-            <p className="text-sm text-muted-foreground">
-              Envie e receba mensagens diretamente por uma instância WhatsApp
-            </p>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fetchChats} disabled={isLoadingChats}>
+              <RefreshCw className={cn("h-3.5 w-3.5", isLoadingChats && "animate-spin")} />
+            </Button>
           </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Instância</label>
-              <Select value={selectedInstanceId} onValueChange={setSelectedInstanceId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma instância" />
-                </SelectTrigger>
-                <SelectContent>
-                  {connectedInstances.length === 0 ? (
-                    <SelectItem value="none" disabled>Nenhuma instância conectada</SelectItem>
-                  ) : (
-                    connectedInstances.map(inst => (
-                      <SelectItem key={inst.id} value={inst.id}>
-                        {inst.instance_name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar conversa..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-sm bg-inbox-input"
+            />
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Número do WhatsApp</label>
-              <Input
-                placeholder="5511999999999"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") startChat();
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                Digite o número completo com código do país (ex: 5511999999999)
-              </p>
-            </div>
-
-            <Button
-              className="w-full"
-              onClick={startChat}
-              disabled={!selectedInstanceId || !phone.replace(/\D/g, "")}
-            >
-              <Phone className="h-4 w-4 mr-2" />
-              Iniciar Chat
+          {/* New chat */}
+          <div className="flex gap-1.5">
+            <Input
+              placeholder="Novo chat: 5511..."
+              value={newPhone}
+              onChange={e => setNewPhone(e.target.value)}
+              className="h-8 text-sm bg-inbox-input"
+              onKeyDown={e => { if (e.key === "Enter") startNewChat(); }}
+            />
+            <Button size="sm" className="h-8 shrink-0" onClick={startNewChat} disabled={!newPhone.replace(/\D/g, "")}>
+              <MessageSquare className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0 bg-inbox">
-      {/* Header */}
-      <header className="h-14 border-b border-border/50 bg-inbox-header flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={handleBack}>
-            ← Voltar
-          </Button>
-          <div>
-            <div className="font-semibold text-sm">{phone}</div>
-            <div className="text-xs text-muted-foreground">
-              via {selectedInstance?.instance_name}
+        {/* Chat list */}
+        <ScrollArea className="flex-1">
+          {isLoadingChats ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          </div>
-        </div>
-        <Button variant="ghost" size="icon" onClick={fetchMessages} className="h-8 w-8">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </header>
-
-      {/* Messages */}
-      <div className="flex-1 min-h-0">
-        <ScrollArea className="h-full" ref={scrollRef}>
-          <div className="p-4 space-y-2">
-            {isLoadingMessages ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-12">
-                Nenhuma mensagem encontrada. Envie uma mensagem para iniciar.
-              </div>
-            ) : (
-              messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={cn("flex", m.fromMe ? "justify-end" : "justify-start")}
+          ) : filteredChats.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-12 px-4">
+              {searchQuery ? "Nenhuma conversa encontrada" : "Nenhuma conversa"}
+            </div>
+          ) : (
+            <div className="divide-y divide-border/30">
+              {filteredChats.map(chat => (
+                <button
+                  key={chat.id}
+                  onClick={() => selectChat(chat)}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-3 text-left hover:bg-accent/50 transition-colors",
+                    selectedChat?.id === chat.id && "bg-primary/10"
+                  )}
                 >
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-2 text-sm border",
-                      m.fromMe
-                        ? "bg-primary/10 border-primary/20 text-foreground"
-                        : "bg-card/40 border-border/30 text-foreground"
-                    )}
-                  >
-                    {m.mediaUrl && m.mediaType === "image" && (
-                      <img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-2" />
-                    )}
-                    {m.mediaUrl && m.mediaType === "audio" && (
-                      <audio controls src={m.mediaUrl} className="mb-2 max-w-full" />
-                    )}
-                    {m.content && (
-                      <div className="whitespace-pre-wrap break-words">{m.content}</div>
-                    )}
-                    <div className="text-[10px] text-muted-foreground mt-1">
-                      {new Date(m.timestamp).toLocaleString()}
+                  <Avatar className="h-10 w-10 shrink-0">
+                    <AvatarImage src={chat.image || undefined} />
+                    <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                      {chat.name.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium truncate">{chat.name}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {formatTime(chat.lastMessageTime)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground truncate">
+                        {chat.lastMessage || chat.phone}
+                      </span>
+                      {(chat.unreadCount || 0) > 0 && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 h-4 shrink-0">
+                          {chat.unreadCount}
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </div>
 
-      {/* Input */}
-      <div className="border-t border-border/50 bg-inbox-header p-3">
-        <div className="flex gap-2 items-end">
-          <Textarea
-            value={text}
-            onChange={e => setText(e.target.value)}
-            placeholder="Digite sua mensagem..."
-            className="min-h-[44px] max-h-40 bg-inbox-input"
-            onKeyDown={e => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={isSending || !text.trim()}
-            className="h-10 shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+      {/* Chat Panel */}
+      <div className={cn(
+        "flex-1 min-w-0 flex flex-col",
+        selectedChat ? "flex" : "hidden md:flex"
+      )}>
+        {!selectedChat ? (
+          <div className="flex-1 flex items-center justify-center bg-inbox">
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+                <MessageSquare className="h-8 w-8 text-primary" />
+              </div>
+              <p className="text-muted-foreground text-sm">Selecione uma conversa para começar</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Chat Header */}
+            <header className="h-14 border-b border-border/50 bg-inbox-header flex items-center justify-between px-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" className="h-8 w-8 md:hidden" onClick={handleBack}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={selectedChat.image || undefined} />
+                  <AvatarFallback className="bg-primary/20 text-primary text-xs">
+                    {selectedChat.name.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-semibold text-sm">{selectedChat.name}</div>
+                  <div className="text-xs text-muted-foreground">{selectedChat.phone}</div>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => fetchMessages()} className="h-8 w-8">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </header>
+
+            {/* Messages */}
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full" ref={scrollRef}>
+                <div className="p-4 space-y-2">
+                  {isLoadingMessages ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-sm text-muted-foreground text-center py-12">
+                      Nenhuma mensagem. Envie uma para iniciar.
+                    </div>
+                  ) : (
+                    messages.map((m) => (
+                      <div key={m.id} className={cn("flex", m.fromMe ? "justify-end" : "justify-start")}>
+                        <div className={cn(
+                          "max-w-[85%] rounded-2xl px-4 py-2 text-sm border",
+                          m.fromMe
+                            ? "bg-primary/10 border-primary/20 text-foreground"
+                            : "bg-card/40 border-border/30 text-foreground"
+                        )}>
+                          {m.mediaUrl && m.mediaType === "image" && (
+                            <img src={m.mediaUrl} alt="" className="rounded-lg max-w-full mb-2" />
+                          )}
+                          {m.mediaUrl && m.mediaType === "audio" && (
+                            <audio controls src={m.mediaUrl} className="mb-2 max-w-full" />
+                          )}
+                          {m.mediaUrl && m.mediaType === "video" && (
+                            <video controls src={m.mediaUrl} className="rounded-lg max-w-full mb-2" />
+                          )}
+                          {m.content && (
+                            <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                          )}
+                          <div className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(m.timestamp).toLocaleString("pt-BR")}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Input */}
+            <div className="border-t border-border/50 bg-inbox-header p-3">
+              <div className="flex gap-2 items-end">
+                <Textarea
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  placeholder="Digite sua mensagem..."
+                  className="min-h-[44px] max-h-40 bg-inbox-input"
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                />
+                <Button onClick={handleSend} disabled={isSending || !text.trim()} className="h-10 shrink-0">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
