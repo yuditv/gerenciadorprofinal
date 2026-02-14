@@ -47,12 +47,14 @@ import {
   ShieldCheck,
   Settings,
   UserPlus,
-  CreditCard
+  CreditCard,
+  Pencil
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { UserPermissionsDialog } from "@/components/UserPermissionsDialog";
 import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { AdminSubscriptionManager } from "@/components/AdminSubscriptionManager";
+import { AdminEditUserDialog } from "@/components/AdminEditUserDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionPlan } from "@/types/subscription";
 import { format } from "date-fns";
@@ -108,6 +110,7 @@ export default function AdminPanel() {
   const [userToBlock, setUserToBlock] = useState<string | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<typeof users[0] | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editUser, setEditUser] = useState<AdminUser | null>(null);
   const [subscriptions, setSubscriptions] = useState<UserSubscriptionData[]>([]);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [isLoadingSubscriptions, setIsLoadingSubscriptions] = useState(false);
@@ -471,6 +474,17 @@ export default function AdminPanel() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {/* Edit Button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                              title="Editar email/senha"
+                              onClick={() => setEditUser(u)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
                             {/* Permissions Button */}
                             <Button
                               variant="ghost"
@@ -652,6 +666,14 @@ export default function AdminPanel() {
         onClose={() => setShowCreateDialog(false)}
         onUserCreated={fetchUsers}
         createUser={createUser}
+      />
+
+      {/* Edit User Dialog */}
+      <AdminEditUserDialog
+        open={!!editUser}
+        onClose={() => setEditUser(null)}
+        user={editUser}
+        onUpdated={fetchUsers}
       />
     </div>
   );
