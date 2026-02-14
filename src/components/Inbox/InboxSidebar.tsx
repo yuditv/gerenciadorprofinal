@@ -11,7 +11,8 @@ import {
   UserX,
   CheckCircle2,
   Mail,
-  Kanban
+  Kanban,
+  Smartphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -49,8 +50,8 @@ interface InboxSidebarProps {
     unread: number;
     mine: number;
   };
-  activeTab: 'conversations' | 'customer-chat' | 'dashboard' | 'kanban';
-  onTabChange: (tab: 'conversations' | 'customer-chat' | 'dashboard' | 'kanban') => void;
+  activeTab: 'conversations' | 'customer-chat' | 'instance-chat' | 'dashboard' | 'kanban';
+  onTabChange: (tab: 'conversations' | 'customer-chat' | 'instance-chat' | 'dashboard' | 'kanban') => void;
   showCustomerChatTab?: boolean;
   customerUnread?: number;
   dateRange?: DateRange;
@@ -164,6 +165,16 @@ export function InboxSidebar({
               )}
             </Button>
           )}
+
+          <Button
+            variant={activeTab === 'instance-chat' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => onTabChange('instance-chat')}
+          >
+            <Smartphone className="h-4 w-4" />
+            <span className="hidden sm:inline">Chat Instância</span>
+          </Button>
 
           <Button
             variant={activeTab === 'kanban' ? 'secondary' : 'ghost'}
