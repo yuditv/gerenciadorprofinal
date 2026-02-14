@@ -38,7 +38,6 @@ import { CreateCustomerChatLinkDialog, QuickCopyLinkButton } from "@/components/
 import { CustomerChatList } from "@/components/CustomerChat/CustomerChatList";
 import { CustomerChatPanel } from "@/components/CustomerChat/CustomerChatPanel";
 import { useAIAgents } from "@/hooks/useAIAgents";
-import { InstanceChatPanel } from "@/components/Inbox/InstanceChatPanel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,7 +58,7 @@ export default function Atendimento() {
   const { permissions: accountPerms, isMember, ownerId } = useAccountContext();
   const { showNotification, playSound } = useSystemNotifications();
   
-  const [activeTab, setActiveTab] = useState<'conversations' | 'customer-chat' | 'instance-chat' | 'dashboard' | 'kanban'>('conversations');
+  const [activeTab, setActiveTab] = useState<'conversations' | 'customer-chat' | 'dashboard' | 'kanban'>('conversations');
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [selectedCustomerConversationId, setSelectedCustomerConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -760,8 +759,6 @@ export default function Atendimento() {
               onSelect={handleSelectConversation}
               selectedId={selectedConversation?.id || null}
             />
-          ) : activeTab === 'instance-chat' ? (
-            <InstanceChatPanel instances={instances} />
           ) : activeTab === 'customer-chat' ? (
             <div className="flex-1 flex overflow-hidden min-h-0">
               {/* Links sidebar - hidden on mobile */}

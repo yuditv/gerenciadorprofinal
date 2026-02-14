@@ -93,7 +93,6 @@ export default function WhatsApp() {
     testWebhook,
     refetch: refetchInstances,
     refreshAllStatus,
-    syncFromUazapi,
   } = useWhatsAppInstances();
   const { 
     campaigns, 
@@ -144,7 +143,6 @@ export default function WhatsApp() {
   const [renameInstance, setRenameInstance] = useState<WhatsAppInstance | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
-  const [syncing, setSyncing] = useState(false);
 
   // Extract instance IDs for monitoring
   const instanceIds = instances.map(i => i.id);
@@ -546,34 +544,19 @@ export default function WhatsApp() {
               <h2 className="text-xl font-semibold">Suas Instâncias WhatsApp</h2>
               <p className="text-sm text-muted-foreground">Gerencie suas conexões</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline"
-                onClick={async () => {
-                  setSyncing(true);
-                  await syncFromUazapi();
-                  setSyncing(false);
-                }}
-                disabled={syncing}
-                className="gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Sincronizando...' : 'Importar da UAZAPI'}
-              </Button>
-              <Button 
-                onClick={() => setCreateInstanceDialogOpen(true)} 
-                className="gap-2"
-                disabled={!canCreateWhatsAppInstance()}
-              >
-                <Plus className="w-4 h-4" />
-                Nova Instância
-                {limits.whatsappInstances !== -1 && (
-                  <Badge variant="secondary" className="ml-1">
-                    {whatsappInstanceCount}/{limits.whatsappInstances}
-                  </Badge>
-                )}
-              </Button>
-            </div>
+            <Button 
+              onClick={() => setCreateInstanceDialogOpen(true)} 
+              className="gap-2"
+              disabled={!canCreateWhatsAppInstance()}
+            >
+              <Plus className="w-4 h-4" />
+              Nova Instância
+              {limits.whatsappInstances !== -1 && (
+                <Badge variant="secondary" className="ml-1">
+                  {whatsappInstanceCount}/{limits.whatsappInstances}
+                </Badge>
+              )}
+            </Button>
           </div>
 
           {instancesLoading ? (
