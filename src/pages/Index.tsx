@@ -196,10 +196,13 @@ const Index = () => {
 
   const filteredAndSortedClients = useMemo(() => {
     const filtered = clients.filter((client) => {
+      const q = search.toLowerCase();
       const matchesSearch =
-        client.name.toLowerCase().includes(search.toLowerCase()) ||
-        client.email.toLowerCase().includes(search.toLowerCase()) ||
-        client.whatsapp.includes(search);
+        client.name.toLowerCase().includes(q) ||
+        client.email.toLowerCase().includes(q) ||
+        client.whatsapp.includes(search) ||
+        (client.appName?.toLowerCase().includes(q) ?? false) ||
+        (client.serviceUsername?.toLowerCase().includes(q) ?? false);
       const matchesPlan = planFilter === 'all' || client.plan === planFilter;
       
       // Tag filter
