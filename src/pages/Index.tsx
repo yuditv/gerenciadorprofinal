@@ -96,8 +96,8 @@ const Index = () => {
   const [search, setSearch] = useState('');
   const [planFilter, setPlanFilter] = useState<PlanType | 'all'>('all');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'name' | 'expiresAt' | 'plan'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'expiresAt' | 'plan' | 'createdAt'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());
@@ -227,6 +227,8 @@ const Index = () => {
         comparison = a.expiresAt.getTime() - b.expiresAt.getTime();
       } else if (sortBy === 'plan') {
         comparison = planOrder[a.plan] - planOrder[b.plan];
+      } else if (sortBy === 'createdAt') {
+        comparison = a.createdAt.getTime() - b.createdAt.getTime();
       }
       
       return sortOrder === 'asc' ? comparison : -comparison;
