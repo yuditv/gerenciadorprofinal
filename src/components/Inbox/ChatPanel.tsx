@@ -52,7 +52,7 @@ import { DeleteMessageDialog } from "./DeleteMessageDialog";
 import { TestGeneratorDialog } from "./TestGeneratorDialog";
 import { IPTVTestChoiceDialog } from "./IPTVTestChoiceDialog";
 import { GextvTestGeneratorDialog } from "./GextvTestGeneratorDialog";
-import { ServerplayTestGeneratorDialog } from "./ServerplayTestGeneratorDialog";
+import { ServerplayTestGeneratorDialog } from "./ServerplayTestGeneratorDialog"; // updated with 4 options
 import { VPNTestGeneratorDialog } from "./VPNTestGeneratorDialog";
 import { GeneratePIXDialog } from "./GeneratePIXDialog";
 import { ScheduleMessageDialog } from "./ScheduleMessageDialog";
