@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tv } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,15 +40,15 @@ interface ServerplayTestGeneratorDialogProps {
 export function ServerplayTestGeneratorDialog({ open, onOpenChange }: ServerplayTestGeneratorDialogProps) {
   const [selectedOption, setSelectedOption] = useState<typeof SERVERPLAY_OPTIONS[number] | null>(null);
 
-  const handleClose = (newOpen: boolean) => {
-    if (!newOpen) {
+  // Reset selection when dialog closes
+  useEffect(() => {
+    if (!open) {
       setSelectedOption(null);
     }
-    onOpenChange(newOpen);
-  };
+  }, [open]);
 
   // If an option is selected, show the IPTV generator with that URL
-  if (selectedOption) {
+  if (selectedOption && open) {
     return (
       <IPTVTestGeneratorDialog
         open={open}
@@ -66,7 +66,7 @@ export function ServerplayTestGeneratorDialog({ open, onOpenChange }: Serverplay
 
   // Show option selection
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
