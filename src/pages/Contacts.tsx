@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, FileText, Users, Download, Upload, FileSpreadsheet, Database, CloudOff, Cloud, RefreshCw, ArrowRightLeft, Pencil, Search, Phone, Mail, Send } from "lucide-react";
+import { Plus, Trash2, FileText, Users, Download, Upload, FileSpreadsheet, Database, CloudOff, Cloud, RefreshCw, ArrowRightLeft, Pencil, Search, Phone, Mail, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -495,7 +495,7 @@ export default function Contacts() {
                       JSON (Backup)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setTxtVerificationOpen(true)}>
-                      <FileText className="h-4 w-4 mr-2" />
+                      <ShieldCheck className="h-4 w-4 mr-2" />
                       TXT (com verificação WhatsApp)
                     </DropdownMenuItem>
                   </DropdownMenuContent>
