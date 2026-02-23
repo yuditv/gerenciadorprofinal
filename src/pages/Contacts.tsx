@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { motion } from "framer-motion";
+import { ImportTxtWithVerificationDialog } from "@/components/ImportTxtWithVerificationDialog";
 
 export default function Contacts() {
   const { contacts, isLoading, userId, isConfigured, importProgress, addContact, updateContact, deleteContact, importContacts, clearAllContacts, getContactCount, refetch } = useContactsSupabase();
@@ -44,6 +45,7 @@ export default function Contacts() {
   const [sentContactCount, setSentContactCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("contacts");
+  const [txtVerificationOpen, setTxtVerificationOpen] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -492,6 +494,10 @@ export default function Contacts() {
                       <FileText className="h-4 w-4 mr-2" />
                       JSON (Backup)
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTxtVerificationOpen(true)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      TXT (com verificação WhatsApp)
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -721,6 +727,15 @@ export default function Contacts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* TXT Import with WhatsApp Verification */}
+      <ImportTxtWithVerificationDialog
+        open={txtVerificationOpen}
+        onOpenChange={setTxtVerificationOpen}
+        onImport={(contacts) => {
+          importContacts(contacts);
+          toast.success(`${contacts.length} contatos ativos adicionados!`);
+        }}
+      />
     </div>
   );
 }
