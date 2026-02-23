@@ -531,22 +531,18 @@ export function useBulkDispatch() {
       }
 
       const contact = contacts[i];
-      const instance = getNextInstance(selectedInstances);
+      let instance = getNextInstance(selectedInstances);
       
       if (!instance) {
-        addLog('error', 'Nenhuma instância disponível');
-        failedCount++;
-        
-        // Auto-pause on failure
-        pausedRef.current = true;
-        setProgress(prev => ({ ...prev, isPaused: true, failed: failedCount }));
-        addLog('warning', '⚠️ Disparo pausado automaticamente devido a falha');
-        toast({
-          title: '⚠️ Disparo Pausado',
-          description: 'O disparo foi pausado devido a uma falha. Verifique e clique em Retomar.',
-          variant: 'destructive',
-        });
-        continue;
+        addLog('warning', '⚠️ Nenhuma instância disponível, aguardando 10s...');
+        await sleep(10000);
+        if (abortControllerRef.current?.signal.aborted) break;
+        instance = getNextInstance(selectedInstances);
+        if (!instance) {
+          addLog('error', 'Nenhuma instância disponível após retry');
+          failedCount++;
+          continue;
+        }
       }
 
       // Select and process message
@@ -564,157 +560,145 @@ export function useBulkDispatch() {
         currentContact: contact.name || phone,
       }));
 
-      try {
-        // If message is an interactive menu placeholder, send it via whatsapp-instances -> /send/menu
-        const interactiveMenu = (!selectedMessage.mediaType || selectedMessage.mediaType === 'none')
-          ? tryParseInteractiveMenu(processedMessage)
-          : null;
+      // Retry logic: try up to 3 times before auto-pausing
+      const MAX_RETRIES = 3;
+      let sendSuccess = false;
 
-        const { data, error } = interactiveMenu
-          ? await supabase.functions.invoke('whatsapp-instances', {
-              body: {
-                action: 'send_menu',
-                phone,
-                instanceKey: instance.instance_key,
-                menuType: interactiveMenu.menuType,
-                text: interactiveMenu.text,
-                choices: interactiveMenu.choices,
-                footerText: interactiveMenu.footerText,
-                listButton: interactiveMenu.listButton,
-                selectableCount: interactiveMenu.selectableCount,
-                imageButton: interactiveMenu.imageButton,
-              }
-            })
-          : await (async () => {
-              // Build request body based on media type
-              // deno-lint-ignore no-explicit-any
-              const requestBody: Record<string, any> = {
-                instanceKey: instance.instance_key,
-                phone,
-                autoArchive: config.autoArchive, // Use config setting
-              };
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          // If message is an interactive menu placeholder, send it via whatsapp-instances -> /send/menu
+          const interactiveMenu = (!selectedMessage.mediaType || selectedMessage.mediaType === 'none')
+            ? tryParseInteractiveMenu(processedMessage)
+            : null;
 
-              if (selectedMessage.mediaType && selectedMessage.mediaType !== 'none' && selectedMessage.mediaUrl) {
-                requestBody.mediaType = selectedMessage.mediaType;
-                requestBody.mediaUrl = selectedMessage.mediaUrl;
-                requestBody.fileName = selectedMessage.fileName;
-                requestBody.caption = processedMessage;
-              } else {
-                requestBody.message = processedMessage;
-              }
+          const { data, error } = interactiveMenu
+            ? await supabase.functions.invoke('whatsapp-instances', {
+                body: {
+                  action: 'send_menu',
+                  phone,
+                  instanceKey: instance.instance_key,
+                  menuType: interactiveMenu.menuType,
+                  text: interactiveMenu.text,
+                  choices: interactiveMenu.choices,
+                  footerText: interactiveMenu.footerText,
+                  listButton: interactiveMenu.listButton,
+                  selectableCount: interactiveMenu.selectableCount,
+                  imageButton: interactiveMenu.imageButton,
+                }
+              })
+            : await (async () => {
+                const requestBody: Record<string, any> = {
+                  instanceKey: instance.instance_key,
+                  phone,
+                  autoArchive: config.autoArchive,
+                };
 
-              return supabase.functions.invoke('send-whatsapp-uazapi', {
-                body: requestBody
-              });
-            })();
+                if (selectedMessage.mediaType && selectedMessage.mediaType !== 'none' && selectedMessage.mediaUrl) {
+                  requestBody.mediaType = selectedMessage.mediaType;
+                  requestBody.mediaUrl = selectedMessage.mediaUrl;
+                  requestBody.fileName = selectedMessage.fileName;
+                  requestBody.caption = processedMessage;
+                } else {
+                  requestBody.message = processedMessage;
+                }
 
-        if (error) throw error;
+                return supabase.functions.invoke('send-whatsapp-uazapi', {
+                  body: requestBody
+                });
+              })();
 
-        sentCount++;
-        
-        // Make attention call if enabled
-        if (config.attentionCall && instance.instance_key) {
-          // Wait for configured delay
-          await sleep(config.attentionCallDelay * 1000);
+          if (error) throw error;
+
+          sentCount++;
+          sendSuccess = true;
           
-          try {
-            await supabase.functions.invoke('whatsapp-instances', {
-              body: {
-                action: 'make_call',
-                phone,
-                instanceKey: instance.instance_key
-              }
-            });
-            addLog('info', `📞 Ligação para ${contact.name || phone}`);
-          } catch (callErr) {
-            console.error('Attention call failed:', callErr);
-            addLog('warning', `⚠️ Falha na ligação para ${contact.name || phone}`);
+          // Make attention call if enabled
+          if (config.attentionCall && instance.instance_key) {
+            await sleep(config.attentionCallDelay * 1000);
+            
+            try {
+              await supabase.functions.invoke('whatsapp-instances', {
+                body: {
+                  action: 'make_call',
+                  phone,
+                  instanceKey: instance.instance_key
+                }
+              });
+              addLog('info', `📞 Ligação para ${contact.name || phone}`);
+            } catch (callErr) {
+              console.error('Attention call failed:', callErr);
+              addLog('warning', `⚠️ Falha na ligação para ${contact.name || phone}`);
+            }
           }
-        }
-        
-        // Check if chat was archived successfully (only available for send-whatsapp-uazapi)
-        if (!interactiveMenu && config.autoArchive && data?.archived) {
-          archivedCount++;
-          addLog('success', `✓ ${contact.name || phone} (arquivado)`);
-        } else {
-          addLog('success', `✓ ${contact.name || phone}`);
-        }
-
-        // Move contact to sent_contacts if it came from saved contacts
-        if (contact.originalId) {
-          try {
-            // Insert into sent_contacts
-            await (supabase as any).from('sent_contacts').insert({
-              user_id: user.id,
-              name: contact.name || '',
-              phone: phone,
-              email: contact.email || null,
-              original_contact_id: contact.originalId,
-              dispatch_history_id: historyRecordId || null,
-              sent_at: new Date().toISOString(),
-            });
-
-            // Delete from contacts
-            await (supabase as any)
-              .from('contacts')
-              .delete()
-              .eq('id', contact.originalId)
-              .eq('user_id', user.id);
-          } catch (moveErr) {
-            console.error('Error moving contact to sent:', moveErr);
+          
+          // Check if chat was archived successfully
+          if (!interactiveMenu && config.autoArchive && data?.archived) {
+            archivedCount++;
+            addLog('success', `✓ ${contact.name || phone} (arquivado)`);
+          } else {
+            addLog('success', `✓ ${contact.name || phone}`);
           }
-        }
 
-        // Log to notification history
-        await supabase.from('notification_history').insert({
-          user_id: user.id,
-          notification_type: 'bulk_whatsapp',
-          status: 'sent',
-          subject: `Disparo em massa`
-        });
+          // Move contact to sent_contacts if it came from saved contacts
+          if (contact.originalId) {
+            try {
+              await (supabase as any).from('sent_contacts').insert({
+                user_id: user.id,
+                name: contact.name || '',
+                phone: phone,
+                email: contact.email || null,
+                original_contact_id: contact.originalId,
+                dispatch_history_id: historyRecordId || null,
+                sent_at: new Date().toISOString(),
+              });
 
-      } catch (err: any) {
-        failedCount++;
-        addLog('error', `✗ ${contact.name || phone}: ${err.message}`);
-        
-        // AUTO-PAUSE ON FAILURE: Pause immediately when a message fails
-        pausedRef.current = true;
-        setProgress(prev => ({ 
-          ...prev, 
-          isPaused: true,
-          sent: sentCount,
-          failed: failedCount,
-          pending: contacts.length - sentCount - failedCount,
-          archived: archivedCount,
-        }));
-        addLog('warning', '⚠️ Disparo pausado automaticamente devido a falha no envio');
-        toast({
-          title: '⚠️ Disparo Pausado',
-          description: `Falha ao enviar para ${contact.name || phone}. Verifique a instância e clique em Retomar.`,
-          variant: 'destructive',
-        });
-        
-        // Persist state immediately after failure
-        persistCurrentState(
-          contacts,
-          config,
-          i + 1, // Next contact to try
-          sentCount,
-          failedCount,
-          archivedCount,
-          historyRecordId || undefined,
-          progress.logs
-        );
-        
-        // Wait for resume
-        while (pausedRef.current) {
-          await sleep(1000);
-          if (abortControllerRef.current?.signal.aborted) break;
+              await (supabase as any)
+                .from('contacts')
+                .delete()
+                .eq('id', contact.originalId)
+                .eq('user_id', user.id);
+            } catch (moveErr) {
+              console.error('Error moving contact to sent:', moveErr);
+            }
+          }
+
+          // Log to notification history
+          await supabase.from('notification_history').insert({
+            user_id: user.id,
+            notification_type: 'bulk_whatsapp',
+            status: 'sent',
+            subject: `Disparo em massa`
+          });
+
+          break; // Exit retry loop on success
+
+        } catch (err: any) {
+          if (attempt < MAX_RETRIES) {
+            addLog('warning', `⚠️ Tentativa ${attempt}/${MAX_RETRIES} falhou para ${contact.name || phone}: ${err.message}. Retentando em 5s...`);
+            await sleep(5000);
+            if (abortControllerRef.current?.signal.aborted) break;
+            continue;
+          }
+
+          // All retries exhausted - count as failure but DON'T auto-pause
+          failedCount++;
+          addLog('error', `✗ ${contact.name || phone}: ${err.message} (após ${MAX_RETRIES} tentativas)`);
+          
+          // Persist state after failure
+          persistCurrentState(
+            contacts,
+            config,
+            i + 1,
+            sentCount,
+            failedCount,
+            archivedCount,
+            historyRecordId || undefined,
+            progress.logs
+          );
         }
-        
-        if (abortControllerRef.current?.signal.aborted) break;
-        continue;
       }
+
+      if (abortControllerRef.current?.signal.aborted) break;
 
       // Use throttled progress update for performance
       throttledSetProgress(prev => ({
