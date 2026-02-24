@@ -48,13 +48,15 @@ import {
   Settings,
   UserPlus,
   CreditCard,
-  Pencil
+  Pencil,
+  Server
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { UserPermissionsDialog } from "@/components/UserPermissionsDialog";
 import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { AdminSubscriptionManager } from "@/components/AdminSubscriptionManager";
 import { AdminEditUserDialog } from "@/components/AdminEditUserDialog";
+import { WhatsAppProvidersManager } from "@/components/WhatsAppProvidersManager";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionPlan } from "@/types/subscription";
 import { format } from "date-fns";
@@ -261,6 +263,10 @@ export default function AdminPanel() {
             <TabsTrigger value="subscriptions" className="data-[state=active]:bg-primary/20">
               <CreditCard className="h-4 w-4 mr-2" />
               Assinaturas
+            </TabsTrigger>
+            <TabsTrigger value="providers" className="data-[state=active]:bg-primary/20">
+              <Server className="h-4 w-4 mr-2" />
+              Provedores API
             </TabsTrigger>
           </TabsList>
 
@@ -648,6 +654,10 @@ export default function AdminPanel() {
               onRefresh={fetchSubscriptions}
               isLoading={isLoadingSubscriptions}
             />
+          </TabsContent>
+
+          <TabsContent value="providers" className="space-y-6">
+            <WhatsAppProvidersManager />
           </TabsContent>
         </Tabs>
       </div>
