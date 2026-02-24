@@ -3285,6 +3285,122 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      referral_credits: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          referral_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          referral_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          referral_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_credits_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_ip_log: {
+        Row: {
+          created_at: string
+          id: string
+          ip_address: string
+          referral_code: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ip_address: string
+          referral_code: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ip_address?: string
+          referral_code?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          credit_awarded: boolean
+          id: string
+          referral_code: string
+          referred_ip: string | null
+          referred_phone: string
+          referred_user_id: string | null
+          referrer_id: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          credit_awarded?: boolean
+          id?: string
+          referral_code: string
+          referred_ip?: string | null
+          referred_phone: string
+          referred_user_id?: string | null
+          referrer_id: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          credit_awarded?: boolean
+          id?: string
+          referral_code?: string
+          referred_ip?: string | null
+          referred_phone?: string
+          referred_user_id?: string | null
+          referrer_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       registration_ips: {
         Row: {
           created_at: string
