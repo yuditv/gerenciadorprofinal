@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, DollarSign, Save, Bell, CreditCard, BellRing, Volume2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Save, Bell, CreditCard, BellRing, Volume2, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { OwnerNotificationSettings } from '@/components/OwnerNotificationSetting
 import { CredentialsSettings } from '@/components/CredentialsSettings';
 import { NotificationSettingsCard } from '@/components/NotificationSettingsCard';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { WhatsAppProvidersManager } from '@/components/WhatsAppProvidersManager';
 import { Key } from 'lucide-react';
 
 export default function Settings() {
@@ -72,7 +73,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue={isAdmin ? "plans" : "notifications"} className="space-y-6">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-7' : 'grid-cols-5'}`}>
             {isAdmin && (
               <TabsTrigger value="plans" className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
@@ -99,6 +100,12 @@ export default function Settings() {
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Credenciais</span>
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="providers" className="flex items-center gap-2">
+                <Server className="h-4 w-4" />
+                <span className="hidden sm:inline">Provedores</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Plans Tab - Admin only */}
@@ -191,6 +198,13 @@ export default function Settings() {
           <TabsContent value="credentials" className="space-y-6">
             <CredentialsSettings />
           </TabsContent>
+
+          {/* Providers Tab - Admin only */}
+          {isAdmin && (
+            <TabsContent value="providers" className="space-y-6">
+              <WhatsAppProvidersManager />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>

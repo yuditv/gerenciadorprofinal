@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveProvider, buildHeaders, sendTextUrl, sendTextBody, sendMediaUrl, sendMediaBody, archiveChatUrl } from "../_shared/whatsapp-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -116,19 +117,11 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const UAZAPI_URL = Deno.env.get("UAZAPI_URL");
-    const UAZAPI_TOKEN = Deno.env.get("UAZAPI_TOKEN");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    if (!UAZAPI_URL || !UAZAPI_TOKEN) {
-      console.error("Missing UAZAPI configuration");
-      return new Response(
-        JSON.stringify({ error: "UAZAPI not configured" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
-      );
-    }
+    // Resolve provider (DB-configured or env fallback)
+    const provider = await resolveProvider(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     const requestData: WhatsAppRequest = await req.json();
     const { phone, message, mediaType, mediaUrl, fileName, caption, autoArchive, instanceKey, instanceName } = requestData;
@@ -143,13 +136,13 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Use instance-specific token if provided, otherwise fallback to default
-    const instanceToken = instanceKey || UAZAPI_TOKEN;
+    // Use instance-specific token if provided, otherwise fallback to provider token
+    const instanceToken = instanceKey || provider.api_token;
     // Session name for uazapiGO v2
     const sessionName = instanceName || '';
     
     const formattedPhone = formatPhoneNumber(phone);
-    console.log(`Sending WhatsApp to: ${formattedPhone}, mediaType: ${mediaType || 'text'}, session: ${sessionName}, using instance: ${instanceKey ? 'custom' : 'default'}`);
+    console.log(`Sending WhatsApp to: ${formattedPhone}, mediaType: ${mediaType || 'text'}, session: ${sessionName}, provider: ${provider.provider_type}, using instance: ${instanceKey ? 'custom' : 'default'}`);
 
     // Validate message for text messages
     if ((!mediaType || mediaType === 'none') && !message) {
@@ -162,11 +155,12 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // UAZAPI format:
-    // - Endpoint: /sendText, /sendImage, etc.
-    // - Header: token (lowercase)
-    // - Body: number, text (lowercase)
-    console.log(`Sending via UAZAPI format`);
+    // Build headers using provider abstraction
+    const headers = provider.provider_type === 'uazapi' 
+      ? { "Content-Type": "application/json", "token": instanceToken }
+      : buildHeaders(provider, instanceToken);
+
+    console.log(`Sending via ${provider.provider_type} format`);
     console.log(`Phone: ${formattedPhone}`);
 
     // deno-lint-ignore no-explicit-any
@@ -175,34 +169,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Determine endpoint based on media type
     if (mediaType && mediaType !== 'none' && mediaUrl) {
-      // Media message - use UAZAPI v2 unified /send/media endpoint
-      // deno-lint-ignore no-explicit-any
-      const body: Record<string, any> = { 
-        number: formattedPhone,
-        type: mediaType, // image, video, audio, document
-        file: mediaUrl   // URL to the media file
-      };
+      const url = sendMediaUrl(provider, sessionName);
+      const body = sendMediaBody(provider, formattedPhone, mediaUrl, mediaType, caption || message, fileName);
       
-      // Add caption/text if provided
-      if (caption || message) {
-        body.text = caption || message;
-      }
-      
-      // Add document name for document type
-      if (mediaType === 'document' && fileName) {
-        body.docName = fileName;
-      }
-      
-      console.log(`Sending ${mediaType} via /send/media`);
-      console.log(`URL: ${UAZAPI_URL}/send/media`);
+      console.log(`Sending ${mediaType} via ${url}`);
       console.log(`Request body:`, JSON.stringify(body));
       
-      const response = await fetch(`${UAZAPI_URL}/send/media`, {
+      const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "token": instanceToken
-        },
+        headers,
         body: JSON.stringify(body),
       });
       
@@ -221,20 +196,16 @@ const handler = async (req: Request): Promise<Response> => {
         lastError = `${response.status}: ${respText}`;
       }
     } else {
-      // Text message - use /send/text with { number, text }
-      console.log(`Sending text via /send/text`);
-      console.log(`URL: ${UAZAPI_URL}/send/text`);
+      // Text message
+      const url = sendTextUrl(provider, sessionName);
+      const body = sendTextBody(provider, formattedPhone, message!, sessionName);
       
-      const response = await fetch(`${UAZAPI_URL}/send/text`, {
+      console.log(`Sending text via ${url}`);
+      
+      const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "token": instanceToken
-        },
-        body: JSON.stringify({
-          number: formattedPhone,
-          text: message
-        }),
+        headers,
+        body: JSON.stringify(body),
       });
       
       const respText = await response.text();
@@ -281,12 +252,10 @@ const handler = async (req: Request): Promise<Response> => {
       try {
         console.log(`[Archive] Attempting to archive chat with: ${formattedPhone}`);
         
-        const archiveResponse = await fetch(`${UAZAPI_URL}/chat/archive`, {
+        const archiveUrl = archiveChatUrl(provider, sessionName);
+        const archiveResponse = await fetch(archiveUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "token": instanceToken
-          },
+          headers,
           body: JSON.stringify({
             number: formattedPhone,
             archive: true

@@ -4525,6 +4525,48 @@ export type Database = {
           },
         ]
       }
+      whatsapp_api_providers: {
+        Row: {
+          api_token: string
+          base_url: string
+          created_at: string
+          extra_config: Json | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          provider_type: Database["public"]["Enums"]["whatsapp_provider_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_token: string
+          base_url: string
+          created_at?: string
+          extra_config?: Json | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          provider_type?: Database["public"]["Enums"]["whatsapp_provider_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_token?: string
+          base_url?: string
+          created_at?: string
+          extra_config?: Json | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          provider_type?: Database["public"]["Enums"]["whatsapp_provider_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       whatsapp_instances: {
         Row: {
           business_hours_end: string | null
@@ -4539,6 +4581,7 @@ export type Database = {
           presence_status: string | null
           profile_name: string | null
           profile_picture_url: string | null
+          provider_id: string | null
           qr_code: string | null
           status: string
           updated_at: string
@@ -4557,6 +4600,7 @@ export type Database = {
           presence_status?: string | null
           profile_name?: string | null
           profile_picture_url?: string | null
+          provider_id?: string | null
           qr_code?: string | null
           status?: string
           updated_at?: string
@@ -4575,12 +4619,21 @@ export type Database = {
           presence_status?: string | null
           profile_name?: string | null
           profile_picture_url?: string | null
+          provider_id?: string | null
           qr_code?: string | null
           status?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_instances_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_api_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -4624,6 +4677,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      whatsapp_provider_type: "uazapi" | "evolution" | "waha" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4752,6 +4806,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      whatsapp_provider_type: ["uazapi", "evolution", "waha", "custom"],
     },
   },
 } as const
