@@ -194,7 +194,10 @@ serve(async (req: Request): Promise<Response> => {
       if (!instance.instance_key && uazapiAdminToken) {
         try {
           console.log("Initializing instance via UAZAPI (late init)...");
-          const initResponse = await fetch(`${uazapiUrl}/instance/init`, {
+          console.log("UAZAPI URL:", uazapiUrl, "Token length:", uazapiAdminToken.length);
+          const initUrl = `${uazapiUrl}/instance/init`;
+          console.log("Init URL:", initUrl);
+          const initResponse = await fetch(initUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -206,22 +209,32 @@ serve(async (req: Request): Promise<Response> => {
             }),
           });
 
+          console.log("UAZAPI init response status:", initResponse.status);
+          const initText = await initResponse.text();
+          console.log("UAZAPI init response body:", initText);
+          
           if (initResponse.ok) {
-            const initData = await initResponse.json();
-            console.log("UAZAPI init response:", initData);
-
-            const newInstanceKey = initData.token || initData.key || initData.instance_key;
-            if (newInstanceKey) {
-              await supabase
-                .from("whatsapp_instances")
-                .update({ instance_key: newInstanceKey })
-                .eq("id", entityId);
-              
-              instance.instance_key = newInstanceKey;
+            try {
+              const initData = JSON.parse(initText);
+              const newInstanceKey = initData.token || initData.key || initData.instance_key;
+              console.log("Extracted instance key:", newInstanceKey ? newInstanceKey.substring(0, 8) + "..." : "null");
+              if (newInstanceKey) {
+                await supabase
+                  .from("whatsapp_instances")
+                  .update({ instance_key: newInstanceKey })
+                  .eq("id", entityId);
+                
+                instance.instance_key = newInstanceKey;
+                console.log("Instance key saved successfully");
+              }
+            } catch (parseErr) {
+              console.error("Failed to parse init response:", parseErr);
             }
+          } else {
+            console.error("UAZAPI init failed with status:", initResponse.status, "body:", initText);
           }
         } catch (e) {
-          console.error("UAZAPI init error:", e);
+          console.error("UAZAPI init error:", e?.message || e);
         }
       }
 
