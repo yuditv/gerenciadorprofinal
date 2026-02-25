@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveProvider } from "../_shared/whatsapp-provider.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,8 +73,8 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    // Fallback to the default UAZAPI base URL if env is missing.
-    const uazapiUrl = Deno.env.get('UAZAPI_URL') || 'https://zynk2.uazapi.com';
+    const providerConfig = await resolveProvider(supabaseUrl, supabaseKey);
+    const uazapiUrl = providerConfig?.base_url || "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get conversation details

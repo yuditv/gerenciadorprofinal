@@ -1,20 +1,12 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveProvider } from "../_shared/whatsapp-provider.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
   'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
 };
-
-function getUazapiBaseUrl(): string {
-  const raw = (Deno.env.get('UAZAPI_URL') ?? '').trim();
-  const fallback = 'https://zynk2.uazapi.com';
-  const candidate = !raw || raw.includes('PLACEHOLDER_VALUE_TO_BE_REPLACED') ? fallback : raw;
-  const normalized = candidate.replace(/\/+$/, '');
-  try { new URL(normalized); } catch { return fallback; }
-  return normalized;
-}
 
 function formatPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/\D/g, '');
@@ -44,7 +36,8 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const uazapiUrl = getUazapiBaseUrl();
+    const providerConfig = await resolveProvider(supabaseUrl, supabaseKey);
+    const uazapiUrl = providerConfig?.base_url || "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get conversation details

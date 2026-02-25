@@ -1,6 +1,6 @@
 // Shared WhatsApp provider abstraction for Edge Functions
-// This module resolves the correct API provider (UAZAPI, Evolution, WAHA)
-// from the database and provides adapter functions for each provider.
+// This module resolves the correct API provider from the whatsapp_api_providers table.
+// NO hardcoded URLs or env var fallbacks — only what the admin configures in the panel.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -14,12 +14,16 @@ export interface ProviderConfig {
   extra_config: Record<string, unknown>;
 }
 
-/** Resolve the default provider from the database, falling back to env vars (UAZAPI_URL/UAZAPI_TOKEN). */
+/**
+ * Resolve the provider from the database.
+ * Priority: 1) Instance-linked provider → 2) Default provider → 3) Any active provider → null
+ * NO env var fallback — only what the admin configures in the panel.
+ */
 export async function resolveProvider(
   supabaseUrl: string,
   supabaseServiceKey: string,
   instanceId?: string
-): Promise<ProviderConfig> {
+): Promise<ProviderConfig | null> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   // 1. If instance has a linked provider, use that
@@ -39,13 +43,7 @@ export async function resolveProvider(
         .maybeSingle();
 
       if (provider) {
-        return {
-          id: provider.id,
-          provider_type: provider.provider_type as ProviderType,
-          base_url: provider.base_url.replace(/\/+$/, ""),
-          api_token: provider.api_token,
-          extra_config: (provider.extra_config as Record<string, unknown>) ?? {},
-        };
+        return toConfig(provider);
       }
     }
   }
@@ -59,25 +57,33 @@ export async function resolveProvider(
     .maybeSingle();
 
   if (defaultProvider) {
-    return {
-      id: defaultProvider.id,
-      provider_type: defaultProvider.provider_type as ProviderType,
-      base_url: defaultProvider.base_url.replace(/\/+$/, ""),
-      api_token: defaultProvider.api_token,
-      extra_config: (defaultProvider.extra_config as Record<string, unknown>) ?? {},
-    };
+    return toConfig(defaultProvider);
   }
 
-  // 3. Fallback: use env vars (backward compatibility with UAZAPI)
-  const envUrl = Deno.env.get("UAZAPI_URL") || "https://zynk2.uazapi.com";
-  const envToken = Deno.env.get("UAZAPI_TOKEN") || "";
+  // 3. Try any active provider
+  const { data: anyProvider } = await supabase
+    .from("whatsapp_api_providers")
+    .select("id, provider_type, base_url, api_token, extra_config")
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
+  if (anyProvider) {
+    return toConfig(anyProvider);
+  }
+
+  // No provider configured
+  return null;
+}
+
+function toConfig(provider: Record<string, unknown>): ProviderConfig {
   return {
-    id: "env-fallback",
-    provider_type: "uazapi",
-    base_url: envUrl.replace(/\/+$/, ""),
-    api_token: envToken,
-    extra_config: {},
+    id: provider.id as string,
+    provider_type: provider.provider_type as ProviderType,
+    base_url: (provider.base_url as string).replace(/\/+$/, ""),
+    api_token: provider.api_token as string,
+    extra_config: (provider.extra_config as Record<string, unknown>) ?? {},
   };
 }
 
@@ -103,7 +109,30 @@ export function buildHeaders(provider: ProviderConfig, instanceToken?: string): 
     default:
       return {
         "Content-Type": "application/json",
-        "Admin-Token": token,
+        token: token,
+      };
+  }
+}
+
+/** Build admin headers (for instance management operations) */
+export function buildAdminHeaders(provider: ProviderConfig): Record<string, string> {
+  switch (provider.provider_type) {
+    case "evolution":
+      return {
+        "Content-Type": "application/json",
+        apikey: provider.api_token,
+      };
+    case "waha":
+      return {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${provider.api_token}`,
+      };
+    case "uazapi":
+    case "custom":
+    default:
+      return {
+        "Content-Type": "application/json",
+        admintoken: provider.api_token,
       };
   }
 }
@@ -260,5 +289,47 @@ export function sendReadReceiptUrl(provider: ProviderConfig, instanceName?: stri
     case "custom":
     default:
       return `${provider.base_url}/chat/markread`;
+  }
+}
+
+/** Build the URL for instance init */
+export function instanceInitUrl(provider: ProviderConfig): string {
+  switch (provider.provider_type) {
+    case "evolution":
+      return `${provider.base_url}/instance/create`;
+    case "waha":
+      return `${provider.base_url}/api/sessions/start`;
+    case "uazapi":
+    case "custom":
+    default:
+      return `${provider.base_url}/instance/init`;
+  }
+}
+
+/** Build the URL for instance connect (QR code) */
+export function instanceConnectUrl(provider: ProviderConfig): string {
+  switch (provider.provider_type) {
+    case "evolution":
+      return `${provider.base_url}/instance/connect`;
+    case "waha":
+      return `${provider.base_url}/api/sessions/start`;
+    case "uazapi":
+    case "custom":
+    default:
+      return `${provider.base_url}/instance/connect`;
+  }
+}
+
+/** Build the URL for instance status */
+export function instanceStatusUrl(provider: ProviderConfig): string {
+  switch (provider.provider_type) {
+    case "evolution":
+      return `${provider.base_url}/instance/connectionState`;
+    case "waha":
+      return `${provider.base_url}/api/sessions/status`;
+    case "uazapi":
+    case "custom":
+    default:
+      return `${provider.base_url}/instance/status`;
   }
 }

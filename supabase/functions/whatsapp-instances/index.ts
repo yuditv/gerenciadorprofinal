@@ -1,6 +1,7 @@
-// WhatsApp Instances Edge Function v9 - Init on Create
+// WhatsApp Instances Edge Function v10 - Provider from DB only
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveProvider, buildAdminHeaders, type ProviderConfig } from "../_shared/whatsapp-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,11 +68,21 @@ serve(async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const uazapiUrl = Deno.env.get("UAZAPI_URL") || "https://zynk2.uazapi.com";
-    const uazapiAdminToken = Deno.env.get("UAZAPI_TOKEN") || "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error("Missing Supabase configuration");
+    }
+
+    // Resolve provider from DB (configured in Admin Panel)
+    const provider = await resolveProvider(supabaseUrl, supabaseServiceKey);
+    const uazapiUrl = provider?.base_url || "";
+    const uazapiAdminToken = provider?.api_token || "";
+    
+    if (!provider) {
+      console.log("No WhatsApp API provider configured in admin panel");
+    } else {
+      console.log("Provider resolved:", provider.provider_type, "URL:", provider.base_url);
     }
 
     // Get auth header
@@ -120,18 +131,15 @@ serve(async (req: Request): Promise<Response> => {
 
       let instanceKey: string | null = null;
 
-      // Initialize in UAZAPI first (uses admintoken header)
-      if (uazapiAdminToken) {
+      // Initialize via provider first
+      if (provider && uazapiAdminToken) {
         try {
-          console.log("Initializing instance in UAZAPI:", instanceName);
-          console.log("UAZAPI URL:", uazapiUrl);
+          console.log("Initializing instance via provider:", instanceName);
+          console.log("Provider:", provider.provider_type, "URL:", uazapiUrl);
           
           const initResponse = await fetch(`${uazapiUrl}/instance/init`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "admintoken": uazapiAdminToken,
-            },
+            headers: buildAdminHeaders(provider),
             body: JSON.stringify({ 
               name: instanceName,
               token: crypto.randomUUID() // Generate a unique token for this instance
@@ -152,7 +160,7 @@ serve(async (req: Request): Promise<Response> => {
           console.error("UAZAPI init error:", e);
         }
       } else {
-        console.log("UAZAPI_TOKEN not configured");
+        console.log("No provider configured in admin panel");
       }
 
       // Insert in database with instance_key if obtained
@@ -164,6 +172,7 @@ serve(async (req: Request): Promise<Response> => {
           status: "disconnected",
           daily_limit: dailyLimit,
           instance_key: instanceKey,
+          provider_id: provider?.id || null,
         })
         .select()
         .single();
@@ -190,19 +199,16 @@ serve(async (req: Request): Promise<Response> => {
         return fail("Instância não encontrada");
       }
 
-      // If no instance_key, we need to init the instance first via UAZAPI
-      if (!instance.instance_key && uazapiAdminToken) {
+      // If no instance_key, we need to init the instance first via provider
+      if (!instance.instance_key && provider && uazapiAdminToken) {
         try {
-          console.log("Initializing instance via UAZAPI (late init)...");
-          console.log("UAZAPI URL:", uazapiUrl, "Token length:", uazapiAdminToken.length);
+          console.log("Initializing instance via provider (late init)...");
+          console.log("Provider:", provider.provider_type, "URL:", uazapiUrl, "Token length:", uazapiAdminToken.length);
           const initUrl = `${uazapiUrl}/instance/init`;
           console.log("Init URL:", initUrl);
           const initResponse = await fetch(initUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "admintoken": uazapiAdminToken,
-            },
+            headers: buildAdminHeaders(provider),
             body: JSON.stringify({ 
               name: instance.instance_name,
               token: crypto.randomUUID()
