@@ -1,27 +1,12 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parsePhoneNumberFromString } from "https://esm.sh/libphonenumber-js@1.11.7";
+import { resolveProvider } from "../_shared/whatsapp-provider.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
 };
-
-function getUazapiBaseUrl(): string {
-  const raw = (Deno.env.get('UAZAPI_URL') ?? '').trim();
-  const fallback = 'https://zynk2.uazapi.com';
-  const candidate = !raw || raw.includes('PLACEHOLDER_VALUE_TO_BE_REPLACED') ? fallback : raw;
-  const normalized = candidate.replace(/\/+$/, '');
-
-  try {
-    // eslint-disable-next-line no-new
-    new URL(normalized);
-  } catch {
-    return fallback;
-  }
-
-  return normalized;
-}
 
 interface SendMessageRequest {
   conversationId: string;
@@ -77,8 +62,11 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const uazapiUrl = getUazapiBaseUrl();
-    console.log(`[Send Inbox] Using UAZAPI base URL: ${uazapiUrl}`);
+    
+    // Resolve provider from DB
+    const provider = await resolveProvider(supabaseUrl, supabaseServiceKey);
+    const uazapiUrl = provider?.base_url || "";
+    console.log(`[Send Inbox] Provider: ${provider?.provider_type || 'none'}, URL: ${uazapiUrl}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -231,9 +219,8 @@ serve(async (req: Request) => {
     if (!isPrivate && instance) {
       const phone = conversation.phone;
       const instanceToken = instance.instance_key;
-      // Prefer instance_key (session token) as you confirmed; fallback to global secret if needed
-      const UAZAPI_TOKEN = (Deno.env.get('UAZAPI_TOKEN') ?? '').trim();
-      const uazapiTokenToUse = instanceToken || UAZAPI_TOKEN;
+      // Use instance_key only - no env var fallback
+      const uazapiTokenToUse = instanceToken || provider?.api_token || "";
 
       console.log(`[Send Inbox] Sending to WhatsApp: ${phone} via instance ${instance.instance_name}`);
 
