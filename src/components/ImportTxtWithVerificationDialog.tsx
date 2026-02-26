@@ -35,40 +35,53 @@ export function ImportTxtWithVerificationDialog({
   const [fileName, setFileName] = useState("");
 
   const normalizePhone = (raw: string): string => {
-    // Remove leading + then strip all non-digits
-    let digits = raw.startsWith('+') ? raw.slice(1) : raw;
-    digits = digits.replace(/\D/g, '');
-    
-    if (digits.length === 0) return '';
-    
-    // Already BR with country code (12-13 digits starting with 55)
-    if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+    const input = raw.trim();
+    if (!input) return "";
+
+    const hasPlusPrefix = input.startsWith("+");
+    let digits = input.replace(/\D/g, "");
+
+    if (!digits) return "";
+
+    // Prefixo internacional com 00 (ex.: 0044...) -> 44...
+    if (digits.startsWith("00") && digits.length > 2) {
+      digits = digits.slice(2);
+    }
+
+    // BR já completo
+    if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
       return digits;
     }
-    
-    // Brazilian local: 10 digits (landline) or 11 digits (mobile)
-    if (digits.length >= 10 && digits.length <= 11) {
-      return '55' + digits;
+
+    // BR local sem DDI (10 ou 11 dígitos)
+    if (digits.length === 10 || digits.length === 11) {
+      return `55${digits}`;
     }
-    
-    // International or already formatted (12+ digits)
-    if (digits.length >= 12) {
+
+    // Internacional/geral (aceita E.164 sem +, entre 8 e 15 dígitos)
+    if (digits.length >= 8 && digits.length <= 15) {
       return digits;
     }
-    
-    // Short numbers - return as-is
-    return digits;
+
+    // Se veio com '+' mas ficou muito curto, ainda assim rejeita para evitar lixo
+    if (hasPlusPrefix && digits.length < 8) {
+      return "";
+    }
+
+    return "";
   };
 
   const parseText = (text: string): ParsedContact[] => {
     const lines = text.split(/\r?\n/).filter(line => line.trim());
-    return lines.map(line => {
-      const parts = line.split(/[,;\t]/).map(p => p.trim());
-      const rawPhone = parts[0] || '';
-      const name = parts[1] || undefined;
-      const phone = normalizePhone(rawPhone);
-      return { phone, name };
-    }).filter(c => c.phone.length >= 10);
+    return lines
+      .map((line) => {
+        const parts = line.split(/[,;\t]/).map((p) => p.trim());
+        const rawPhone = parts[0] || "";
+        const name = parts[1] || undefined;
+        const phone = normalizePhone(rawPhone);
+        return { phone, name };
+      })
+      .filter((c) => c.phone.length >= 8);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
