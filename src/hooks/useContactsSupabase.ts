@@ -411,15 +411,24 @@ export function useContactsSupabase() {
     for (let i = 0; i < phones.length; i += lookupChunkSize) {
       const chunk = phones.slice(i, i + lookupChunkSize);
       try {
-        const { data } = await (supabase as any)
-          .from("contacts")
-          .select("phone")
-          .eq("user_id", userId)
-          .in("phone", chunk);
-        if (data) {
-          for (const row of data) {
-            existingPhones.add(row.phone);
-          }
+        // Fetch ALL matching rows (override Supabase default 1000 limit)
+        let allData: any[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await (supabase as any)
+            .from("contacts")
+            .select("phone")
+            .eq("user_id", userId)
+            .in("phone", chunk)
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (data) allData = allData.concat(data);
+          if (!data || data.length < pageSize) break;
+          from += pageSize;
+        }
+        for (const row of allData) {
+          existingPhones.add(row.phone);
         }
       } catch (err) {
         console.warn("Lookup chunk failed, treating as new:", err);
