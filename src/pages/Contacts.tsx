@@ -486,10 +486,6 @@ export default function Contacts() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => { setEditingContact(null); setFormOpen(true); }}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Adicionar manualmente
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => excelInputRef.current?.click()}>
                       <FileSpreadsheet className="h-4 w-4 mr-2" />
                       Excel / CSV
