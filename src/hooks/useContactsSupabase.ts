@@ -384,127 +384,76 @@ export function useContactsSupabase() {
       }))
       .filter((c) => Boolean(c.phone));
 
-    // Fetch existing by phone (we want to UPDATE existing, not create duplicates)
-    const phones = Array.from(new Set(normalized.map((c) => c.phone)));
-    const { data: existingRows, error: existingErr } = await (supabase as any)
-      .from("contacts")
-      .select("id, phone")
-      .eq("user_id", userId)
-      .in("phone", phones);
-    if (existingErr) throw existingErr;
-    const existingByPhone = new Map<string, { id: string; phone: string }>(
-      (existingRows || []).map((r: any) => [r.phone, { id: r.id, phone: r.phone }])
-    );
+    if (normalized.length === 0) {
+      toast.warning("Nenhum contato válido para importar");
+      return;
+    }
 
-    const toUpdate = normalized.filter((c) => existingByPhone.has(c.phone));
-    const toInsert = normalized.filter((c) => !existingByPhone.has(c.phone));
-
-    // Insert/update in smaller batches to avoid timeouts and limits
-    const batchSize = 100;
+    const batchSize = 500;
     let totalProcessed = 0;
     let failedBatches = 0;
 
-    // Set initial progress
     setImportProgress({
       current: 0,
       total: normalized.length,
       isImporting: true,
     });
 
-    // 1) Update existing
-    for (let i = 0; i < toUpdate.length; i += batchSize) {
-      const batch = toUpdate.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
-      
-      try {
-        await Promise.all(
-          batch.map(async (c) => {
-            const existing = existingByPhone.get(c.phone);
-            if (!existing) return;
-            const { error } = await (supabase as any)
-              .from("contacts")
-              .update({
-                name: c.name,
-                email: c.email,
-                notes: c.notes,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", existing.id)
-              .eq("user_id", userId);
-            if (error) throw error;
-          })
-        );
-
-        // Also update conversations (Inbox)
-        await Promise.all(
-          batch.map(async (c) => {
-            const { error } = await (supabase as any)
-              .from("conversations")
-              .update({ contact_name: c.name, updated_at: new Date().toISOString() })
-              .eq("user_id", userId)
-              .eq("phone", c.phone);
-            if (error) throw error;
-          })
-        );
-
-        totalProcessed += batch.length;
-        
-        // Update progress after each batch
-        setImportProgress({
-          current: totalProcessed,
-          total: normalized.length,
-          isImporting: true,
-        });
-
-        // Small delay to avoid rate limiting
-        if (i + batchSize < toUpdate.length) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-      } catch (error) {
-        console.error(`Erro no batch ${batchNumber}:`, error);
-        failedBatches++;
-      }
-    }
-
-    // 2) Insert new
-    for (let i = 0; i < toInsert.length; i += batchSize) {
-      const batch = toInsert.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
+    for (let i = 0; i < normalized.length; i += batchSize) {
+      const batch = normalized.slice(i, i + batchSize);
 
       try {
-        const { error } = await (supabase as any).from("contacts").insert(batch);
+        // Use upsert with on_conflict to handle duplicates automatically
+        const { error } = await (supabase as any)
+          .from("contacts")
+          .upsert(batch, { onConflict: "user_id,phone", ignoreDuplicates: false });
+
         if (error) throw error;
 
-        // Update conversations (Inbox)
-        await Promise.all(
-          batch.map(async (c) => {
-            const { error } = await (supabase as any)
-              .from("conversations")
-              .update({ contact_name: c.name, updated_at: new Date().toISOString() })
-              .eq("user_id", userId)
-              .eq("phone", c.phone);
-            if (error) throw error;
-          })
-        );
+        // Update conversation names in background (non-blocking)
+        (supabase as any)
+          .from("conversations")
+          .upsert(
+            batch.map((c) => ({
+              user_id: userId,
+              phone: c.phone,
+              contact_name: c.name,
+              updated_at: new Date().toISOString(),
+            })),
+            { onConflict: "user_id,phone", ignoreDuplicates: true }
+          )
+          .then(() => {})
+          .catch(() => {});
 
         totalProcessed += batch.length;
-
-        setImportProgress({
-          current: totalProcessed,
-          total: normalized.length,
-          isImporting: true,
-        });
-
-        if (i + batchSize < toInsert.length) {
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
       } catch (error) {
-        console.error(`Erro no batch (insert) ${batchNumber}:`, error);
-        failedBatches++;
+        console.error(`Erro no batch ${Math.floor(i / batchSize) + 1}:`, error);
+        
+        // Fallback: try inserting one by one for this batch
+        for (const contact of batch) {
+          try {
+            await (supabase as any)
+              .from("contacts")
+              .upsert(contact, { onConflict: "user_id,phone", ignoreDuplicates: false });
+            totalProcessed++;
+          } catch {
+            failedBatches++;
+          }
+        }
+      }
+
+      setImportProgress({
+        current: totalProcessed,
+        total: normalized.length,
+        isImporting: true,
+      });
+
+      // Yield to UI thread
+      if (i + batchSize < normalized.length) {
+        await new Promise(resolve => setTimeout(resolve, 30));
       }
     }
 
-    // Reset progress
     setImportProgress({
       current: totalProcessed,
       total: normalized.length,
@@ -512,9 +461,9 @@ export function useContactsSupabase() {
     });
 
     await fetchContacts();
-    
+
     if (failedBatches > 0) {
-      toast.warning(`Importação concluída: ${totalProcessed} contatos processados, ${failedBatches} batches falharam`);
+      toast.warning(`Importação concluída: ${totalProcessed} contatos processados, ${failedBatches} falharam`);
     } else {
       toast.success(`${totalProcessed} contato(s) importado(s) com sucesso!`);
     }
