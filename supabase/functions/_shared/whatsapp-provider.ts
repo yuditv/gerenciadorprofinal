@@ -214,7 +214,7 @@ export function sendMediaBody(
     default:
       return {
         number: phone,
-        media: mediaUrl,
+        file: mediaUrl,
         type: mediaType,
         caption: caption || "",
         fileName: fileName || "",
