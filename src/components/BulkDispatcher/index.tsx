@@ -82,6 +82,7 @@ export function BulkDispatcher() {
     pagination: savedContactsPagination,
     hasInitialLoad: savedContactsInitialized,
     searchContactsRemote,
+    deleteContactsByPhones,
   } = useContactsSupabase();
 
   const [savedContacts, setSavedContacts] = useState<SavedContact[]>([]);
@@ -223,17 +224,27 @@ export function BulkDispatcher() {
       setVerificationProgress(((i + batch.length) / contacts.length) * 100);
     }
 
-    handleContactsChange(verified);
+    const validContacts = verified.filter(c => c.isValid === true);
+    const invalidContacts = verified.filter(c => c.isValid === false);
+    const unknownContacts = verified.filter(c => c.isValid === undefined);
+
+    // Delete invalid contacts from database
+    if (invalidContacts.length > 0) {
+      const invalidPhones = invalidContacts.map(c => c.phone);
+      const deletedCount = await deleteContactsByPhones(invalidPhones);
+      console.log(`Deleted ${deletedCount} invalid contacts from database`);
+    }
+
+    // Keep only valid + unknown contacts in dispatch list (remove invalid)
+    const cleanedContacts = [...validContacts, ...unknownContacts];
+    handleContactsChange(cleanedContacts);
     setIsVerifying(false);
-    
-    const validCount = verified.filter(c => c.isValid === true).length;
-    const invalidCount = verified.filter(c => c.isValid === false).length;
     
     toast({
       title: 'Verificação Concluída',
-      description: `${validCount} válidos, ${invalidCount} inválidos`,
+      description: `✅ ${validContacts.length} válidos mantidos • ❌ ${invalidContacts.length} inválidos removidos do sistema${unknownContacts.length > 0 ? ` • ⚠️ ${unknownContacts.length} não verificados` : ''}`,
     });
-  }, [contacts, config.instanceIds, instances, checkNumbers, toast, handleContactsChange]);
+  }, [contacts, config.instanceIds, instances, checkNumbers, toast, handleContactsChange, deleteContactsByPhones]);
 
   const handleMessagesChange = useCallback((messages: DispatchMessage[]) => {
     updateConfig({ messages });

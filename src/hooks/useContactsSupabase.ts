@@ -512,6 +512,33 @@ export function useContactsSupabase() {
     }
   };
 
+  const deleteContactsByPhones = useCallback(async (phones: string[]): Promise<number> => {
+    if (!userId || phones.length === 0) return 0;
+
+    let deletedCount = 0;
+    const batchSize = 500;
+
+    try {
+      for (let i = 0; i < phones.length; i += batchSize) {
+        const batch = phones.slice(i, i + batchSize);
+        const { error, count } = await (supabase as any)
+          .from("contacts")
+          .delete({ count: "exact" })
+          .eq("user_id", userId)
+          .in("phone", batch);
+
+        if (error) throw error;
+        deletedCount += count || batch.length;
+      }
+
+      setContacts((prev) => prev.filter((c) => !phones.includes(c.phone)));
+      return deletedCount;
+    } catch (error) {
+      console.error("Error batch deleting contacts:", error);
+      return deletedCount;
+    }
+  }, [userId]);
+
   const getAllPhoneNumbers = useCallback(async (): Promise<string[]> => {
     if (!userId) return [];
 
@@ -546,6 +573,7 @@ export function useContactsSupabase() {
     clearAllContacts,
     getContactCount,
     getAllPhoneNumbers,
+    deleteContactsByPhones,
     loadMoreContacts,
     refetch: fetchContacts,
   };
