@@ -389,9 +389,9 @@ export function useContactsSupabase() {
       return;
     }
 
-    const batchSize = 500;
+    const batchSize = 200;
     let totalProcessed = 0;
-    let failedBatches = 0;
+    let failedCount = 0;
 
     setImportProgress({
       current: 0,
@@ -401,57 +401,53 @@ export function useContactsSupabase() {
 
     for (let i = 0; i < normalized.length; i += batchSize) {
       const batch = normalized.slice(i, i + batchSize);
+      const batchNum = Math.floor(i / batchSize) + 1;
 
       try {
-        // Use upsert with on_conflict to handle duplicates automatically
         const { error } = await (supabase as any)
           .from("contacts")
           .upsert(batch, { onConflict: "user_id,phone", ignoreDuplicates: false });
 
         if (error) throw error;
 
-        // Update conversation names in background (non-blocking)
-        (supabase as any)
-          .from("conversations")
-          .upsert(
-            batch.map((c) => ({
-              user_id: userId,
-              phone: c.phone,
-              contact_name: c.name,
-              updated_at: new Date().toISOString(),
-            })),
-            { onConflict: "user_id,phone", ignoreDuplicates: true }
-          )
-          .then(() => {})
-          .catch(() => {});
-
         totalProcessed += batch.length;
       } catch (error) {
-        console.error(`Erro no batch ${Math.floor(i / batchSize) + 1}:`, error);
+        console.error(`Erro no batch ${batchNum}:`, error);
         
-        // Fallback: try inserting one by one for this batch
-        for (const contact of batch) {
+        // Fallback: sub-batches of 50
+        for (let j = 0; j < batch.length; j += 50) {
+          const subBatch = batch.slice(j, j + 50);
           try {
-            await (supabase as any)
+            const { error: subErr } = await (supabase as any)
               .from("contacts")
-              .upsert(contact, { onConflict: "user_id,phone", ignoreDuplicates: false });
-            totalProcessed++;
+              .upsert(subBatch, { onConflict: "user_id,phone", ignoreDuplicates: false });
+            if (subErr) throw subErr;
+            totalProcessed += subBatch.length;
           } catch {
-            failedBatches++;
+            // Last resort: one by one
+            for (const contact of subBatch) {
+              try {
+                const { error: singleErr } = await (supabase as any)
+                  .from("contacts")
+                  .upsert(contact, { onConflict: "user_id,phone", ignoreDuplicates: false });
+                if (singleErr) throw singleErr;
+                totalProcessed++;
+              } catch {
+                failedCount++;
+              }
+            }
           }
         }
       }
 
       setImportProgress({
-        current: totalProcessed,
+        current: totalProcessed + failedCount,
         total: normalized.length,
         isImporting: true,
       });
 
       // Yield to UI thread
-      if (i + batchSize < normalized.length) {
-        await new Promise(resolve => setTimeout(resolve, 30));
-      }
+      await new Promise(resolve => setTimeout(resolve, 30));
     }
 
     setImportProgress({
@@ -462,8 +458,8 @@ export function useContactsSupabase() {
 
     await fetchContacts();
 
-    if (failedBatches > 0) {
-      toast.warning(`Importação concluída: ${totalProcessed} contatos processados, ${failedBatches} falharam`);
+    if (failedCount > 0) {
+      toast.warning(`Importação concluída: ${totalProcessed} contatos processados, ${failedCount} falharam`);
     } else {
       toast.success(`${totalProcessed} contato(s) importado(s) com sucesso!`);
     }
