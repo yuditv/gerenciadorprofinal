@@ -390,6 +390,7 @@ export function useContactsSupabase() {
     }
 
     const duplicateCount = Math.max(0, totalOriginal - invalidCount - deduped.size);
+    const preProcessedSkippedCount = duplicateCount + invalidCount;
 
     const normalized = Array.from(deduped.values()).map((c) => ({
       user_id: userId,
@@ -405,8 +406,8 @@ export function useContactsSupabase() {
     }
 
     setImportProgress({
-      current: 0,
-      total: normalized.length,
+      current: preProcessedSkippedCount,
+      total: totalOriginal,
       isImporting: true,
     });
 
@@ -457,8 +458,8 @@ export function useContactsSupabase() {
       }
 
       setImportProgress({
-        current: totalProcessed + failedCount,
-        total: normalized.length,
+        current: preProcessedSkippedCount + totalProcessed + failedCount,
+        total: totalOriginal,
         isImporting: true,
       });
 
@@ -468,8 +469,8 @@ export function useContactsSupabase() {
 
     // Reset progress
     setImportProgress({
-      current: totalProcessed,
-      total: normalized.length,
+      current: totalOriginal,
+      total: totalOriginal,
       isImporting: false,
     });
 
