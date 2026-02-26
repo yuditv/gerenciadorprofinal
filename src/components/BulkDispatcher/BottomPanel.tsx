@@ -27,6 +27,8 @@ interface BottomPanelProps {
   hasMoreSavedContacts?: boolean;
   onLoadMoreSavedContacts?: () => void;
   onSearchSavedContacts?: (query: string, limit?: number) => Promise<SavedContact[]>;
+  sentContactsCount?: number;
+  onResetContacts?: () => Promise<void>;
   // Timing
   minDelay: number;
   maxDelay: number;
@@ -71,6 +73,8 @@ export function BottomPanel({
   hasMoreSavedContacts,
   onLoadMoreSavedContacts,
   onSearchSavedContacts,
+  sentContactsCount,
+  onResetContacts,
   minDelay,
   maxDelay,
   pauseAfterMessages,
@@ -134,6 +138,8 @@ export function BottomPanel({
                 hasMoreSavedContacts={hasMoreSavedContacts}
                 onLoadMoreSavedContacts={onLoadMoreSavedContacts}
                 onSearchSavedContacts={onSearchSavedContacts}
+                sentContactsCount={sentContactsCount}
+                onResetContacts={onResetContacts}
               />
             </motion.div>
           )}

@@ -14,7 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Users, Upload, FileSpreadsheet, Trash2, 
   Check, X, Loader2, Download, AlertCircle,
-  Database, Search, Plus, CheckCircle2, XCircle
+  Database, Search, Plus, CheckCircle2, XCircle,
+  RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
@@ -60,6 +61,9 @@ interface ContactsManagerProps {
   hasMoreSavedContacts?: boolean;
   onLoadMoreSavedContacts?: () => void;
   onSearchSavedContacts?: (query: string, limit?: number) => Promise<SavedContact[]>;
+  // Reset props
+  sentContactsCount?: number;
+  onResetContacts?: () => Promise<void>;
 }
 
 export function ContactsManager({
@@ -79,7 +83,9 @@ export function ContactsManager({
   savedContactsTotal = 0,
   hasMoreSavedContacts = false,
   onLoadMoreSavedContacts,
-  onSearchSavedContacts
+  onSearchSavedContacts,
+  sentContactsCount = 0,
+  onResetContacts,
 }: ContactsManagerProps) {
   const [manualInput, setManualInput] = useState('');
   const [activeTab, setActiveTab] = useState('manual');
@@ -92,6 +98,7 @@ export function ContactsManager({
   const [autoSave, setAutoSave] = useState(false);
   const [searchResults, setSearchResults] = useState<SavedContact[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   
   // Debounced search for server-side filtering
   useEffect(() => {
@@ -550,8 +557,37 @@ Exemplo:
                 <Database className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>{savedSearch ? 'Nenhum contato encontrado' : 'Nenhum contato salvo'}</p>
                 <p className="text-xs mt-1">
-                  Adicione contatos na página "Contatos"
+                  {savedSearch ? 'Tente outro termo' : 'Adicione contatos na página "Contatos"'}
                 </p>
+                {!savedSearch && sentContactsCount > 0 && onResetContacts && (
+                  <div className="mt-4">
+                    <p className="text-sm text-foreground font-medium mb-2">
+                      {sentContactsCount} contato(s) na lista de enviados
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        setIsResetting(true);
+                        try {
+                          await onResetContacts();
+                          onRefreshSaved?.();
+                        } finally {
+                          setIsResetting(false);
+                        }
+                      }}
+                      disabled={isResetting}
+                      className="gap-2"
+                    >
+                      {isResetting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4" />
+                      )}
+                      Resetar — Trazer todos de volta
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <ScrollArea className="h-[200px] rounded-lg border border-border/50">
