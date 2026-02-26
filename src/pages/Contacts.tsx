@@ -731,9 +731,8 @@ export default function Contacts() {
       <ImportTxtWithVerificationDialog
         open={txtVerificationOpen}
         onOpenChange={setTxtVerificationOpen}
-        onImport={(contacts) => {
-          importContacts(contacts);
-          toast.success(`${contacts.length} contatos ativos adicionados!`);
+        onImport={async (contacts) => {
+          await importContacts(contacts);
         }}
       />
     </div>
