@@ -607,7 +607,24 @@ export function useBulkDispatch() {
                 });
               })();
 
-          if (error) throw error;
+          // Check for invalid number (don't retry these)
+          if (error) {
+            // Try to detect invalid number from error context or data
+            const errorMsg = typeof error === 'object' && error?.message ? error.message : String(error);
+            const responseData = data as any;
+            const isInvalidNumber = responseData?.invalid_number || 
+              errorMsg.toLowerCase().includes('not on whatsapp') ||
+              errorMsg.toLowerCase().includes('não está no whatsapp') ||
+              errorMsg.toLowerCase().includes('não encontrado no whatsapp');
+            
+            if (isInvalidNumber) {
+              failedCount++;
+              addLog('error', `✗ ${contact.name || phone}: Número não encontrado no WhatsApp`);
+              sendSuccess = false;
+              break; // Skip retries for invalid numbers
+            }
+            throw error;
+          }
 
           sentCount++;
           sendSuccess = true;
