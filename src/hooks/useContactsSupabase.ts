@@ -374,14 +374,22 @@ export function useContactsSupabase() {
       return;
     }
 
-    // Deduplicate by phone - keep last occurrence (latest data wins)
+    const totalOriginal = importedContacts.length;
+
+    // Deduplicate by phone (same number = same contato)
     const deduped = new Map<string, typeof importedContacts[0]>();
+    let invalidCount = 0;
+
     for (const c of importedContacts) {
       const phone = c.phone?.replace(/\D/g, '') || '';
-      if (phone.length >= 10) {
-        deduped.set(phone, { ...c, phone });
+      if (phone.length < 10) {
+        invalidCount++;
+        continue;
       }
+      deduped.set(phone, { ...c, phone });
     }
+
+    const duplicateCount = Math.max(0, totalOriginal - invalidCount - deduped.size);
 
     const normalized = Array.from(deduped.values()).map((c) => ({
       user_id: userId,
@@ -467,10 +475,17 @@ export function useContactsSupabase() {
 
     await fetchContacts();
     
+    const summary = [
+      `${totalProcessed.toLocaleString()} únicos salvos/atualizados`,
+      duplicateCount > 0 ? `${duplicateCount.toLocaleString()} duplicados no arquivo` : null,
+      invalidCount > 0 ? `${invalidCount.toLocaleString()} inválidos` : null,
+      failedCount > 0 ? `${failedCount.toLocaleString()} falharam` : null,
+    ].filter(Boolean).join(" • ");
+
     if (failedCount > 0) {
-      toast.warning(`Importação concluída: ${totalProcessed.toLocaleString()} importados, ${failedCount.toLocaleString()} falharam`);
+      toast.warning(`Importação concluída: ${summary}`);
     } else {
-      toast.success(`${totalProcessed.toLocaleString()} contato(s) importado(s) com sucesso!`);
+      toast.success(`Importação concluída: ${summary}`);
     }
   };
 

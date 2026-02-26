@@ -21,7 +21,7 @@ interface ParsedContact {
 interface ImportTxtWithVerificationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (contacts: Array<{ name: string; phone: string }>) => void;
+  onImport: (contacts: Array<{ name: string; phone: string }>) => Promise<void>;
 }
 
 export function ImportTxtWithVerificationDialog({
@@ -72,7 +72,7 @@ export function ImportTxtWithVerificationDialog({
 
     setLoading(true);
     try {
-      onImport(parsedContacts.map(c => ({
+      await onImport(parsedContacts.map(c => ({
         name: c.name || "Sem nome",
         phone: c.phone,
       })));
