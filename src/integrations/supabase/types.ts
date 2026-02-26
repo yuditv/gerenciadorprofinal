@@ -2098,6 +2098,30 @@ export type Database = {
           },
         ]
       }
+      daily_spins: {
+        Row: {
+          created_at: string
+          id: string
+          prize_amount: number
+          prize_label: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prize_amount?: number
+          prize_label: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prize_amount?: number
+          prize_label?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       dispatch_configs: {
         Row: {
           ai_personalization: boolean | null
@@ -3146,6 +3170,50 @@ export type Database = {
         }
         Relationships: []
       }
+      raffle_numbers: {
+        Row: {
+          buyer_name: string | null
+          buyer_phone: string | null
+          buyer_user_id: string | null
+          created_at: string
+          id: string
+          number: number
+          purchased_at: string | null
+          raffle_id: string
+          status: string
+        }
+        Insert: {
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_user_id?: string | null
+          created_at?: string
+          id?: string
+          number: number
+          purchased_at?: string | null
+          raffle_id: string
+          status?: string
+        }
+        Update: {
+          buyer_name?: string | null
+          buyer_phone?: string | null
+          buyer_user_id?: string | null
+          created_at?: string
+          id?: string
+          number?: number
+          purchased_at?: string | null
+          raffle_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raffle_numbers_raffle_id_fkey"
+            columns: ["raffle_id"]
+            isOneToOne: false
+            referencedRelation: "raffles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       raffle_payments: {
         Row: {
           amount: number
@@ -3230,11 +3298,14 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          draw_date: string | null
           drawn_at: string | null
           end_date: string
           id: string
           price: number
+          price_per_number: number | null
           prize: string
+          prize_description: string | null
           prize_image_url: string | null
           sold_numbers: number
           status: string
@@ -3249,11 +3320,14 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          draw_date?: string | null
           drawn_at?: string | null
           end_date?: string
           id?: string
           price?: number
+          price_per_number?: number | null
           prize: string
+          prize_description?: string | null
           prize_image_url?: string | null
           sold_numbers?: number
           status?: string
@@ -3268,11 +3342,14 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          draw_date?: string | null
           drawn_at?: string | null
           end_date?: string
           id?: string
           price?: number
+          price_per_number?: number | null
           prize?: string
+          prize_description?: string | null
           prize_image_url?: string | null
           sold_numbers?: number
           status?: string
@@ -4002,6 +4079,39 @@ export type Database = {
           plan_type?: string | null
           price?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      trial_tests: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          id: string
+          ip_address: string
+          selected_app: string | null
+          selected_plan: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          ip_address: string
+          selected_app?: string | null
+          selected_plan?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          id?: string
+          ip_address?: string
+          selected_app?: string | null
+          selected_plan?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }

@@ -246,7 +246,7 @@ export function ImportTxtWithVerificationDialog({
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">Verificação WhatsApp</span>
-              <Badge variant="outline" className="text-xs">Obrigatório</Badge>
+              <Badge variant="outline" className="text-xs">Opcional</Badge>
             </div>
 
             <div className="space-y-2">
@@ -344,7 +344,7 @@ export function ImportTxtWithVerificationDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !verificationDone || activeContacts.length === 0}
+            disabled={loading || parsedContacts.length === 0}
           >
             {loading ? (
               <>
@@ -354,7 +354,7 @@ export function ImportTxtWithVerificationDialog({
             ) : verificationDone ? (
               `Adicionar ${activeContacts.length} Contatos Ativos`
             ) : (
-              "Verifique os números primeiro"
+              `Adicionar ${parsedContacts.length} Contatos`
             )}
           </Button>
         </DialogFooter>
