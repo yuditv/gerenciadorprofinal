@@ -619,7 +619,19 @@ export function useBulkDispatch() {
             
             if (isInvalidNumber) {
               failedCount++;
-              addLog('error', `✗ ${contact.name || phone}: Número não encontrado no WhatsApp`);
+              addLog('error', `✗ ${contact.name || phone}: Número inválido — removido do sistema`);
+              
+              // Remove invalid number from contacts database permanently
+              try {
+                if (contact.originalId) {
+                  await (supabase as any).from('contacts').delete().eq('id', contact.originalId).eq('user_id', user.id);
+                } else {
+                  await (supabase as any).from('contacts').delete().eq('phone', phone).eq('user_id', user.id);
+                }
+              } catch (delErr) {
+                console.error('Error deleting invalid contact:', delErr);
+              }
+              
               sendSuccess = false;
               break; // Skip retries for invalid numbers
             }
