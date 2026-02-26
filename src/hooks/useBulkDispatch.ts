@@ -639,27 +639,35 @@ export function useBulkDispatch() {
             addLog('success', `✓ ${contact.name || phone}`);
           }
 
-          // Move contact to sent_contacts if it came from saved contacts
-          if (contact.originalId) {
-            try {
-              await (supabase as any).from('sent_contacts').insert({
-                user_id: user.id,
-                name: contact.name || '',
-                phone: phone,
-                email: contact.email || null,
-                original_contact_id: contact.originalId,
-                dispatch_history_id: historyRecordId || null,
-                sent_at: new Date().toISOString(),
-              });
+          // Move contact to sent_contacts (all contacts, not just saved ones)
+          try {
+            await (supabase as any).from('sent_contacts').upsert({
+              user_id: user.id,
+              name: contact.name || '',
+              phone: phone,
+              email: contact.email || null,
+              original_contact_id: contact.originalId || null,
+              dispatch_history_id: historyRecordId || null,
+              sent_at: new Date().toISOString(),
+            }, { onConflict: 'user_id,phone' });
 
+            // If it came from saved contacts, delete from contacts table
+            if (contact.originalId) {
               await (supabase as any)
                 .from('contacts')
                 .delete()
                 .eq('id', contact.originalId)
                 .eq('user_id', user.id);
-            } catch (moveErr) {
-              console.error('Error moving contact to sent:', moveErr);
+            } else {
+              // Also delete by phone if exists in contacts
+              await (supabase as any)
+                .from('contacts')
+                .delete()
+                .eq('phone', phone)
+                .eq('user_id', user.id);
             }
+          } catch (moveErr) {
+            console.error('Error moving contact to sent:', moveErr);
           }
 
           // Log to notification history
