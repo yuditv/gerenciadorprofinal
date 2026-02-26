@@ -119,7 +119,7 @@ export function SentContactsList() {
       }
 
       toast.success(`${inserted} número(s) adicionado(s) aos contatos enviados`);
-      refetch();
+      await refetch();
     } catch (error) {
       console.error('Error uploading used numbers:', error);
       toast.error('Erro ao importar números');
