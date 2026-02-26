@@ -191,7 +191,7 @@ export default function Contacts() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const imported = JSON.parse(content);
@@ -210,8 +210,7 @@ export default function Contacts() {
           return;
         }
 
-        importContacts(validContacts);
-        toast.success(`${validContacts.length} contato(s) importado(s) com sucesso!`);
+        await importContacts(validContacts);
       } catch (error) {
         console.error("Error parsing JSON:", error);
         toast.error("Erro ao ler arquivo JSON");
@@ -229,7 +228,7 @@ export default function Contacts() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
@@ -290,8 +289,7 @@ export default function Contacts() {
           return;
         }
 
-        importContacts(importedContacts);
-        toast.success(`${importedContacts.length} contato(s) importado(s) com sucesso!`);
+        await importContacts(importedContacts);
       } catch (error) {
         console.error("Error parsing Excel/CSV:", error);
         toast.error("Erro ao ler arquivo. Verifique o formato.");
@@ -731,9 +729,8 @@ export default function Contacts() {
       <ImportTxtWithVerificationDialog
         open={txtVerificationOpen}
         onOpenChange={setTxtVerificationOpen}
-        onImport={(contacts) => {
-          importContacts(contacts);
-          toast.success(`${contacts.length} contatos ativos adicionados!`);
+        onImport={async (contacts) => {
+          await importContacts(contacts);
         }}
       />
     </div>
