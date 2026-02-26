@@ -396,132 +396,48 @@ export function useContactsSupabase() {
       return;
     }
 
-    // Set initial progress
     setImportProgress({
       current: 0,
       total: normalized.length,
       isImporting: true,
     });
 
-    // Fetch existing phones in chunks (PostgREST has URL size limits for .in())
-    const phones = normalized.map((c) => c.phone);
-    const lookupChunkSize = 500;
-    const existingPhones = new Set<string>();
-    
-    for (let i = 0; i < phones.length; i += lookupChunkSize) {
-      const chunk = phones.slice(i, i + lookupChunkSize);
-      try {
-        // Fetch ALL matching rows (override Supabase default 1000 limit)
-        let allData: any[] = [];
-        let from = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data, error } = await (supabase as any)
-            .from("contacts")
-            .select("phone")
-            .eq("user_id", userId)
-            .in("phone", chunk)
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          if (data) allData = allData.concat(data);
-          if (!data || data.length < pageSize) break;
-          from += pageSize;
-        }
-        for (const row of allData) {
-          existingPhones.add(row.phone);
-        }
-      } catch (err) {
-        console.warn("Lookup chunk failed, treating as new:", err);
-      }
-    }
-
-    const toUpdate = normalized.filter((c) => existingPhones.has(c.phone));
-    const toInsert = normalized.filter((c) => !existingPhones.has(c.phone));
-
-    const insertBatchSize = 200;
-    const updateBatchSize = 50;
+    const batchSize = 500;
     let totalProcessed = 0;
     let failedCount = 0;
 
-    // Helper: retry a batch operation up to 3 times
-    const withRetry = async (fn: () => Promise<void>, retries = 3) => {
-      for (let attempt = 1; attempt <= retries; attempt++) {
-        try {
-          await fn();
-          return true;
-        } catch (err) {
-          if (attempt === retries) {
-            console.error("Batch failed after retries:", err);
-            return false;
-          }
-          await new Promise(r => setTimeout(r, 200 * attempt));
-        }
-      }
-      return false;
-    };
+    // Use upsert with the unique constraint (user_id, phone)
+    // This handles both inserts and updates in a single operation
+    for (let i = 0; i < normalized.length; i += batchSize) {
+      const batch = normalized.slice(i, i + batchSize);
 
-    // 1) Update existing contacts in sequential batches
-    for (let i = 0; i < toUpdate.length; i += updateBatchSize) {
-      const batch = toUpdate.slice(i, i + updateBatchSize);
-      
-      const success = await withRetry(async () => {
-        // Update each contact individually (no bulk update in Supabase by phone)
-        for (const c of batch) {
-          const { error } = await (supabase as any)
-            .from("contacts")
-            .update({
-              name: c.name,
-              email: c.email,
-              notes: c.notes,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", userId)
-            .eq("phone", c.phone);
-          if (error) throw error;
-        }
-      });
-
-      if (success) {
-        totalProcessed += batch.length;
-      } else {
-        failedCount += batch.length;
-      }
-
-      setImportProgress({
-        current: totalProcessed + failedCount,
-        total: normalized.length,
-        isImporting: true,
-      });
-
-      // Yield to UI and avoid rate limiting
-      await new Promise(r => setTimeout(r, 30));
-    }
-
-    // 2) Insert new contacts in batches
-    for (let i = 0; i < toInsert.length; i += insertBatchSize) {
-      const batch = toInsert.slice(i, i + insertBatchSize);
-
-      const success = await withRetry(async () => {
-        const { error } = await (supabase as any).from("contacts").insert(batch);
+      try {
+        const { error } = await (supabase as any)
+          .from("contacts")
+          .upsert(batch, { onConflict: "user_id,phone" });
+        
         if (error) throw error;
-      });
-
-      if (!success) {
-        // Try smaller sub-batches
-        const subSize = 50;
+        totalProcessed += batch.length;
+      } catch (err) {
+        console.error(`Upsert batch ${Math.floor(i / batchSize) + 1} failed:`, err);
+        
+        // Fallback: try smaller sub-batches
+        const subSize = 100;
         for (let j = 0; j < batch.length; j += subSize) {
           const subBatch = batch.slice(j, j + subSize);
-          const subSuccess = await withRetry(async () => {
-            const { error } = await (supabase as any).from("contacts").insert(subBatch);
+          try {
+            const { error } = await (supabase as any)
+              .from("contacts")
+              .upsert(subBatch, { onConflict: "user_id,phone" });
             if (error) throw error;
-          });
-          if (subSuccess) {
             totalProcessed += subBatch.length;
-          } else {
-            // Try individual inserts as last resort
+          } catch {
+            // Last resort: individual upserts
             for (const contact of subBatch) {
               try {
-                const { error } = await (supabase as any).from("contacts").insert(contact);
+                const { error } = await (supabase as any)
+                  .from("contacts")
+                  .upsert(contact, { onConflict: "user_id,phone" });
                 if (error) throw error;
                 totalProcessed++;
               } catch {
@@ -530,8 +446,6 @@ export function useContactsSupabase() {
             }
           }
         }
-      } else {
-        totalProcessed += batch.length;
       }
 
       setImportProgress({
@@ -540,7 +454,8 @@ export function useContactsSupabase() {
         isImporting: true,
       });
 
-      await new Promise(r => setTimeout(r, 30));
+      // Yield to UI
+      await new Promise(r => setTimeout(r, 20));
     }
 
     // Reset progress
