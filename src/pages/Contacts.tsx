@@ -151,7 +151,8 @@ export default function Contacts() {
       getContactCount().then(setContactCount);
       getSentContactCount().then(setSentContactCount);
     }
-  }, [userId, contacts.length, sentContacts.length, getContactCount, getSentContactCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // Auto-carregar todas as páginas para garantir lista completa na tela
   useEffect(() => {
@@ -159,10 +160,11 @@ export default function Contacts() {
 
     const timer = window.setTimeout(() => {
       loadMoreContacts();
-    }, 0);
+    }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [userId, hasInitialLoad, pagination.hasMore, pagination.page, isLoading, loadMoreContacts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, hasInitialLoad, pagination.hasMore, pagination.page, isLoading]);
 
   const handleSubmit = (data: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
     if (editingContact) {
