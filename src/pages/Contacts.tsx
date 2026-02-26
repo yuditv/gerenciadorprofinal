@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, FileText, Users, Download, Upload, FileSpreadsheet, Database, CloudOff, Cloud, RefreshCw, ArrowRightLeft, Pencil, Search, Phone, Mail, Send, ShieldCheck } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Plus, Trash2, FileText, Users, Download, Upload, FileSpreadsheet, Database, CloudOff, Cloud, RefreshCw, ArrowRightLeft, Pencil, Search, Phone, Mail, Send, ShieldCheck, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -46,8 +47,10 @@ export default function Contacts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("contacts");
   const [txtVerificationOpen, setTxtVerificationOpen] = useState(false);
+  const [usedNumbers, setUsedNumbers] = useState<Set<string>>(new Set());
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
+  const usedNumbersInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   // Filter contacts based on search
@@ -137,6 +140,51 @@ export default function Contacts() {
     }
   }, [userId, contacts.length, sentContacts.length, getContactCount, getSentContactCount]);
 
+  const handleUploadUsedNumbers = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const numbers = new Set<string>();
+        text.split('\n').forEach(line => {
+          const phone = line.trim().replace(/\D/g, '');
+          if (phone.length >= 10) {
+            numbers.add(phone);
+            // Also add with/without 55 prefix for better matching
+            if (phone.startsWith('55') && phone.length > 12) {
+              numbers.add(phone.slice(2));
+            } else if (!phone.startsWith('55') && phone.length <= 11) {
+              numbers.add('55' + phone);
+            }
+          }
+        });
+        setUsedNumbers(numbers);
+        toast.success(`${numbers.size} números usados carregados. Eles serão excluídos das importações.`);
+      } catch (error) {
+        console.error("Error parsing used numbers:", error);
+        toast.error("Erro ao ler arquivo de números usados");
+      }
+    };
+    reader.readAsText(file);
+    if (usedNumbersInputRef.current) usedNumbersInputRef.current.value = "";
+  };
+
+  const filterUsedNumbers = useCallback((contactsList: Array<{ name: string; phone: string; email?: string; notes?: string }>) => {
+    if (usedNumbers.size === 0) return contactsList;
+    const filtered = contactsList.filter(c => {
+      const phone = c.phone.replace(/\D/g, '');
+      return !usedNumbers.has(phone);
+    });
+    const removed = contactsList.length - filtered.length;
+    if (removed > 0) {
+      toast.info(`${removed} número(s) já usado(s) foram removidos automaticamente`);
+    }
+    return filtered;
+  }, [usedNumbers]);
+
   const handleSubmit = (data: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
     if (editingContact) {
       updateContact(editingContact.id, data);
@@ -210,8 +258,9 @@ export default function Contacts() {
           return;
         }
 
-        importContacts(validContacts);
-        toast.success(`${validContacts.length} contato(s) importado(s) com sucesso!`);
+        const filtered = filterUsedNumbers(validContacts);
+        importContacts(filtered);
+        toast.success(`${filtered.length} contato(s) importado(s) com sucesso!`);
       } catch (error) {
         console.error("Error parsing JSON:", error);
         toast.error("Erro ao ler arquivo JSON");
@@ -290,8 +339,9 @@ export default function Contacts() {
           return;
         }
 
-        importContacts(importedContacts);
-        toast.success(`${importedContacts.length} contato(s) importado(s) com sucesso!`);
+        const filtered = filterUsedNumbers(importedContacts);
+        importContacts(filtered);
+        toast.success(`${filtered.length} contato(s) importado(s) com sucesso!`);
       } catch (error) {
         console.error("Error parsing Excel/CSV:", error);
         toast.error("Erro ao ler arquivo. Verifique o formato.");
@@ -385,6 +435,13 @@ export default function Contacts() {
         type="file"
         accept=".xlsx,.xls,.csv"
         onChange={handleImportExcel}
+        className="hidden"
+      />
+      <input
+        ref={usedNumbersInputRef}
+        type="file"
+        accept=".txt"
+        onChange={handleUploadUsedNumbers}
         className="hidden"
       />
 
@@ -500,6 +557,35 @@ export default function Contacts() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                {/* Upload Used Numbers */}
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => usedNumbersInputRef.current?.click()}
+                >
+                  <Ban className="h-4 w-4" />
+                  Números Usados
+                  {usedNumbers.size > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {usedNumbers.size}
+                    </Badge>
+                  )}
+                </Button>
+
+                {usedNumbers.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setUsedNumbers(new Set());
+                      toast.success("Lista de números usados limpa");
+                    }}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Limpar usados
+                  </Button>
+                )}
 
                 {contacts.length > 0 && (
                   <>
@@ -731,9 +817,10 @@ export default function Contacts() {
       <ImportTxtWithVerificationDialog
         open={txtVerificationOpen}
         onOpenChange={setTxtVerificationOpen}
-        onImport={(contacts) => {
-          importContacts(contacts);
-          toast.success(`${contacts.length} contatos ativos adicionados!`);
+        onImport={(importedContacts) => {
+          const filtered = filterUsedNumbers(importedContacts);
+          importContacts(filtered);
+          toast.success(`${filtered.length} contatos adicionados!`);
         }}
       />
     </div>
