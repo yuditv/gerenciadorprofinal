@@ -38,37 +38,33 @@ export function ImportTxtWithVerificationDialog({
     const input = raw.trim();
     if (!input) return "";
 
-    const hasPlusPrefix = input.startsWith("+");
+    // Remove tudo que não for dígito
     let digits = input.replace(/\D/g, "");
 
-    if (!digits) return "";
+    if (!digits || digits.length < 4) return "";
 
     // Prefixo internacional com 00 (ex.: 0044...) -> 44...
-    if (digits.startsWith("00") && digits.length > 2) {
+    if (digits.startsWith("00") && digits.length > 4) {
       digits = digits.slice(2);
     }
 
-    // BR já completo
-    if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    // BR já completo (55 + DDD + número)
+    if (digits.startsWith("55") && digits.length >= 12 && digits.length <= 13) {
       return digits;
     }
 
-    // BR local sem DDI (10 ou 11 dígitos)
+    // BR local sem DDI (10 ou 11 dígitos) — adiciona 55
     if (digits.length === 10 || digits.length === 11) {
       return `55${digits}`;
     }
 
-    // Internacional/geral (aceita E.164 sem +, entre 8 e 15 dígitos)
-    if (digits.length >= 8 && digits.length <= 15) {
+    // BR com 8 ou 9 dígitos (sem DDD) — retorna como está
+    if (digits.length === 8 || digits.length === 9) {
       return digits;
     }
 
-    // Se veio com '+' mas ficou muito curto, ainda assim rejeita para evitar lixo
-    if (hasPlusPrefix && digits.length < 8) {
-      return "";
-    }
-
-    return "";
+    // Qualquer outro tamanho: aceitar como está (internacional, etc.)
+    return digits;
   };
 
   const parseText = (text: string): ParsedContact[] => {
@@ -81,7 +77,7 @@ export function ImportTxtWithVerificationDialog({
         const phone = normalizePhone(rawPhone);
         return { phone, name };
       })
-      .filter((c) => c.phone.length >= 8);
+      .filter((c) => c.phone.length >= 4);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
