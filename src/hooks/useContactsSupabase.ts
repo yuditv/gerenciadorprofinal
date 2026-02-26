@@ -374,35 +374,27 @@ export function useContactsSupabase() {
       return;
     }
 
-    const normalized = importedContacts
-      .map((c) => ({
-        user_id: userId,
-        name: c.name,
-        phone: c.phone,
-        email: c.email || null,
-        notes: c.notes || null,
-      }))
-      .filter((c) => Boolean(c.phone));
+    // Deduplicate by phone - keep last occurrence (latest data wins)
+    const deduped = new Map<string, typeof importedContacts[0]>();
+    for (const c of importedContacts) {
+      const phone = c.phone?.replace(/\D/g, '') || '';
+      if (phone.length >= 10) {
+        deduped.set(phone, { ...c, phone });
+      }
+    }
 
-    // Fetch existing by phone (we want to UPDATE existing, not create duplicates)
-    const phones = Array.from(new Set(normalized.map((c) => c.phone)));
-    const { data: existingRows, error: existingErr } = await (supabase as any)
-      .from("contacts")
-      .select("id, phone")
-      .eq("user_id", userId)
-      .in("phone", phones);
-    if (existingErr) throw existingErr;
-    const existingByPhone = new Map<string, { id: string; phone: string }>(
-      (existingRows || []).map((r: any) => [r.phone, { id: r.id, phone: r.phone }])
-    );
+    const normalized = Array.from(deduped.values()).map((c) => ({
+      user_id: userId,
+      name: c.name || "Sem nome",
+      phone: c.phone,
+      email: c.email || null,
+      notes: c.notes || null,
+    }));
 
-    const toUpdate = normalized.filter((c) => existingByPhone.has(c.phone));
-    const toInsert = normalized.filter((c) => !existingByPhone.has(c.phone));
-
-    // Insert/update in smaller batches to avoid timeouts and limits
-    const batchSize = 100;
-    let totalProcessed = 0;
-    let failedBatches = 0;
+    if (normalized.length === 0) {
+      toast.error("Nenhum contato válido encontrado");
+      return;
+    }
 
     // Set initial progress
     setImportProgress({
@@ -411,97 +403,135 @@ export function useContactsSupabase() {
       isImporting: true,
     });
 
-    // 1) Update existing
-    for (let i = 0; i < toUpdate.length; i += batchSize) {
-      const batch = toUpdate.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
-      
+    // Fetch existing phones in chunks (PostgREST has URL size limits for .in())
+    const phones = normalized.map((c) => c.phone);
+    const lookupChunkSize = 500;
+    const existingPhones = new Set<string>();
+    
+    for (let i = 0; i < phones.length; i += lookupChunkSize) {
+      const chunk = phones.slice(i, i + lookupChunkSize);
       try {
-        await Promise.all(
-          batch.map(async (c) => {
-            const existing = existingByPhone.get(c.phone);
-            if (!existing) return;
-            const { error } = await (supabase as any)
-              .from("contacts")
-              .update({
-                name: c.name,
-                email: c.email,
-                notes: c.notes,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", existing.id)
-              .eq("user_id", userId);
-            if (error) throw error;
-          })
-        );
-
-        // Also update conversations (Inbox)
-        await Promise.all(
-          batch.map(async (c) => {
-            const { error } = await (supabase as any)
-              .from("conversations")
-              .update({ contact_name: c.name, updated_at: new Date().toISOString() })
-              .eq("user_id", userId)
-              .eq("phone", c.phone);
-            if (error) throw error;
-          })
-        );
-
-        totalProcessed += batch.length;
-        
-        // Update progress after each batch
-        setImportProgress({
-          current: totalProcessed,
-          total: normalized.length,
-          isImporting: true,
-        });
-
-        // Small delay to avoid rate limiting
-        if (i + batchSize < toUpdate.length) {
-          await new Promise(resolve => setTimeout(resolve, 50));
+        const { data } = await (supabase as any)
+          .from("contacts")
+          .select("phone")
+          .eq("user_id", userId)
+          .in("phone", chunk);
+        if (data) {
+          for (const row of data) {
+            existingPhones.add(row.phone);
+          }
         }
-      } catch (error) {
-        console.error(`Erro no batch ${batchNumber}:`, error);
-        failedBatches++;
+      } catch (err) {
+        console.warn("Lookup chunk failed, treating as new:", err);
       }
     }
 
-    // 2) Insert new
-    for (let i = 0; i < toInsert.length; i += batchSize) {
-      const batch = toInsert.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
+    const toUpdate = normalized.filter((c) => existingPhones.has(c.phone));
+    const toInsert = normalized.filter((c) => !existingPhones.has(c.phone));
 
-      try {
+    const insertBatchSize = 200;
+    const updateBatchSize = 50;
+    let totalProcessed = 0;
+    let failedCount = 0;
+
+    // Helper: retry a batch operation up to 3 times
+    const withRetry = async (fn: () => Promise<void>, retries = 3) => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          await fn();
+          return true;
+        } catch (err) {
+          if (attempt === retries) {
+            console.error("Batch failed after retries:", err);
+            return false;
+          }
+          await new Promise(r => setTimeout(r, 200 * attempt));
+        }
+      }
+      return false;
+    };
+
+    // 1) Update existing contacts in sequential batches
+    for (let i = 0; i < toUpdate.length; i += updateBatchSize) {
+      const batch = toUpdate.slice(i, i + updateBatchSize);
+      
+      const success = await withRetry(async () => {
+        // Update each contact individually (no bulk update in Supabase by phone)
+        for (const c of batch) {
+          const { error } = await (supabase as any)
+            .from("contacts")
+            .update({
+              name: c.name,
+              email: c.email,
+              notes: c.notes,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId)
+            .eq("phone", c.phone);
+          if (error) throw error;
+        }
+      });
+
+      if (success) {
+        totalProcessed += batch.length;
+      } else {
+        failedCount += batch.length;
+      }
+
+      setImportProgress({
+        current: totalProcessed + failedCount,
+        total: normalized.length,
+        isImporting: true,
+      });
+
+      // Yield to UI and avoid rate limiting
+      await new Promise(r => setTimeout(r, 30));
+    }
+
+    // 2) Insert new contacts in batches
+    for (let i = 0; i < toInsert.length; i += insertBatchSize) {
+      const batch = toInsert.slice(i, i + insertBatchSize);
+
+      const success = await withRetry(async () => {
         const { error } = await (supabase as any).from("contacts").insert(batch);
         if (error) throw error;
+      });
 
-        // Update conversations (Inbox)
-        await Promise.all(
-          batch.map(async (c) => {
-            const { error } = await (supabase as any)
-              .from("conversations")
-              .update({ contact_name: c.name, updated_at: new Date().toISOString() })
-              .eq("user_id", userId)
-              .eq("phone", c.phone);
+      if (!success) {
+        // Try smaller sub-batches
+        const subSize = 50;
+        for (let j = 0; j < batch.length; j += subSize) {
+          const subBatch = batch.slice(j, j + subSize);
+          const subSuccess = await withRetry(async () => {
+            const { error } = await (supabase as any).from("contacts").insert(subBatch);
             if (error) throw error;
-          })
-        );
-
-        totalProcessed += batch.length;
-
-        setImportProgress({
-          current: totalProcessed,
-          total: normalized.length,
-          isImporting: true,
-        });
-
-        if (i + batchSize < toInsert.length) {
-          await new Promise(resolve => setTimeout(resolve, 50));
+          });
+          if (subSuccess) {
+            totalProcessed += subBatch.length;
+          } else {
+            // Try individual inserts as last resort
+            for (const contact of subBatch) {
+              try {
+                const { error } = await (supabase as any).from("contacts").insert(contact);
+                if (error) throw error;
+                totalProcessed++;
+              } catch {
+                failedCount++;
+              }
+            }
+          }
         }
-      } catch (error) {
-        console.error(`Erro no batch (insert) ${batchNumber}:`, error);
-        failedBatches++;
+      } else {
+        totalProcessed += batch.length;
       }
+
+      setImportProgress({
+        current: totalProcessed + failedCount,
+        total: normalized.length,
+        isImporting: true,
+      });
+
+      await new Promise(r => setTimeout(r, 30));
     }
 
     // Reset progress
@@ -513,10 +543,10 @@ export function useContactsSupabase() {
 
     await fetchContacts();
     
-    if (failedBatches > 0) {
-      toast.warning(`Importação concluída: ${totalProcessed} contatos processados, ${failedBatches} batches falharam`);
+    if (failedCount > 0) {
+      toast.warning(`Importação concluída: ${totalProcessed.toLocaleString()} importados, ${failedCount.toLocaleString()} falharam`);
     } else {
-      toast.success(`${totalProcessed} contato(s) importado(s) com sucesso!`);
+      toast.success(`${totalProcessed.toLocaleString()} contato(s) importado(s) com sucesso!`);
     }
   };
 
