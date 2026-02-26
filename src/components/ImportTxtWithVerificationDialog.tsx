@@ -21,7 +21,7 @@ interface ParsedContact {
 interface ImportTxtWithVerificationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (contacts: Array<{ name: string; phone: string }>) => Promise<void> | void;
+  onImport: (contacts: Array<{ name: string; phone: string }>) => void;
 }
 
 export function ImportTxtWithVerificationDialog({
@@ -34,50 +34,17 @@ export function ImportTxtWithVerificationDialog({
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
 
-  const normalizePhone = (raw: string): string => {
-    const input = raw.trim();
-    if (!input) return "";
-
-    // Remove tudo que não for dígito
-    let digits = input.replace(/\D/g, "");
-
-    if (!digits || digits.length < 4) return "";
-
-    // Prefixo internacional com 00 (ex.: 0044...) -> 44...
-    if (digits.startsWith("00") && digits.length > 4) {
-      digits = digits.slice(2);
-    }
-
-    // BR já completo (55 + DDD + número)
-    if (digits.startsWith("55") && digits.length >= 12 && digits.length <= 13) {
-      return digits;
-    }
-
-    // BR local sem DDI (10 ou 11 dígitos) — adiciona 55
-    if (digits.length === 10 || digits.length === 11) {
-      return `55${digits}`;
-    }
-
-    // BR com 8 ou 9 dígitos (sem DDD) — retorna como está
-    if (digits.length === 8 || digits.length === 9) {
-      return digits;
-    }
-
-    // Qualquer outro tamanho: aceitar como está (internacional, etc.)
-    return digits;
-  };
-
   const parseText = (text: string): ParsedContact[] => {
-    const lines = text.split(/\r?\n/).filter(line => line.trim());
-    return lines
-      .map((line) => {
-        const parts = line.split(/[,;\t]/).map((p) => p.trim());
-        const rawPhone = parts[0] || "";
-        const name = parts[1] || undefined;
-        const phone = normalizePhone(rawPhone);
-        return { phone, name };
-      })
-      .filter((c) => c.phone.length >= 4);
+    const lines = text.split('\n').filter(line => line.trim());
+    return lines.map(line => {
+      const parts = line.split(/[,;\t]/).map(p => p.trim());
+      let phone = parts[0]?.replace(/\D/g, '') || '';
+      const name = parts[1] || undefined;
+      if (phone.length >= 10 && phone.length <= 11 && !phone.startsWith('55')) {
+        phone = '55' + phone;
+      }
+      return { phone, name };
+    }).filter(c => c.phone.length >= 10);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,14 +72,11 @@ export function ImportTxtWithVerificationDialog({
 
     setLoading(true);
     try {
-      await onImport(parsedContacts.map(c => ({
+      onImport(parsedContacts.map(c => ({
         name: c.name || "Sem nome",
         phone: c.phone,
       })));
       handleClose();
-    } catch (error) {
-      console.error("Error importing contacts from TXT:", error);
-      toast.error("Falha ao importar contatos");
     } finally {
       setLoading(false);
     }

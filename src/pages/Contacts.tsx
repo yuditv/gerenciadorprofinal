@@ -32,23 +32,7 @@ import { motion } from "framer-motion";
 import { ImportTxtWithVerificationDialog } from "@/components/ImportTxtWithVerificationDialog";
 
 export default function Contacts() {
-  const {
-    contacts,
-    isLoading,
-    userId,
-    isConfigured,
-    importProgress,
-    addContact,
-    updateContact,
-    deleteContact,
-    importContacts,
-    clearAllContacts,
-    getContactCount,
-    loadMoreContacts,
-    pagination,
-    hasInitialLoad,
-    refetch,
-  } = useContactsSupabase();
+  const { contacts, isLoading, userId, isConfigured, importProgress, addContact, updateContact, deleteContact, importContacts, clearAllContacts, getContactCount, refetch } = useContactsSupabase();
   const { sentContacts, getSentContactCount } = useSentContacts();
   const [formOpen, setFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -151,20 +135,7 @@ export default function Contacts() {
       getContactCount().then(setContactCount);
       getSentContactCount().then(setSentContactCount);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
-
-  // Auto-carregar todas as páginas para garantir lista completa na tela
-  useEffect(() => {
-    if (!userId || !hasInitialLoad || !pagination.hasMore || isLoading) return;
-
-    const timer = window.setTimeout(() => {
-      loadMoreContacts();
-    }, 300);
-
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, hasInitialLoad, pagination.hasMore, pagination.page, isLoading]);
+  }, [userId, contacts.length, sentContacts.length, getContactCount, getSentContactCount]);
 
   const handleSubmit = (data: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
     if (editingContact) {
@@ -220,7 +191,7 @@ export default function Contacts() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
         const imported = JSON.parse(content);
@@ -239,7 +210,8 @@ export default function Contacts() {
           return;
         }
 
-        await importContacts(validContacts);
+        importContacts(validContacts);
+        toast.success(`${validContacts.length} contato(s) importado(s) com sucesso!`);
       } catch (error) {
         console.error("Error parsing JSON:", error);
         toast.error("Erro ao ler arquivo JSON");
@@ -257,7 +229,7 @@ export default function Contacts() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
@@ -318,7 +290,8 @@ export default function Contacts() {
           return;
         }
 
-        await importContacts(importedContacts);
+        importContacts(importedContacts);
+        toast.success(`${importedContacts.length} contato(s) importado(s) com sucesso!`);
       } catch (error) {
         console.error("Error parsing Excel/CSV:", error);
         toast.error("Erro ao ler arquivo. Verifique o formato.");
@@ -590,7 +563,7 @@ export default function Contacts() {
                       Nenhum contato encontrado para "{searchQuery}"
                     </p>
                   ) : (
-                    filteredContacts.map((contact, index) => (
+                    filteredContacts.slice(0, 100).map((contact, index) => (
                       <motion.div
                         key={contact.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -633,6 +606,11 @@ export default function Contacts() {
                         </div>
                       </motion.div>
                     ))
+                  )}
+                  {filteredContacts.length > 100 && (
+                    <p className="text-center text-sm text-muted-foreground py-3">
+                      Mostrando 100 de {filteredContacts.length} contatos. Use a busca para filtrar.
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -753,8 +731,9 @@ export default function Contacts() {
       <ImportTxtWithVerificationDialog
         open={txtVerificationOpen}
         onOpenChange={setTxtVerificationOpen}
-        onImport={async (contacts) => {
-          await importContacts(contacts);
+        onImport={(contacts) => {
+          importContacts(contacts);
+          toast.success(`${contacts.length} contatos ativos adicionados!`);
         }}
       />
     </div>
