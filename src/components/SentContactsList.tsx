@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useSentContacts, SentContact } from '@/hooks/useSentContacts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   RefreshCw, 
   Trash2, 
@@ -28,13 +29,15 @@ import {
   User, 
   Calendar,
   Loader2,
-  ChevronDown
+  ChevronDown,
+  Upload
 } from 'lucide-react';
 
 export function SentContactsList() {
   const { 
     sentContacts, 
     isLoading, 
+    userId,
     restoreContact, 
     restoreAllContacts, 
     clearAllSentContacts,
@@ -45,6 +48,8 @@ export function SentContactsList() {
   const [displayLimit, setDisplayLimit] = useState(50);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const filteredContacts = sentContacts.filter(contact => {
     if (!searchQuery.trim()) return true;
@@ -73,6 +78,54 @@ export function SentContactsList() {
       await clearAllSentContacts();
     } finally {
       setIsClearing(false);
+    }
+  };
+
+  const handleUploadUsedNumbers = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !userId) return;
+
+    setIsUploading(true);
+    try {
+      const text = await file.text();
+      const lines = text.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+      
+      // Extract phone numbers (digits only, min 8 digits)
+      const phones = lines
+        .map(line => line.replace(/\D/g, ''))
+        .filter(p => p.length >= 8);
+
+      if (phones.length === 0) {
+        toast.error('Nenhum número válido encontrado no arquivo');
+        return;
+      }
+
+      // Insert in batches
+      const batchSize = 100;
+      let inserted = 0;
+      for (let i = 0; i < phones.length; i += batchSize) {
+        const batch = phones.slice(i, i + batchSize).map(phone => ({
+          user_id: userId,
+          name: phone,
+          phone,
+          sent_at: new Date().toISOString(),
+        }));
+        const { error } = await (supabase as any).from('sent_contacts').insert(batch);
+        if (error) {
+          console.error('Error inserting batch:', error);
+        } else {
+          inserted += batch.length;
+        }
+      }
+
+      toast.success(`${inserted} número(s) adicionado(s) aos contatos enviados`);
+      refetch();
+    } catch (error) {
+      console.error('Error uploading used numbers:', error);
+      toast.error('Erro ao importar números');
+    } finally {
+      setIsUploading(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = '';
     }
   };
 
@@ -116,6 +169,15 @@ export function SentContactsList() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Hidden upload input */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept=".txt,.csv"
+          onChange={handleUploadUsedNumbers}
+          className="hidden"
+        />
+
         {/* Search and Actions */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
@@ -129,6 +191,19 @@ export function SentContactsList() {
           </div>
           
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => uploadInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              Importar Usados
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button 
