@@ -32,7 +32,7 @@ import { motion } from "framer-motion";
 import { ImportTxtWithVerificationDialog } from "@/components/ImportTxtWithVerificationDialog";
 
 export default function Contacts() {
-  const { contacts, isLoading, userId, isConfigured, importProgress, addContact, updateContact, deleteContact, importContacts, clearAllContacts, getContactCount, refetch } = useContactsSupabase();
+  const { contacts, isLoading, userId, isConfigured, importProgress, addContact, updateContact, deleteContact, importContacts, clearAllContacts, getContactCount, refetch, pagination, loadMoreContacts } = useContactsSupabase();
   const { sentContacts, getSentContactCount } = useSentContacts();
   const [formOpen, setFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -191,7 +191,7 @@ export default function Contacts() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const imported = JSON.parse(content);
@@ -210,8 +210,7 @@ export default function Contacts() {
           return;
         }
 
-        importContacts(validContacts);
-        toast.success(`${validContacts.length} contato(s) importado(s) com sucesso!`);
+        await importContacts(validContacts);
       } catch (error) {
         console.error("Error parsing JSON:", error);
         toast.error("Erro ao ler arquivo JSON");
@@ -229,7 +228,7 @@ export default function Contacts() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array" });
@@ -290,8 +289,7 @@ export default function Contacts() {
           return;
         }
 
-        importContacts(importedContacts);
-        toast.success(`${importedContacts.length} contato(s) importado(s) com sucesso!`);
+        await importContacts(importedContacts);
       } catch (error) {
         console.error("Error parsing Excel/CSV:", error);
         toast.error("Erro ao ler arquivo. Verifique o formato.");
@@ -557,13 +555,22 @@ export default function Contacts() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                <div
+                  className="space-y-2 max-h-[400px] overflow-y-auto pr-2"
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+                    if (isNearBottom && pagination.hasMore && !isLoading) {
+                      void loadMoreContacts();
+                    }
+                  }}
+                >
                   {filteredContacts.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">
                       Nenhum contato encontrado para "{searchQuery}"
                     </p>
                   ) : (
-                    filteredContacts.slice(0, 100).map((contact, index) => (
+                    filteredContacts.map((contact, index) => (
                       <motion.div
                         key={contact.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -607,9 +614,9 @@ export default function Contacts() {
                       </motion.div>
                     ))
                   )}
-                  {filteredContacts.length > 100 && (
+                  {searchQuery.trim() === "" && pagination.hasMore && (
                     <p className="text-center text-sm text-muted-foreground py-3">
-                      Mostrando 100 de {filteredContacts.length} contatos. Use a busca para filtrar.
+                      Role para baixo para carregar mais contatos...
                     </p>
                   )}
                 </div>
