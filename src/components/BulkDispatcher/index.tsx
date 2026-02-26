@@ -18,6 +18,7 @@ import { useBulkDispatchContext } from '@/contexts/BulkDispatchContext';
 import { useDispatchConfigs } from '@/hooks/useDispatchConfigs';
 import { useWhatsAppInstances } from '@/hooks/useWhatsAppInstances';
 import { useContactsSupabase } from '@/hooks/useContactsSupabase';
+import { useSentContacts } from '@/hooks/useSentContacts';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Contact, SavedContact } from './ContactsManager';
@@ -84,6 +85,12 @@ export function BulkDispatcher() {
     searchContactsRemote,
     deleteContactsByPhones,
   } = useContactsSupabase();
+
+  const {
+    restoreAllContacts,
+    getSentContactCount,
+    sentContacts: sentContactsList,
+  } = useSentContacts();
 
   const [savedContacts, setSavedContacts] = useState<SavedContact[]>([]);
   const [shouldLoadSavedContacts, setShouldLoadSavedContacts] = useState(false);
@@ -671,6 +678,11 @@ export function BulkDispatcher() {
           hasMoreSavedContacts={savedContactsPagination.hasMore}
           onLoadMoreSavedContacts={loadMoreContacts}
           onSearchSavedContacts={searchContactsRemote}
+          sentContactsCount={sentContactsList.length}
+          onResetContacts={async () => {
+            await restoreAllContacts();
+            refreshSavedContacts();
+          }}
           // Timing props
           minDelay={config.minDelay}
           maxDelay={config.maxDelay}

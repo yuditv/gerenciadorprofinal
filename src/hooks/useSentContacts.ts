@@ -233,9 +233,9 @@ export function useSentContacts() {
     }
 
     try {
-      const batchSize = 100;
+      const batchSize = 500;
       
-      // Insert back to contacts
+      // Upsert back to contacts to avoid duplicates
       for (let i = 0; i < sentContacts.length; i += batchSize) {
         const batch = sentContacts.slice(i, i + batchSize).map(c => ({
           user_id: userId,
@@ -245,7 +245,9 @@ export function useSentContacts() {
           notes: c.notes || null,
         }));
         
-        const { error } = await (supabase as any).from("contacts").insert(batch);
+        const { error } = await (supabase as any)
+          .from("contacts")
+          .upsert(batch, { onConflict: "user_id,phone" });
         if (error) console.error("Error restoring batch:", error);
       }
 
@@ -257,8 +259,9 @@ export function useSentContacts() {
 
       if (deleteError) throw deleteError;
 
+      const count = sentContacts.length;
       setSentContacts([]);
-      toast.success(`${sentContacts.length} contato(s) restaurado(s)!`);
+      toast.success(`${count} contato(s) restaurado(s) para Meus Contatos!`);
     } catch (error) {
       console.error("Error restoring all contacts:", error);
       toast.error("Erro ao restaurar contatos");
