@@ -34,15 +34,39 @@ export function ImportTxtWithVerificationDialog({
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
 
+  const normalizePhone = (raw: string): string => {
+    // Remove leading + then strip all non-digits
+    let digits = raw.startsWith('+') ? raw.slice(1) : raw;
+    digits = digits.replace(/\D/g, '');
+    
+    if (digits.length === 0) return '';
+    
+    // Already BR with country code (12-13 digits starting with 55)
+    if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+      return digits;
+    }
+    
+    // Brazilian local: 10 digits (landline) or 11 digits (mobile)
+    if (digits.length >= 10 && digits.length <= 11) {
+      return '55' + digits;
+    }
+    
+    // International or already formatted (12+ digits)
+    if (digits.length >= 12) {
+      return digits;
+    }
+    
+    // Short numbers - return as-is
+    return digits;
+  };
+
   const parseText = (text: string): ParsedContact[] => {
-    const lines = text.split('\n').filter(line => line.trim());
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
     return lines.map(line => {
       const parts = line.split(/[,;\t]/).map(p => p.trim());
-      let phone = parts[0]?.replace(/\D/g, '') || '';
+      const rawPhone = parts[0] || '';
       const name = parts[1] || undefined;
-      if (phone.length >= 10 && phone.length <= 11 && !phone.startsWith('55')) {
-        phone = '55' + phone;
-      }
+      const phone = normalizePhone(rawPhone);
       return { phone, name };
     }).filter(c => c.phone.length >= 10);
   };
