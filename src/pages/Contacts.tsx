@@ -32,7 +32,23 @@ import { motion } from "framer-motion";
 import { ImportTxtWithVerificationDialog } from "@/components/ImportTxtWithVerificationDialog";
 
 export default function Contacts() {
-  const { contacts, isLoading, userId, isConfigured, importProgress, addContact, updateContact, deleteContact, importContacts, clearAllContacts, getContactCount, refetch } = useContactsSupabase();
+  const {
+    contacts,
+    isLoading,
+    userId,
+    isConfigured,
+    importProgress,
+    addContact,
+    updateContact,
+    deleteContact,
+    importContacts,
+    clearAllContacts,
+    getContactCount,
+    loadMoreContacts,
+    pagination,
+    hasInitialLoad,
+    refetch,
+  } = useContactsSupabase();
   const { sentContacts, getSentContactCount } = useSentContacts();
   const [formOpen, setFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -136,6 +152,17 @@ export default function Contacts() {
       getSentContactCount().then(setSentContactCount);
     }
   }, [userId, contacts.length, sentContacts.length, getContactCount, getSentContactCount]);
+
+  // Auto-carregar todas as páginas para garantir lista completa na tela
+  useEffect(() => {
+    if (!userId || !hasInitialLoad || !pagination.hasMore || isLoading) return;
+
+    const timer = window.setTimeout(() => {
+      loadMoreContacts();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [userId, hasInitialLoad, pagination.hasMore, pagination.page, isLoading, loadMoreContacts]);
 
   const handleSubmit = (data: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
     if (editingContact) {
@@ -561,7 +588,7 @@ export default function Contacts() {
                       Nenhum contato encontrado para "{searchQuery}"
                     </p>
                   ) : (
-                    filteredContacts.slice(0, 100).map((contact, index) => (
+                    filteredContacts.map((contact, index) => (
                       <motion.div
                         key={contact.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -604,11 +631,6 @@ export default function Contacts() {
                         </div>
                       </motion.div>
                     ))
-                  )}
-                  {filteredContacts.length > 100 && (
-                    <p className="text-center text-sm text-muted-foreground py-3">
-                      Mostrando 100 de {filteredContacts.length} contatos. Use a busca para filtrar.
-                    </p>
                   )}
                 </div>
               </CardContent>
