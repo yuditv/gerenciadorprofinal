@@ -240,7 +240,7 @@ serve(async (req: Request): Promise<Response> => {
             console.error("UAZAPI init failed with status:", initResponse.status, "body:", initText);
           }
         } catch (e) {
-          console.error("UAZAPI init error:", e?.message || e);
+          console.error("UAZAPI init error:", (e as Error)?.message || e);
         }
       }
 
