@@ -890,11 +890,41 @@ INSTRUÇÕES IMPORTANTES:
             }
           }
 
+          // ============ LEARNED KNOWLEDGE FROM AI LEARNING ENGINE ============
+          let learnedKnowledgeContext = '';
+          if (!promptOnly) {
+            try {
+              let knowledgeQuery = supabaseAdmin
+                .from('ai_knowledge_base')
+                .select('question_pattern, best_answer, category, confidence_score')
+                .eq('user_id', userId)
+                .gte('confidence_score', 0.4)
+                .order('confidence_score', { ascending: false })
+                .limit(20);
+
+              if (agentId) {
+                knowledgeQuery = knowledgeQuery.or(`agent_id.eq.${agentId},agent_id.is.null`);
+              }
+
+              const { data: learnedKnowledge } = await knowledgeQuery;
+
+              if (learnedKnowledge && learnedKnowledge.length > 0) {
+                learnedKnowledgeContext = `\n\n## CONHECIMENTO APRENDIDO (Base de aprendizado contínuo)\n\nUse estes conhecimentos como referência para responder perguntas similares. Adapte a linguagem ao contexto atual:\n\n`;
+                for (const k of learnedKnowledge) {
+                  learnedKnowledgeContext += `**[${k.category}]** Pergunta: ${k.question_pattern}\nResposta ideal: ${k.best_answer}\n\n`;
+                }
+                console.log(`[${VERSION}] Injected ${learnedKnowledge.length} learned knowledge items into prompt`);
+              }
+            } catch (knowledgeErr) {
+              console.error('[ai-agent-chat] Error fetching learned knowledge:', knowledgeErr);
+            }
+          }
+
           // In prompt-only mode we enforce EXACTLY the system prompt.
           // Otherwise we enrich with rules/knowledge/memory.
           const enrichedSystemPrompt = promptOnly
             ? baseSystemPrompt
-            : (baseSystemPrompt + antiHallucinationRules + cannedResponsesContext + clientContext);
+            : (baseSystemPrompt + antiHallucinationRules + cannedResponsesContext + learnedKnowledgeContext + clientContext);
 
           // Build messages array with system prompt and (optional) history
           const messages: AIMessage[] = [{ role: 'system', content: enrichedSystemPrompt }];

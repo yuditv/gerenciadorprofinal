@@ -368,6 +368,33 @@ SEMPRE use 'save_customer_info' quando o cliente mencionar:
 - Seu plano/serviço (info_type: "plan")
 - Seu dispositivo (info_type: "device")
 - Qualquer preferência ou informação relevante (info_type: "preference" ou "note")`;
+
+    // ============ INJECT LEARNED KNOWLEDGE ============
+    try {
+      let knowledgeQuery = supabaseAdmin
+        .from('ai_knowledge_base')
+        .select('question_pattern, best_answer, category, confidence_score')
+        .eq('user_id', conversation.owner_id)
+        .gte('confidence_score', 0.4)
+        .order('confidence_score', { ascending: false })
+        .limit(15);
+
+      if (agentId) {
+        knowledgeQuery = knowledgeQuery.or(`agent_id.eq.${agentId},agent_id.is.null`);
+      }
+
+      const { data: learnedKnowledge } = await knowledgeQuery;
+
+      if (learnedKnowledge && learnedKnowledge.length > 0) {
+        systemPrompt += `\n\n## CONHECIMENTO APRENDIDO (Base de aprendizado contínuo)\n\nUse estes conhecimentos como referência para responder perguntas similares:\n\n`;
+        for (const k of learnedKnowledge) {
+          systemPrompt += `**[${k.category}]** P: ${k.question_pattern}\nR: ${k.best_answer}\n\n`;
+        }
+        console.log(`[${VERSION}] Injected ${learnedKnowledge.length} learned knowledge items`);
+      }
+    } catch (knowledgeErr) {
+      console.error(`[${VERSION}] Error fetching learned knowledge:`, knowledgeErr);
+    }
     
     messages.push({ role: 'system', content: systemPrompt });
 
