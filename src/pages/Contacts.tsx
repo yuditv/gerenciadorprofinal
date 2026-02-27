@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Trash2, FileText, Users, Download, Upload, FileSpreadsheet, Database, CloudOff, Cloud, RefreshCw, ArrowRightLeft, Pencil, Search, Phone, Mail, Send, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, FileText, Users, Download, Upload, FileSpreadsheet, Database, CloudOff, Cloud, RefreshCw, ArrowRightLeft, Pencil, Search, Phone, Mail, Send, ShieldCheck, PhoneOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -30,10 +30,13 @@ import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { motion } from "framer-motion";
 import { ImportTxtWithVerificationDialog } from "@/components/ImportTxtWithVerificationDialog";
+import { InactiveContactsList } from "@/components/InactiveContactsList";
+import { useInactiveContacts } from "@/hooks/useInactiveContacts";
 
 export default function Contacts() {
   const { contacts, isLoading, userId, isConfigured, importProgress, addContact, updateContact, deleteContact, importContacts, clearAllContacts, getContactCount, refetch, pagination, loadMoreContacts } = useContactsSupabase();
   const { sentContacts, getSentContactCount } = useSentContacts();
+  const { getInactiveCount } = useInactiveContacts();
   const [formOpen, setFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Contact | null>(null);
@@ -43,6 +46,7 @@ export default function Contacts() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [contactCount, setContactCount] = useState(0);
   const [sentContactCount, setSentContactCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("contacts");
   const [txtVerificationOpen, setTxtVerificationOpen] = useState(false);
@@ -134,8 +138,9 @@ export default function Contacts() {
     if (userId) {
       getContactCount().then(setContactCount);
       getSentContactCount().then(setSentContactCount);
+      getInactiveCount().then(setInactiveCount);
     }
-  }, [userId, contacts.length, sentContacts.length, getContactCount, getSentContactCount]);
+  }, [userId, contacts.length, sentContacts.length, getContactCount, getSentContactCount, getInactiveCount]);
 
   const handleSubmit = (data: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
     if (editingContact) {
@@ -411,7 +416,7 @@ export default function Contacts() {
 
       {/* Tabs for contacts and sent contacts */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="contacts" className="gap-2">
             <Database className="h-4 w-4" />
             Meus Contatos
@@ -421,9 +426,16 @@ export default function Contacts() {
           </TabsTrigger>
           <TabsTrigger value="sent" className="gap-2">
             <Send className="h-4 w-4" />
-            Contatos Enviados
+            Enviados
             <span className="text-xs bg-muted px-1.5 py-0.5 rounded-full">
               {sentContactCount.toLocaleString()}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="inactive" className="gap-2">
+            <PhoneOff className="h-4 w-4" />
+            Inativos
+            <span className="text-xs bg-muted px-1.5 py-0.5 rounded-full">
+              {inactiveCount.toLocaleString()}
             </span>
           </TabsTrigger>
         </TabsList>
@@ -644,6 +656,11 @@ export default function Contacts() {
         {/* Contatos Enviados Tab */}
         <TabsContent value="sent">
           <SentContactsList />
+        </TabsContent>
+
+        {/* Contatos Inativos Tab */}
+        <TabsContent value="inactive">
+          <InactiveContactsList />
         </TabsContent>
       </Tabs>
 

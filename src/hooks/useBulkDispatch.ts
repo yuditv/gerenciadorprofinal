@@ -658,17 +658,26 @@ export function useBulkDispatch() {
             
             if (isInvalidNumber) {
               failedCount++;
-              addLog('error', `✗ ${contact.name || phone}: Número sem WhatsApp — removido do sistema`);
+              addLog('error', `✗ ${contact.name || phone}: Número sem WhatsApp — movido para inativos`);
               
-              // Remove ONLY truly invalid numbers from database
+              // Move to inactive_contacts instead of deleting
               try {
+                await (supabase as any).from('inactive_contacts').upsert({
+                  user_id: user.id,
+                  name: contact.name || 'Sem nome',
+                  phone: phone,
+                  original_phone: contact.phone,
+                  reason: 'no_whatsapp',
+                }, { onConflict: 'user_id,phone' });
+                
+                // Then remove from contacts
                 if (contact.originalId) {
                   await (supabase as any).from('contacts').delete().eq('id', contact.originalId).eq('user_id', user.id);
                 } else {
                   await (supabase as any).from('contacts').delete().eq('phone', phone).eq('user_id', user.id);
                 }
               } catch (delErr) {
-                console.error('Error deleting invalid contact:', delErr);
+                console.error('Error moving invalid contact to inactive:', delErr);
               }
               
               sendSuccess = false;
