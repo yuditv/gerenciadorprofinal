@@ -469,6 +469,109 @@ export type Database = {
           },
         ]
       }
+      ai_knowledge_base: {
+        Row: {
+          agent_id: string | null
+          best_answer: string
+          category: string
+          confidence_score: number | null
+          context_tags: string[] | null
+          created_at: string
+          id: string
+          last_used_at: string | null
+          question_pattern: string
+          source_message_ids: string[] | null
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          best_answer: string
+          category?: string
+          confidence_score?: number | null
+          context_tags?: string[] | null
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          question_pattern: string
+          source_message_ids?: string[] | null
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          best_answer?: string
+          category?: string
+          confidence_score?: number | null
+          context_tags?: string[] | null
+          created_at?: string
+          id?: string
+          last_used_at?: string | null
+          question_pattern?: string
+          source_message_ids?: string[] | null
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_knowledge_base_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_learning_sessions: {
+        Row: {
+          agent_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          knowledge_extracted: number | null
+          knowledge_updated: number | null
+          messages_analyzed: number | null
+          started_at: string
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          knowledge_extracted?: number | null
+          knowledge_updated?: number | null
+          messages_analyzed?: number | null
+          started_at?: string
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          knowledge_extracted?: number | null
+          knowledge_updated?: number | null
+          messages_analyzed?: number | null
+          started_at?: string
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_learning_sessions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_message_buffer: {
         Row: {
           agent_id: string | null
