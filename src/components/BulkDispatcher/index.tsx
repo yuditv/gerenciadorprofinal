@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,7 @@ export function BulkDispatcher() {
     hasInitialLoad: savedContactsInitialized,
     searchContactsRemote,
     deleteContactsByPhones,
+    userId,
   } = useContactsSupabase();
 
   const {
@@ -209,14 +211,44 @@ export function BulkDispatcher() {
         const results = await checkNumbers(instance.id, phones, true);
         
         if (results) {
+          const contactUpdates: Array<{ phone: string; name: string }> = [];
+          
           batch.forEach((contact, idx) => {
             const result = results.find(r => r.phone.includes(contact.phone.slice(-8)));
+            const discoveredName = result?.whatsappName || null;
+            
+            // If contact has no name but WhatsApp returned one, use it
+            const finalName = (!contact.name || contact.name.trim() === '') && discoveredName
+              ? discoveredName
+              : contact.name;
+            
+            // Track contacts that got a new name for DB update
+            if (discoveredName && (!contact.name || contact.name.trim() === '')) {
+              contactUpdates.push({ phone: contact.phone, name: discoveredName });
+            }
+            
             verified.push({
               ...contact,
+              name: finalName,
               isValid: result?.exists ?? undefined,
-              whatsappName: result?.whatsappName
+              whatsappName: discoveredName
             } as Contact);
           });
+          
+          // Update names in contacts database for those that got a WhatsApp name
+          if (contactUpdates.length > 0) {
+            for (const upd of contactUpdates) {
+              try {
+                await (supabase as any)
+                  .from('contacts')
+                  .update({ name: upd.name })
+                  .eq('phone', upd.phone)
+                  .eq('user_id', userId);
+              } catch (e) {
+                console.error('Error updating contact name:', e);
+              }
+            }
+          }
         } else {
           batch.forEach(contact => {
             verified.push({ ...contact, isValid: undefined } as Contact);
@@ -251,7 +283,7 @@ export function BulkDispatcher() {
       title: 'Verificação Concluída',
       description: `✅ ${validContacts.length} válidos mantidos • ❌ ${invalidContacts.length} inválidos removidos do sistema${unknownContacts.length > 0 ? ` • ⚠️ ${unknownContacts.length} não verificados` : ''}`,
     });
-  }, [contacts, config.instanceIds, instances, checkNumbers, toast, handleContactsChange, deleteContactsByPhones]);
+  }, [contacts, config.instanceIds, instances, checkNumbers, toast, handleContactsChange, deleteContactsByPhones, userId]);
 
   const handleMessagesChange = useCallback((messages: DispatchMessage[]) => {
     updateConfig({ messages });
