@@ -13,6 +13,7 @@ import { ComposerStudio } from './ComposerStudio';
 import { PhonePreview } from './PhonePreview';
 import { BottomPanel } from './BottomPanel';
 import { DispatchProgress } from './DispatchProgress';
+import { DispatchSummaryDialog } from './DispatchSummaryDialog';
 import { ConfigManager } from './ConfigManager';
 import { DispatchMessage } from '@/hooks/useBulkDispatch';
 import { useBulkDispatchContext } from '@/contexts/BulkDispatchContext';
@@ -330,6 +331,7 @@ export function BulkDispatcher() {
   const prevProgressRef = useRef({ isRunning: false, sent: 0 });
   const dispatchStartTimeRef = useRef<number | null>(null);
   const [messagesPerMinute, setMessagesPerMinute] = useState<number | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   // Track dispatch start time and calculate speed
   useEffect(() => {
@@ -422,6 +424,9 @@ export function BulkDispatcher() {
           });
         }, 250);
       }
+
+      // Show summary dialog
+      setShowSummary(true);
     }
 
     prevProgressRef.current = { isRunning: progress.isRunning, sent: progress.sent };
@@ -849,6 +854,11 @@ export function BulkDispatcher() {
           </div>
         </div>
       </motion.div>
+      <DispatchSummaryDialog
+        open={showSummary}
+        onOpenChange={setShowSummary}
+        progress={progress}
+      />
     </div>
   );
 }
