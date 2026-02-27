@@ -1,8 +1,9 @@
-import { Bot } from "lucide-react";
+import { Bot, Brain } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AIAgentAdmin } from "@/components/AIAgentAdmin";
 import { AIAgentChat } from "@/components/AIAgentChat";
+import { AILearningPanel } from "@/components/AILearningPanel";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { PlanLimitAlert } from "@/components/PlanLimitAlert";
 import { motion } from "framer-motion";
@@ -80,6 +81,10 @@ export default function AIAgent() {
                 <Bot className="h-4 w-4" />
                 Testar Chat
               </TabsTrigger>
+              <TabsTrigger value="learning" className="gap-2">
+                <Brain className="h-4 w-4" />
+                Aprendizado IA
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="manage">
@@ -98,6 +103,10 @@ export default function AIAgent() {
                   <AIAgentChat />
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="learning">
+              <AILearningPanel />
             </TabsContent>
           </Tabs>
         </motion.div>

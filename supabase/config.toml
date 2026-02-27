@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.infinitepay-webhook]
 verify_jwt = false
+
+[functions.ai-learning-engine]
+verify_jwt = false
