@@ -607,21 +607,44 @@ export function useBulkDispatch() {
                 });
               })();
 
-          // Check for invalid number (don't retry these)
+          // Check for invalid number vs connection errors
           if (error) {
-            // Try to detect invalid number from error context or data
             const errorMsg = typeof error === 'object' && error?.message ? error.message : String(error);
             const responseData = data as any;
-            const isInvalidNumber = responseData?.invalid_number || 
+            
+            // Detect connection/network errors — these should NOT remove the contact
+            const isConnectionError = 
+              errorMsg.toLowerCase().includes('network') ||
+              errorMsg.toLowerCase().includes('timeout') ||
+              errorMsg.toLowerCase().includes('conexão') ||
+              errorMsg.toLowerCase().includes('connection') ||
+              errorMsg.toLowerCase().includes('fetch') ||
+              errorMsg.toLowerCase().includes('econnrefused') ||
+              errorMsg.toLowerCase().includes('socket') ||
+              errorMsg.toLowerCase().includes('abort') ||
+              errorMsg.toLowerCase().includes('unavailable') ||
+              errorMsg.toLowerCase().includes('502') ||
+              errorMsg.toLowerCase().includes('503') ||
+              errorMsg.toLowerCase().includes('504') ||
+              errorMsg.toLowerCase().includes('instance') ||
+              !responseData; // No response data usually means connection issue
+            
+            // Only consider invalid if explicitly flagged AND not a connection error
+            const isInvalidNumber = !isConnectionError && (
+              responseData?.invalid_number === true || 
               errorMsg.toLowerCase().includes('not on whatsapp') ||
               errorMsg.toLowerCase().includes('não está no whatsapp') ||
-              errorMsg.toLowerCase().includes('não encontrado no whatsapp');
+              errorMsg.toLowerCase().includes('não encontrado no whatsapp') ||
+              errorMsg.toLowerCase().includes('number does not exist') ||
+              errorMsg.toLowerCase().includes('número inativo') ||
+              errorMsg.toLowerCase().includes('not registered')
+            );
             
             if (isInvalidNumber) {
               failedCount++;
-              addLog('error', `✗ ${contact.name || phone}: Número inválido — removido do sistema`);
+              addLog('error', `✗ ${contact.name || phone}: Número sem WhatsApp — removido do sistema`);
               
-              // Remove invalid number from contacts database permanently
+              // Remove ONLY truly invalid numbers from database
               try {
                 if (contact.originalId) {
                   await (supabase as any).from('contacts').delete().eq('id', contact.originalId).eq('user_id', user.id);
@@ -635,6 +658,8 @@ export function useBulkDispatch() {
               sendSuccess = false;
               break; // Skip retries for invalid numbers
             }
+            
+            // Connection/other errors — throw to trigger retry (contact stays)
             throw error;
           }
 
