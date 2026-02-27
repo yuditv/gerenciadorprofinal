@@ -494,19 +494,26 @@ export function useBulkDispatch() {
     let messagesSinceLastPause = 0;
 
     for (let i = startIndex; i < contacts.length; i++) {
+      try {
       currentIndexRef.current = i;
       
-      // Persist state for recovery
-      persistCurrentState(
-        contacts,
-        config,
-        i,
-        sentCount,
-        failedCount,
-        archivedCount,
-        historyRecordId || undefined,
-        progress.logs
-      );
+      // Persist state for recovery (use functional getter for fresh logs)
+      try {
+        let currentLogs: DispatchProgress['logs'] = [];
+        setProgress(prev => { currentLogs = prev.logs; return prev; });
+        persistCurrentState(
+          contacts,
+          config,
+          i,
+          sentCount,
+          failedCount,
+          archivedCount,
+          historyRecordId || undefined,
+          currentLogs
+        );
+      } catch (persistErr) {
+        console.warn('Failed to persist dispatch state:', persistErr);
+      }
 
       // Check if aborted
       if (abortControllerRef.current?.signal.aborted) {
@@ -546,8 +553,17 @@ export function useBulkDispatch() {
       }
 
       // Select and process message
-      const selectedMessage = selectRandomMessage();
-      const processedMessage = processMessage(selectedMessage.content, contact);
+      let selectedMessage: ReturnType<typeof selectRandomMessage>;
+      let processedMessage: string;
+      try {
+        selectedMessage = selectRandomMessage();
+        processedMessage = processMessage(selectedMessage.content, contact);
+      } catch (msgErr) {
+        console.error('Error processing message:', msgErr);
+        addLog('error', `✗ Erro ao processar mensagem para ${contact.name || contact.phone}: ${msgErr instanceof Error ? msgErr.message : 'Erro desconhecido'}`);
+        failedCount++;
+        continue;
+      }
 
       // Format phone number
       let phone = contact.phone.replace(/\D/g, '');
@@ -725,12 +741,16 @@ export function useBulkDispatch() {
           }
 
           // Log to notification history
-          await supabase.from('notification_history').insert({
-            user_id: user.id,
-            notification_type: 'bulk_whatsapp',
-            status: 'sent',
-            subject: `Disparo em massa`
-          });
+          try {
+            await supabase.from('notification_history').insert({
+              user_id: user.id,
+              notification_type: 'bulk_whatsapp',
+              status: 'sent',
+              subject: `Disparo em massa`
+            });
+          } catch (notifErr) {
+            console.warn('Failed to log notification:', notifErr);
+          }
 
           break; // Exit retry loop on success
 
@@ -747,16 +767,20 @@ export function useBulkDispatch() {
           addLog('error', `✗ ${contact.name || phone}: ${err.message} (após ${MAX_RETRIES} tentativas)`);
           
           // Persist state after failure
-          persistCurrentState(
-            contacts,
-            config,
-            i + 1,
-            sentCount,
-            failedCount,
-            archivedCount,
-            historyRecordId || undefined,
-            progress.logs
-          );
+          try {
+            persistCurrentState(
+              contacts,
+              config,
+              i + 1,
+              sentCount,
+              failedCount,
+              archivedCount,
+              historyRecordId || undefined,
+              []
+            );
+          } catch (persistErr2) {
+            console.warn('Failed to persist after failure:', persistErr2);
+          }
         }
       }
 
@@ -793,6 +817,17 @@ export function useBulkDispatch() {
       if (i < contacts.length - 1) {
         const delay = getRandomDelay();
         await sleep(delay);
+      }
+
+      } catch (loopErr) {
+        // GLOBAL SAFETY NET: Catch ANY unhandled error in the loop iteration
+        // This prevents the entire dispatch from crashing silently
+        console.error(`[BulkDispatch] Unhandled error at contact ${i}:`, loopErr);
+        failedCount++;
+        addLog('error', `✗ Erro inesperado no contato ${i + 1}: ${loopErr instanceof Error ? loopErr.message : 'Erro desconhecido'}. Continuando...`);
+        
+        // Small delay before continuing to next contact
+        await sleep(2000);
       }
     }
 
