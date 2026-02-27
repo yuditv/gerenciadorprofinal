@@ -21,6 +21,7 @@ import { useDispatchConfigs } from '@/hooks/useDispatchConfigs';
 import { useWhatsAppInstances } from '@/hooks/useWhatsAppInstances';
 import { useContactsSupabase } from '@/hooks/useContactsSupabase';
 import { useSentContacts } from '@/hooks/useSentContacts';
+import { useInactiveContacts } from '@/hooks/useInactiveContacts';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Contact, SavedContact } from './ContactsManager';
@@ -88,6 +89,8 @@ export function BulkDispatcher() {
     deleteContactsByPhones,
     userId,
   } = useContactsSupabase();
+
+  const { moveToInactive } = useInactiveContacts();
 
   const {
     restoreAllContacts,
@@ -268,11 +271,16 @@ export function BulkDispatcher() {
     const invalidContacts = verified.filter(c => c.isValid === false);
     const unknownContacts = verified.filter(c => c.isValid === undefined);
 
-    // Delete invalid contacts from database
+    // Move invalid contacts to inactive instead of deleting
     if (invalidContacts.length > 0) {
       const invalidPhones = invalidContacts.map(c => c.phone);
+      await moveToInactive(invalidContacts.map(c => ({
+        name: c.name || 'Sem nome',
+        phone: c.phone,
+        reason: 'no_whatsapp',
+      })));
       const deletedCount = await deleteContactsByPhones(invalidPhones);
-      console.log(`Deleted ${deletedCount} invalid contacts from database`);
+      console.log(`Moved ${deletedCount} invalid contacts to inactive`);
     }
 
     // Keep only valid + unknown contacts in dispatch list (remove invalid)
@@ -282,9 +290,9 @@ export function BulkDispatcher() {
     
     toast({
       title: 'Verificação Concluída',
-      description: `✅ ${validContacts.length} válidos mantidos • ❌ ${invalidContacts.length} inválidos removidos do sistema${unknownContacts.length > 0 ? ` • ⚠️ ${unknownContacts.length} não verificados` : ''}`,
+      description: `✅ ${validContacts.length} válidos mantidos • ❌ ${invalidContacts.length} movidos para inativos${unknownContacts.length > 0 ? ` • ⚠️ ${unknownContacts.length} não verificados` : ''}`,
     });
-  }, [contacts, config.instanceIds, instances, checkNumbers, toast, handleContactsChange, deleteContactsByPhones, userId]);
+  }, [contacts, config.instanceIds, instances, checkNumbers, toast, handleContactsChange, deleteContactsByPhones, moveToInactive, userId]);
 
   const handleMessagesChange = useCallback((messages: DispatchMessage[]) => {
     updateConfig({ messages });
