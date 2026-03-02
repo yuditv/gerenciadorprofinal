@@ -6,14 +6,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { 
   RefreshCw, Calendar, User, Phone, Mail, CreditCard, 
   Clock, ExternalLink, ShoppingBag, StickyNote, Shield,
-  AlertTriangle, CheckCircle
+  AlertTriangle, CheckCircle, Link2, Copy, Check
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { format, addMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -29,6 +31,8 @@ interface RenewalConfirmDialogProps {
 const STORE_URL = 'https://loja-oficial-nine.vercel.app/';
 
 export function RenewalConfirmDialog({ client, open, onOpenChange, onConfirm, getPlanName }: RenewalConfirmDialogProps) {
+  const [copiedRef, setCopiedRef] = useState(false);
+
   if (!client) return null;
 
   const status = getExpirationStatus(client.expiresAt);
@@ -36,6 +40,14 @@ export function RenewalConfirmDialog({ client, open, onOpenChange, onConfirm, ge
   const planName = getPlanName ? getPlanName(client.plan) : planLabels[client.plan];
   const duration = planDurations[client.plan];
   const newExpiresAt = addMonths(new Date(), duration);
+  const referralLink = `${STORE_URL}?ref=${client.referralCode}`;
+
+  const handleCopyReferral = () => {
+    navigator.clipboard.writeText(referralLink);
+    setCopiedRef(true);
+    toast.success('Link de indicação copiado!');
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
 
   const handleConfirm = () => {
     onConfirm(client.id);
@@ -187,6 +199,28 @@ export function RenewalConfirmDialog({ client, open, onOpenChange, onConfirm, ge
             </span>
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
           </a>
+
+          {/* Referral Link */}
+          <div className="p-3 rounded-lg bg-muted/50 border border-border/50 space-y-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-primary" />
+              🔗 Link de Indicação
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-background/50 rounded px-2 py-1.5 text-muted-foreground truncate border border-border/30">
+                {referralLink}
+              </code>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 border-primary/20"
+                onClick={handleCopyReferral}
+              >
+                {copiedRef ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copiedRef ? 'Copiado!' : 'Copiar'}
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Actions */}

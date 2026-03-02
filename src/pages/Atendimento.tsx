@@ -979,10 +979,11 @@ export default function Atendimento() {
           createdAt: new Date(),
           expiresAt: new Date(),
           renewalHistory: [],
-          serviceUsername: null,
-          servicePassword: null,
-          appName: null,
-          device: null
+           serviceUsername: null,
+           servicePassword: null,
+           appName: null,
+           device: null,
+           referralCode: '',
         } : null}
       />
 

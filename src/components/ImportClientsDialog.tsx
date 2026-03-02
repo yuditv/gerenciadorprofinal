@@ -291,6 +291,7 @@ export function ImportClientsDialog({ open, onOpenChange, onImport }: ImportClie
         servicePassword: null,
         appName: null,
         device: null,
+        referralCode: '',
       }));
 
       await onImport(clientsToImport);

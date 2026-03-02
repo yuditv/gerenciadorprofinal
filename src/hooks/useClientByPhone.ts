@@ -114,6 +114,7 @@ export function useClientByPhone(phone: string | null) {
         servicePassword: foundClient.service_password,
         appName: foundClient.app_name,
         device: foundClient.device,
+        referralCode: (foundClient as any).referral_code || '',
       };
 
       setClient(mappedClient);

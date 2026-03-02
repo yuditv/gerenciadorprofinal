@@ -35,6 +35,8 @@ export interface Client {
   // IPTV specific fields
   appName: string | null;
   device: string | null;
+  // Referral
+  referralCode: string;
 }
 
 export const planLabels: Record<PlanType, string> = {
