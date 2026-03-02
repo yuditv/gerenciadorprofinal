@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, DollarSign, Save, Bell, CreditCard, BellRing, Volume2 } from 'lucide-react';
+import { ArrowLeft, DollarSign, Save, Bell, BellRing, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { usePlanSettings, PlanSetting } from '@/hooks/usePlanSettings';
 import { RenewalReminderSettings } from '@/components/RenewalReminderSettings';
-import { SubscriptionReminderSettings } from '@/components/SubscriptionReminderSettings';
+
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
 import { CredentialsSettings } from '@/components/CredentialsSettings';
 import { NotificationSettingsCard } from '@/components/NotificationSettingsCard';
@@ -72,7 +72,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue={isAdmin ? "plans" : "notifications"} className="space-y-6">
-          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-6' : 'grid-cols-5'}`}>
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
             {isAdmin && (
               <TabsTrigger value="plans" className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
@@ -82,10 +82,6 @@ export default function Settings() {
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Clientes</span>
-            </TabsTrigger>
-            <TabsTrigger value="subscription-reminders" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              <span className="hidden sm:inline">Assinatura</span>
             </TabsTrigger>
             <TabsTrigger value="owner-notifications" className="flex items-center gap-2">
               <BellRing className="h-4 w-4" />
@@ -172,10 +168,6 @@ export default function Settings() {
             <RenewalReminderSettings />
           </TabsContent>
 
-          {/* Subscription Reminders Tab */}
-          <TabsContent value="subscription-reminders" className="space-y-6">
-            <SubscriptionReminderSettings />
-          </TabsContent>
 
           {/* Owner Notifications Tab */}
           <TabsContent value="owner-notifications" className="space-y-6">

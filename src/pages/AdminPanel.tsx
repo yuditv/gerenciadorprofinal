@@ -49,7 +49,8 @@ import {
   UserPlus,
   CreditCard,
   Pencil,
-  Server
+  Server,
+  Bell
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { UserPermissionsDialog } from "@/components/UserPermissionsDialog";
@@ -57,6 +58,7 @@ import { CreateUserDialog } from "@/components/CreateUserDialog";
 import { AdminSubscriptionManager } from "@/components/AdminSubscriptionManager";
 import { AdminEditUserDialog } from "@/components/AdminEditUserDialog";
 import { WhatsAppProvidersManager } from "@/components/WhatsAppProvidersManager";
+import { SubscriptionReminderSettings } from "@/components/SubscriptionReminderSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionPlan } from "@/types/subscription";
 import { format } from "date-fns";
@@ -267,6 +269,10 @@ export default function AdminPanel() {
             <TabsTrigger value="providers" className="data-[state=active]:bg-primary/20">
               <Server className="h-4 w-4 mr-2" />
               Provedores API
+            </TabsTrigger>
+            <TabsTrigger value="subscription-reminders" className="data-[state=active]:bg-primary/20">
+              <Bell className="h-4 w-4 mr-2" />
+              Lembretes
             </TabsTrigger>
           </TabsList>
 
@@ -658,6 +664,10 @@ export default function AdminPanel() {
 
           <TabsContent value="providers" className="space-y-6">
             <WhatsAppProvidersManager />
+          </TabsContent>
+
+          <TabsContent value="subscription-reminders" className="space-y-6">
+            <SubscriptionReminderSettings />
           </TabsContent>
         </Tabs>
       </div>
