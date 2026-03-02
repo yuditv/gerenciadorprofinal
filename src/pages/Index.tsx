@@ -21,6 +21,7 @@ import { PlanFilter } from '@/components/PlanFilter';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { ExpiringClientsAlert } from '@/components/ExpiringClientsAlert';
 import { RenewalHistoryDialog } from '@/components/RenewalHistoryDialog';
+import { RenewalConfirmDialog } from '@/components/RenewalConfirmDialog';
 import { ChangePlanDialog } from '@/components/ChangePlanDialog';
 import { NotificationHistoryDialog } from '@/components/NotificationHistoryDialog';
 import { ImportClientsDialog } from '@/components/ImportClientsDialog';
@@ -110,6 +111,8 @@ const Index = () => {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const [verifyWhatsAppOpen, setVerifyWhatsAppOpen] = useState(false);
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [renewClient2, setRenewClient2] = useState<Client | null>(null);
   const clientsPerPage = viewMode === 'grid' ? 12 : 20;
 
   // Show subscription dialog when trying to use blocked feature
@@ -163,11 +166,19 @@ const Index = () => {
     setWhatsappDialogOpen(true);
   };
 
-  const handleRenewClientClick = async (clientId: string) => {
+  const handleRenewClientClick = (clientId: string) => {
     if (!canEditClients) {
       showSubscriptionRequired();
       return;
     }
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setRenewClient2(client);
+      setRenewDialogOpen(true);
+    }
+  };
+
+  const handleConfirmRenewal = async (clientId: string) => {
     const result = await renewClient(clientId);
     if (result) {
       toast.success('Cliente renovado com sucesso!');
@@ -961,6 +972,14 @@ const Index = () => {
         open={verifyWhatsAppOpen}
         onOpenChange={setVerifyWhatsAppOpen}
         clients={clients}
+      />
+      {/* Renewal Confirm Dialog */}
+      <RenewalConfirmDialog
+        client={renewClient2}
+        open={renewDialogOpen}
+        onOpenChange={setRenewDialogOpen}
+        onConfirm={handleConfirmRenewal}
+        getPlanName={getPlanName}
       />
       </div>
     </>
