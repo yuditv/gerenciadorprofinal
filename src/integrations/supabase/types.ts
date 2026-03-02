@@ -1482,6 +1482,7 @@ export type Database = {
           notes: string | null
           plan: string
           price: number | null
+          referral_code: string
           service: string | null
           service_password: string | null
           service_username: string | null
@@ -1500,6 +1501,7 @@ export type Database = {
           notes?: string | null
           plan: string
           price?: number | null
+          referral_code?: string
           service?: string | null
           service_password?: string | null
           service_username?: string | null
@@ -1518,6 +1520,7 @@ export type Database = {
           notes?: string | null
           plan?: string
           price?: number | null
+          referral_code?: string
           service?: string | null
           service_password?: string | null
           service_username?: string | null

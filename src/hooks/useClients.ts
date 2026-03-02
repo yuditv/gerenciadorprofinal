@@ -22,6 +22,7 @@ interface DbClient {
   service_password: string | null;
   app_name: string | null;
   device: string | null;
+  referral_code: string;
 }
 
 interface DbRenewal {
@@ -98,6 +99,7 @@ export function useClients() {
       servicePassword: c.service_password,
       appName: c.app_name,
       device: c.device,
+      referralCode: c.referral_code,
     }));
 
     setClients(formattedClients);

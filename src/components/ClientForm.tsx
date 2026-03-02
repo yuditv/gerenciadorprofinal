@@ -230,6 +230,7 @@ export function ClientForm({ open, onOpenChange, onSubmit, initialData }: Client
       servicePassword: sanitizedPassword,
       appName: service === 'IPTV' ? sanitizedAppName : null,
       device: service === 'IPTV' ? sanitizedDevice : null,
+      referralCode: '',
     });
     onOpenChange(false);
   };

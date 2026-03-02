@@ -4,10 +4,11 @@ import { PlanBadge } from './PlanBadge';
 import { ExpirationBadge } from './ExpirationBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Pencil, Trash2, Calendar, RefreshCw, History, ArrowRightLeft, Bell, StickyNote, MessageSquare, Bot } from 'lucide-react';
+import { Phone, Mail, Pencil, Trash2, Calendar, RefreshCw, History, ArrowRightLeft, Bell, StickyNote, MessageSquare, Bot, Link2, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ClientCardProps {
   client: Client;
@@ -26,9 +27,18 @@ interface ClientCardProps {
 export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, onChangePlan, onViewNotifications, onSendEmail, onSendWhatsApp, onActivateAI, getPlanName }: ClientCardProps) {
   const whatsappLink = `https://wa.me/${client.whatsapp.replace(/\D/g, '')}`;
   const status = getExpirationStatus(client.expiresAt);
-   const needsAttention = status === 'expiring' || status === 'expired';
+  const needsAttention = status === 'expiring' || status === 'expired';
   const hasHistory = client.renewalHistory && client.renewalHistory.length > 0;
   const planName = getPlanName ? getPlanName(client.plan) : planLabels[client.plan];
+  const referralLink = `https://loja-oficial-nine.vercel.app/?ref=${client.referralCode}`;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyReferral = () => {
+    navigator.clipboard.writeText(referralLink);
+    setCopied(true);
+    toast.success('Link de indicação copiado!');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <Card className={cn(
@@ -210,6 +220,16 @@ export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, o
               Renovar
             </Button>
           </div>
+          {/* Referral Link */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-1.5 text-xs border-primary/20 hover:border-primary/40"
+            onClick={handleCopyReferral}
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Link2 className="h-3.5 w-3.5 text-primary" />}
+            🔗 {copied ? 'Link Copiado!' : 'Copiar Link de Indicação'}
+          </Button>
         </div>
       </CardContent>
     </Card>
