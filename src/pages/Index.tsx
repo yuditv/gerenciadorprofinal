@@ -57,6 +57,7 @@ import { getDaysUntilExpiration } from '@/types/client';
 import { supabase } from '@/integrations/supabase/client';
 import { useAIAgentPreferences } from '@/hooks/useAIAgentPreferences';
 import { activateAIForExpiredClient } from '@/lib/activateExpiredClientAI';
+import { useReferralClicks } from '@/hooks/useReferralClicks';
 
 const Index = () => {
   const { user } = useAuth();
@@ -67,6 +68,7 @@ const Index = () => {
   const { isActive, canAccessFeature } = useSubscription();
   const { isAdmin } = useUserPermissions();
   const { preferences: aiPrefs } = useAIAgentPreferences();
+  const { getClickCount } = useReferralClicks();
   const { 
     notifications, 
     unreadConversations, 
@@ -805,6 +807,7 @@ const Index = () => {
                       onSendWhatsApp={handleSendWhatsappClick}
                       onActivateAI={handleActivateAIForExpiredClient}
                       getPlanName={getPlanName}
+                      referralClickCount={getClickCount(client.id)}
                     />
                   </div>
                 ))}

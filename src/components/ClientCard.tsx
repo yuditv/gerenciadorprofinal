@@ -4,7 +4,7 @@ import { PlanBadge } from './PlanBadge';
 import { ExpirationBadge } from './ExpirationBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Pencil, Trash2, Calendar, RefreshCw, History, ArrowRightLeft, Bell, StickyNote, MessageSquare, Bot, Link2, Copy, Check } from 'lucide-react';
+import { Phone, Mail, Pencil, Trash2, Calendar, RefreshCw, History, ArrowRightLeft, Bell, StickyNote, MessageSquare, Bot, Link2, Copy, Check, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -22,9 +22,10 @@ interface ClientCardProps {
   onSendWhatsApp?: (client: Client) => void;
   onActivateAI?: (client: Client) => void;
   getPlanName?: (plan: string) => string;
+  referralClickCount?: number;
 }
 
-export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, onChangePlan, onViewNotifications, onSendEmail, onSendWhatsApp, onActivateAI, getPlanName }: ClientCardProps) {
+export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, onChangePlan, onViewNotifications, onSendEmail, onSendWhatsApp, onActivateAI, getPlanName, referralClickCount = 0 }: ClientCardProps) {
   const whatsappLink = `https://wa.me/${client.whatsapp.replace(/\D/g, '')}`;
   const status = getExpirationStatus(client.expiresAt);
   const needsAttention = status === 'expiring' || status === 'expired';
@@ -221,15 +222,21 @@ export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, o
             </Button>
           </div>
           {/* Referral Link */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-1.5 text-xs border-primary/20 hover:border-primary/40"
-            onClick={handleCopyReferral}
-          >
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Link2 className="h-3.5 w-3.5 text-primary" />}
-            🔗 {copied ? 'Link Copiado!' : 'Copiar Link de Indicação'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 gap-1.5 text-xs border-primary/20 hover:border-primary/40"
+              onClick={handleCopyReferral}
+            >
+              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Link2 className="h-3.5 w-3.5 text-primary" />}
+              🔗 {copied ? 'Link Copiado!' : 'Copiar Link de Indicação'}
+            </Button>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+              <Users className="h-3.5 w-3.5" />
+              {referralClickCount}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
