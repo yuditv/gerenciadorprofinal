@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.ai-learning-engine]
 verify_jwt = false
+
+[functions.track-referral]
+verify_jwt = false

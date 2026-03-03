@@ -3510,6 +3510,47 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_clicks: {
+        Row: {
+          clicked_at: string
+          client_id: string | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          referral_code: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          clicked_at?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          referral_code: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          clicked_at?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          referral_code?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_clicks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_codes: {
         Row: {
           code: string
