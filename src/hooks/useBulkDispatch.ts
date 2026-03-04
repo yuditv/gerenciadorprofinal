@@ -538,15 +538,25 @@ export function useBulkDispatch() {
       }
 
       const contact = contacts[i];
+      // Re-check instance status from the live list
       let instance = getNextInstance(selectedInstances);
       
       if (!instance) {
-        addLog('warning', '⚠️ Nenhuma instância disponível, aguardando 10s...');
-        await sleep(10000);
+        addLog('warning', '⚠️ Instância desconectada! Disparo pausado automaticamente.');
+        pausedRef.current = true;
+        setProgress(prev => ({ ...prev, isPaused: true }));
+        
+        // Wait for resume or abort
+        while (pausedRef.current) {
+          await sleep(1000);
+          if (abortControllerRef.current?.signal.aborted) break;
+        }
         if (abortControllerRef.current?.signal.aborted) break;
+        
+        // After resume, try again
         instance = getNextInstance(selectedInstances);
         if (!instance) {
-          addLog('error', 'Nenhuma instância disponível após retry');
+          addLog('error', 'Nenhuma instância disponível após retomar');
           failedCount++;
           continue;
         }
@@ -560,7 +570,7 @@ export function useBulkDispatch() {
         processedMessage = processMessage(selectedMessage.content, contact);
       } catch (msgErr) {
         console.error('Error processing message:', msgErr);
-        addLog('error', `✗ Erro ao processar mensagem para ${contact.name || contact.phone}: ${msgErr instanceof Error ? msgErr.message : 'Erro desconhecido'}`);
+          addLog('error', `✗ ${contact.phone}: Erro ao processar mensagem — ${msgErr instanceof Error ? msgErr.message : 'Erro desconhecido'}`);
         failedCount++;
         continue;
       }
@@ -573,7 +583,7 @@ export function useBulkDispatch() {
 
       setProgress(prev => ({
         ...prev,
-        currentContact: contact.name || phone,
+        currentContact: phone,
       }));
 
       // Retry logic: try up to 3 times before auto-pausing
@@ -658,7 +668,7 @@ export function useBulkDispatch() {
             
             if (isInvalidNumber) {
               failedCount++;
-              addLog('error', `✗ ${contact.name || phone}: Número sem WhatsApp — movido para inativos`);
+              addLog('error', `✗ ${phone}: Número sem WhatsApp — movido para inativos`);
               
               // Move to inactive_contacts instead of deleting
               try {
@@ -703,19 +713,19 @@ export function useBulkDispatch() {
                   instanceKey: instance.instance_key
                 }
               });
-              addLog('info', `📞 Ligação para ${contact.name || phone}`);
+              addLog('info', `📞 Ligação para ${phone}`);
             } catch (callErr) {
               console.error('Attention call failed:', callErr);
-              addLog('warning', `⚠️ Falha na ligação para ${contact.name || phone}`);
+              addLog('warning', `⚠️ Falha na ligação para ${phone}`);
             }
           }
           
           // Check if chat was archived successfully
           if (!interactiveMenu && config.autoArchive && data?.archived) {
             archivedCount++;
-            addLog('success', `✓ ${contact.name || phone} (arquivado)`);
+            addLog('success', `✓ ${phone} (arquivado)`);
           } else {
-            addLog('success', `✓ ${contact.name || phone}`);
+            addLog('success', `✓ ${phone}`);
           }
 
           // Move contact to sent_contacts (all contacts, not just saved ones)
@@ -765,15 +775,34 @@ export function useBulkDispatch() {
 
         } catch (err: any) {
           if (attempt < MAX_RETRIES) {
-            addLog('warning', `⚠️ Tentativa ${attempt}/${MAX_RETRIES} falhou para ${contact.name || phone}: ${err.message}. Retentando em 5s...`);
+            addLog('warning', `⚠️ Tentativa ${attempt}/${MAX_RETRIES} falhou para ${phone}: ${err.message}. Retentando em 5s...`);
             await sleep(5000);
             if (abortControllerRef.current?.signal.aborted) break;
             continue;
           }
 
-          // All retries exhausted - count as failure but DON'T auto-pause
+          // All retries exhausted - count as failure and move to inactive
           failedCount++;
-          addLog('error', `✗ ${contact.name || phone}: ${err.message} (após ${MAX_RETRIES} tentativas)`);
+          const errMsg = err.message || 'Erro desconhecido';
+          const isNumberError = errMsg.toLowerCase().includes('not on whatsapp') || 
+            errMsg.toLowerCase().includes('not registered') ||
+            errMsg.toLowerCase().includes('número');
+          const errorReason = isNumberError ? 'invalid_number' : 'connection_error';
+          addLog('error', `✗ ${phone}: ${isNumberError ? 'Número inválido/inexistente' : 'Erro de conexão'} — ${errMsg}`);
+          
+          // Move failed contacts to inactive
+          try {
+            await (supabase as any).from('inactive_contacts').upsert({
+              user_id: user!.id,
+              name: contact.name || 'Sem nome',
+              phone: phone,
+              original_phone: contact.phone,
+              reason: errorReason,
+              notes: errMsg,
+            }, { onConflict: 'user_id,phone' });
+          } catch (inactiveErr) {
+            console.error('Error moving to inactive:', inactiveErr);
+          }
           
           // Persist state after failure
           try {
@@ -833,7 +862,7 @@ export function useBulkDispatch() {
         // This prevents the entire dispatch from crashing silently
         console.error(`[BulkDispatch] Unhandled error at contact ${i}:`, loopErr);
         failedCount++;
-        addLog('error', `✗ Erro inesperado no contato ${i + 1}: ${loopErr instanceof Error ? loopErr.message : 'Erro desconhecido'}. Continuando...`);
+        addLog('error', `✗ ${contacts[i]?.phone || 'desconhecido'}: Erro inesperado — ${loopErr instanceof Error ? loopErr.message : 'Erro desconhecido'}`);
         
         // Small delay before continuing to next contact
         await sleep(2000);

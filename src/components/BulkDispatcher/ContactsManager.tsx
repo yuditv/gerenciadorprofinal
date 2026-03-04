@@ -263,16 +263,21 @@ export function ContactsManager({
 
   // Display contacts: use search results if searching, otherwise use local filter for small datasets
   const displayedSavedContacts = useMemo(() => {
+    let result: SavedContact[];
     // If server search returned results, use those
-    if (searchResults !== null) return searchResults;
-    
-    // For small datasets or no search, filter locally
-    if (!savedSearch.trim()) return savedContacts;
-    const search = savedSearch.toLowerCase();
-    return savedContacts.filter(c => 
-      c.name.toLowerCase().includes(search) ||
-      c.phone.includes(search)
-    );
+    if (searchResults !== null) {
+      result = searchResults;
+    } else if (!savedSearch.trim()) {
+      result = savedContacts;
+    } else {
+      const search = savedSearch.toLowerCase();
+      result = savedContacts.filter(c => 
+        c.name.toLowerCase().includes(search) ||
+        c.phone.includes(search)
+      );
+    }
+    // Limit to 50 contacts max for performance and select-all sanity
+    return result.slice(0, 50);
   }, [savedContacts, savedSearch, searchResults]);
 
   // Toggle contact selection
@@ -530,9 +535,9 @@ Exemplo:
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
                 {savedContactsTotal > 0 ? (
-                  <>Mostrando {savedContacts.length} de {savedContactsTotal} contato(s)</>
+                  <>Mostrando {displayedSavedContacts.length} de {savedContactsTotal} contato(s) (máx. 50)</>
                 ) : (
-                  <>{savedContacts.length} contato(s) salvos</>
+                  <>{displayedSavedContacts.length} contato(s) (máx. 50)</>
                 )}
               </span>
               {displayedSavedContacts.length > 0 && (
