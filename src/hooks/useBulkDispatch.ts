@@ -586,12 +586,10 @@ export function useBulkDispatch() {
         currentContact: phone,
       }));
 
-      // Retry logic: try up to 3 times before auto-pausing
-      const MAX_RETRIES = 3;
+      // Single attempt — no retries, move to next contact on failure
       let sendSuccess = false;
 
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
+      try {
           // If message is an interactive menu placeholder, send it via whatsapp-instances -> /send/menu
           const interactiveMenu = (!selectedMessage.mediaType || selectedMessage.mediaType === 'none')
             ? tryParseInteractiveMenu(processedMessage)
@@ -633,193 +631,136 @@ export function useBulkDispatch() {
                 });
               })();
 
-          // Check for invalid number vs connection errors
+          // Check for errors
           if (error) {
             const errorMsg = typeof error === 'object' && error?.message ? error.message : String(error);
             const responseData = data as any;
             
-            // Detect connection/network errors — these should NOT remove the contact
-            const isConnectionError = 
-              errorMsg.toLowerCase().includes('network') ||
-              errorMsg.toLowerCase().includes('timeout') ||
-              errorMsg.toLowerCase().includes('conexão') ||
-              errorMsg.toLowerCase().includes('connection') ||
-              errorMsg.toLowerCase().includes('fetch') ||
-              errorMsg.toLowerCase().includes('econnrefused') ||
-              errorMsg.toLowerCase().includes('socket') ||
-              errorMsg.toLowerCase().includes('abort') ||
-              errorMsg.toLowerCase().includes('unavailable') ||
-              errorMsg.toLowerCase().includes('502') ||
-              errorMsg.toLowerCase().includes('503') ||
-              errorMsg.toLowerCase().includes('504') ||
-              errorMsg.toLowerCase().includes('instance') ||
-              !responseData; // No response data usually means connection issue
-            
-            // Only consider invalid if explicitly flagged AND not a connection error
-            const isInvalidNumber = !isConnectionError && (
+            const isInvalidNumber = 
               responseData?.invalid_number === true || 
               errorMsg.toLowerCase().includes('not on whatsapp') ||
               errorMsg.toLowerCase().includes('não está no whatsapp') ||
               errorMsg.toLowerCase().includes('não encontrado no whatsapp') ||
               errorMsg.toLowerCase().includes('number does not exist') ||
               errorMsg.toLowerCase().includes('número inativo') ||
-              errorMsg.toLowerCase().includes('not registered')
-            );
+              errorMsg.toLowerCase().includes('not registered');
             
-            if (isInvalidNumber) {
-              failedCount++;
-              addLog('error', `✗ ${phone}: Número sem WhatsApp — movido para inativos`);
-              
-              // Move to inactive_contacts instead of deleting
-              try {
-                await (supabase as any).from('inactive_contacts').upsert({
-                  user_id: user.id,
-                  name: contact.name || 'Sem nome',
-                  phone: phone,
-                  original_phone: contact.phone,
-                  reason: 'no_whatsapp',
-                }, { onConflict: 'user_id,phone' });
-                
-                // Then remove from contacts
-                if (contact.originalId) {
-                  await (supabase as any).from('contacts').delete().eq('id', contact.originalId).eq('user_id', user.id);
-                } else {
-                  await (supabase as any).from('contacts').delete().eq('phone', phone).eq('user_id', user.id);
-                }
-              } catch (delErr) {
-                console.error('Error moving invalid contact to inactive:', delErr);
-              }
-              
-              sendSuccess = false;
-              break; // Skip retries for invalid numbers
-            }
+            const errorReason = isInvalidNumber ? 'no_whatsapp' : 'connection_error';
             
-            // Connection/other errors — throw to trigger retry (contact stays)
-            throw error;
-          }
-
-          sentCount++;
-          sendSuccess = true;
-          
-          // Make attention call if enabled
-          if (config.attentionCall && instance.instance_key) {
-            await sleep(config.attentionCallDelay * 1000);
+            failedCount++;
+            addLog('error', `✗ ${phone}: ${isInvalidNumber ? 'Número sem WhatsApp' : 'Erro de conexão'} — ${errorMsg}`);
             
+            // Move to inactive_contacts
             try {
-              await supabase.functions.invoke('whatsapp-instances', {
-                body: {
-                  action: 'make_call',
-                  phone,
-                  instanceKey: instance.instance_key
-                }
-              });
-              addLog('info', `📞 Ligação para ${phone}`);
-            } catch (callErr) {
-              console.error('Attention call failed:', callErr);
-              addLog('warning', `⚠️ Falha na ligação para ${phone}`);
+              await (supabase as any).from('inactive_contacts').upsert({
+                user_id: user.id,
+                name: contact.name || 'Sem nome',
+                phone: phone,
+                original_phone: contact.phone,
+                reason: errorReason,
+                notes: errorMsg,
+              }, { onConflict: 'user_id,phone' });
+              
+              // Remove from contacts
+              if (contact.originalId) {
+                await (supabase as any).from('contacts').delete().eq('id', contact.originalId).eq('user_id', user.id);
+              } else {
+                await (supabase as any).from('contacts').delete().eq('phone', phone).eq('user_id', user.id);
+              }
+            } catch (delErr) {
+              console.error('Error moving contact to inactive:', delErr);
             }
-          }
-          
-          // Check if chat was archived successfully
-          if (!interactiveMenu && config.autoArchive && data?.archived) {
-            archivedCount++;
-            addLog('success', `✓ ${phone} (arquivado)`);
+            
+            sendSuccess = false;
           } else {
-            addLog('success', `✓ ${phone}`);
-          }
-
-          // Move contact to sent_contacts (all contacts, not just saved ones)
-          try {
-            await (supabase as any).from('sent_contacts').upsert({
-              user_id: user.id,
-              name: contact.name || '',
-              phone: phone,
-              email: contact.email || null,
-              original_contact_id: contact.originalId || null,
-              dispatch_history_id: historyRecordId || null,
-              sent_at: new Date().toISOString(),
-            }, { onConflict: 'user_id,phone' });
-
-            // If it came from saved contacts, delete from contacts table
-            if (contact.originalId) {
-              await (supabase as any)
-                .from('contacts')
-                .delete()
-                .eq('id', contact.originalId)
-                .eq('user_id', user.id);
-            } else {
-              // Also delete by phone if exists in contacts
-              await (supabase as any)
-                .from('contacts')
-                .delete()
-                .eq('phone', phone)
-                .eq('user_id', user.id);
+            sentCount++;
+            sendSuccess = true;
+          
+            // Make attention call if enabled
+            if (config.attentionCall && instance.instance_key) {
+              await sleep(config.attentionCallDelay * 1000);
+              
+              try {
+                await supabase.functions.invoke('whatsapp-instances', {
+                  body: {
+                    action: 'make_call',
+                    phone,
+                    instanceKey: instance.instance_key
+                  }
+                });
+                addLog('info', `📞 Ligação para ${phone}`);
+              } catch (callErr) {
+                console.error('Attention call failed:', callErr);
+                addLog('warning', `⚠️ Falha na ligação para ${phone}`);
+              }
             }
-          } catch (moveErr) {
-            console.error('Error moving contact to sent:', moveErr);
+            
+            // Check if chat was archived successfully
+            if (!interactiveMenu && config.autoArchive && data?.archived) {
+              archivedCount++;
+              addLog('success', `✓ ${phone} (arquivado)`);
+            } else {
+              addLog('success', `✓ ${phone}`);
+            }
+
+            // Move contact to sent_contacts
+            try {
+              await (supabase as any).from('sent_contacts').upsert({
+                user_id: user.id,
+                name: contact.name || '',
+                phone: phone,
+                email: contact.email || null,
+                original_contact_id: contact.originalId || null,
+                dispatch_history_id: historyRecordId || null,
+                sent_at: new Date().toISOString(),
+              }, { onConflict: 'user_id,phone' });
+
+              if (contact.originalId) {
+                await (supabase as any).from('contacts').delete().eq('id', contact.originalId).eq('user_id', user.id);
+              } else {
+                await (supabase as any).from('contacts').delete().eq('phone', phone).eq('user_id', user.id);
+              }
+            } catch (moveErr) {
+              console.error('Error moving contact to sent:', moveErr);
+            }
+
+            // Log to notification history
+            try {
+              await supabase.from('notification_history').insert({
+                user_id: user.id,
+                notification_type: 'bulk_whatsapp',
+                status: 'sent',
+                subject: `Disparo em massa`
+              });
+            } catch (notifErr) {
+              console.warn('Failed to log notification:', notifErr);
+            }
           }
 
-          // Log to notification history
-          try {
-            await supabase.from('notification_history').insert({
-              user_id: user.id,
-              notification_type: 'bulk_whatsapp',
-              status: 'sent',
-              subject: `Disparo em massa`
-            });
-          } catch (notifErr) {
-            console.warn('Failed to log notification:', notifErr);
-          }
-
-          break; // Exit retry loop on success
-
-        } catch (err: any) {
-          if (attempt < MAX_RETRIES) {
-            addLog('warning', `⚠️ Tentativa ${attempt}/${MAX_RETRIES} falhou para ${phone}: ${err.message}. Retentando em 5s...`);
-            await sleep(5000);
-            if (abortControllerRef.current?.signal.aborted) break;
-            continue;
-          }
-
-          // All retries exhausted - count as failure and move to inactive
+      } catch (err: any) {
+          // Unexpected error — count as failure and move on
           failedCount++;
           const errMsg = err.message || 'Erro desconhecido';
-          const isNumberError = errMsg.toLowerCase().includes('not on whatsapp') || 
-            errMsg.toLowerCase().includes('not registered') ||
-            errMsg.toLowerCase().includes('número');
-          const errorReason = isNumberError ? 'invalid_number' : 'connection_error';
-          addLog('error', `✗ ${phone}: ${isNumberError ? 'Número inválido/inexistente' : 'Erro de conexão'} — ${errMsg}`);
+          addLog('error', `✗ ${phone}: Erro de conexão — ${errMsg}`);
           
-          // Move failed contacts to inactive
           try {
             await (supabase as any).from('inactive_contacts').upsert({
               user_id: user!.id,
               name: contact.name || 'Sem nome',
               phone: phone,
               original_phone: contact.phone,
-              reason: errorReason,
+              reason: 'connection_error',
               notes: errMsg,
             }, { onConflict: 'user_id,phone' });
           } catch (inactiveErr) {
             console.error('Error moving to inactive:', inactiveErr);
           }
           
-          // Persist state after failure
           try {
-            persistCurrentState(
-              contacts,
-              config,
-              i + 1,
-              sentCount,
-              failedCount,
-              archivedCount,
-              historyRecordId || undefined,
-              []
-            );
+            persistCurrentState(contacts, config, i + 1, sentCount, failedCount, archivedCount, historyRecordId || undefined, []);
           } catch (persistErr2) {
             console.warn('Failed to persist after failure:', persistErr2);
           }
-        }
       }
 
       if (abortControllerRef.current?.signal.aborted) break;
