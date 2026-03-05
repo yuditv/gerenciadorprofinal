@@ -141,8 +141,7 @@ export function FloatingDispatchPanel() {
                   <ScrollArea className="h-[160px] rounded-xl border border-border bg-background/40">
                     <div className="p-2 space-y-1">
                       {progress.logs
-                        .slice(-30)
-                        .reverse()
+                        .slice(0, 30)
                         .map((log, idx) => (
                           <div
                             key={`${log.time.getTime()}-${idx}`}

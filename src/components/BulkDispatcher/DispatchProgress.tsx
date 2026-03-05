@@ -249,7 +249,7 @@ export function DispatchProgress({
             <ScrollArea className="h-[140px] rounded-xl bg-background/50 border border-white/10">
               <div className="p-3 space-y-1">
                 <AnimatePresence mode="popLayout">
-                  {progress.logs.slice(-20).reverse().map((log, index) => (
+                  {progress.logs.slice(0, 20).map((log, index) => (
                     <motion.div
                       key={`${log.time.getTime()}-${index}`}
                       initial={{ opacity: 0, x: -10 }}
