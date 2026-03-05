@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { 
   RefreshCw, Calendar, User, Phone, Mail, CreditCard, 
   Clock, ExternalLink, ShoppingBag, StickyNote, Shield,
-  AlertTriangle, CheckCircle, Link2, Copy, Check
+  AlertTriangle, CheckCircle, Link2, Copy, Check, MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, addMonths } from 'date-fns';
@@ -29,6 +29,7 @@ interface RenewalConfirmDialogProps {
 }
 
 const STORE_URL = 'https://loja-oficial-nine.vercel.app/';
+const WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029VaiMJxt8F2pDwXgnbY2r';
 
 export function RenewalConfirmDialog({ client, open, onOpenChange, onConfirm, getPlanName }: RenewalConfirmDialogProps) {
   const [copiedRef, setCopiedRef] = useState(false);
@@ -198,6 +199,20 @@ export function RenewalConfirmDialog({ client, open, onOpenChange, onConfirm, ge
               🛒 Acessar Loja Oficial
             </span>
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </a>
+
+          {/* WhatsApp Channel Link */}
+          <a
+            href={WHATSAPP_CHANNEL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 hover:border-emerald-500/40 transition-colors group"
+          >
+            <MessageSquare className="h-4 w-4 text-emerald-500" />
+            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors flex-1">
+              📢 Canal de Atualizações no WhatsApp
+            </span>
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
           </a>
 
           {/* Referral Link */}
