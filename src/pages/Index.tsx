@@ -58,6 +58,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAIAgentPreferences } from '@/hooks/useAIAgentPreferences';
 import { activateAIForExpiredClient } from '@/lib/activateExpiredClientAI';
 import { useReferralClicks } from '@/hooks/useReferralClicks';
+import { useRenewalButtonSettings } from '@/hooks/useRenewalButtonSettings';
 
 const Index = () => {
   const { user } = useAuth();
@@ -69,6 +70,7 @@ const Index = () => {
   const { isAdmin } = useUserPermissions();
   const { preferences: aiPrefs } = useAIAgentPreferences();
   const { getClickCount } = useReferralClicks();
+  const { settings: renewalBtnSettings } = useRenewalButtonSettings();
   const { 
     notifications, 
     unreadConversations, 
@@ -174,10 +176,38 @@ const Index = () => {
       return;
     }
     const client = clients.find(c => c.id === clientId);
-    if (client) {
+    if (!client) return;
+
+    // Admin always sees the full dialog
+    if (isAdmin) {
       setRenewClient2(client);
       setRenewDialogOpen(true);
+      return;
     }
+
+    // Normal users use their configured action
+    const actionType = renewalBtnSettings.actionType;
+
+    if (actionType === 'link' && renewalBtnSettings.customLink) {
+      window.open(renewalBtnSettings.customLink, '_blank');
+      return;
+    }
+
+    if (actionType === 'whatsapp') {
+      const phone = client.whatsapp.replace(/\D/g, '');
+      const planName = getPlanName ? getPlanName(client.plan) : client.plan;
+      const message = renewalBtnSettings.whatsappMessage
+        .replace(/{nome}/g, client.name)
+        .replace(/{plano}/g, planName)
+        .replace(/{valor}/g, client.price !== null ? `R$ ${client.price.toFixed(2)}` : '')
+        .replace(/{vencimento}/g, format(client.expiresAt, 'dd/MM/yyyy'));
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+      return;
+    }
+
+    // Default: show dialog
+    setRenewClient2(client);
+    setRenewDialogOpen(true);
   };
 
   const handleConfirmRenewal = async (clientId: string) => {
@@ -808,6 +838,7 @@ const Index = () => {
                       onActivateAI={handleActivateAIForExpiredClient}
                       getPlanName={getPlanName}
                       referralClickCount={getClickCount(client.id)}
+                      renewButtonText={isAdmin ? 'Renovar' : renewalBtnSettings.buttonText}
                     />
                   </div>
                 ))}

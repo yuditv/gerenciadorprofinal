@@ -23,9 +23,10 @@ interface ClientCardProps {
   onActivateAI?: (client: Client) => void;
   getPlanName?: (plan: string) => string;
   referralClickCount?: number;
+  renewButtonText?: string;
 }
 
-export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, onChangePlan, onViewNotifications, onSendEmail, onSendWhatsApp, onActivateAI, getPlanName, referralClickCount = 0 }: ClientCardProps) {
+export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, onChangePlan, onViewNotifications, onSendEmail, onSendWhatsApp, onActivateAI, getPlanName, referralClickCount = 0, renewButtonText = 'Renovar' }: ClientCardProps) {
   const whatsappLink = `https://wa.me/${client.whatsapp.replace(/\D/g, '')}`;
   const status = getExpirationStatus(client.expiresAt);
   const needsAttention = status === 'expiring' || status === 'expired';
@@ -218,7 +219,7 @@ export function ClientCard({ client, onEdit, onDelete, onRenew, onViewHistory, o
               onClick={() => onRenew(client.id)}
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Renovar
+              {renewButtonText}
             </Button>
           </div>
           {/* Referral Link */}

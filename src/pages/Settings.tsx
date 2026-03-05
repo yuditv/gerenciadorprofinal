@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import { usePlanSettings, PlanSetting } from '@/hooks/usePlanSettings';
 import { RenewalReminderSettings } from '@/components/RenewalReminderSettings';
+import { RenewalButtonSettingsCard } from '@/components/RenewalButtonSettingsCard';
 
 import { OwnerNotificationSettings } from '@/components/OwnerNotificationSettings';
 import { CredentialsSettings } from '@/components/CredentialsSettings';
@@ -166,6 +167,7 @@ export default function Settings() {
           {/* Client Notifications Tab */}
           <TabsContent value="notifications" className="space-y-6">
             <RenewalReminderSettings />
+            {!isAdmin && <RenewalButtonSettingsCard />}
           </TabsContent>
 
 

@@ -3688,6 +3688,39 @@ export type Database = {
         }
         Relationships: []
       }
+      renewal_button_settings: {
+        Row: {
+          action_type: string
+          button_text: string
+          created_at: string
+          custom_link: string | null
+          id: string
+          updated_at: string
+          user_id: string
+          whatsapp_message: string | null
+        }
+        Insert: {
+          action_type?: string
+          button_text?: string
+          created_at?: string
+          custom_link?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+          whatsapp_message?: string | null
+        }
+        Update: {
+          action_type?: string
+          button_text?: string
+          created_at?: string
+          custom_link?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+          whatsapp_message?: string | null
+        }
+        Relationships: []
+      }
       renewal_history: {
         Row: {
           client_id: string
