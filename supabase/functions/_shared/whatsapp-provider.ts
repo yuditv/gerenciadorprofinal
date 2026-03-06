@@ -211,14 +211,20 @@ export function sendMediaBody(
       };
     case "uazapi":
     case "custom":
-    default:
-      return {
+    default: {
+      const body: Record<string, unknown> = {
         number: phone,
         file: mediaUrl,
         type: mediaType,
-        caption: caption || "",
-        fileName: fileName || "",
       };
+      if (caption) {
+        body.text = caption;
+      }
+      if (fileName) {
+        body.docName = fileName;
+      }
+      return body;
+    }
   }
 }
 
