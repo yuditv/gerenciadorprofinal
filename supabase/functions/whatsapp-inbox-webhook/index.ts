@@ -1780,6 +1780,45 @@ serve(async (req: Request) => {
       });
     }
 
+    // ===== AUTO ADD CLIENT SYSTEM =====
+    // Detect messages sent BY the user to themselves with client registration triggers
+    if (fromMe && savedMessage) {
+      const msgText = (message || caption || '').trim();
+      const lowerMsg = msgText.toLowerCase();
+      
+      // Trigger keywords: messages starting with #cliente, /addcliente, adicionar cliente, novo cliente
+      const autoAddTriggers = ['#cliente', '/addcliente', '/novocliente', 'adicionar cliente', 'novo cliente', '#addcliente'];
+      const shouldAutoAdd = autoAddTriggers.some(trigger => lowerMsg.startsWith(trigger));
+      
+      if (shouldAutoAdd) {
+        console.log('[Inbox Webhook] Auto-add client trigger detected in fromMe message');
+        try {
+          const supabaseUrlForAdd = Deno.env.get('SUPABASE_URL') || '';
+          const supabaseServiceKeyForAdd = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+          
+          // Fire and forget - don't block the webhook response
+          fetch(`${supabaseUrlForAdd}/functions/v1/auto-add-client`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKeyForAdd}`
+            },
+            body: JSON.stringify({
+              userId: instance.user_id,
+              message: msgText,
+              instanceId: instance.id,
+              conversationId: conversation.id,
+              phone: normalizedPhone
+            })
+          });
+          
+          console.log('[Inbox Webhook] Auto-add client function triggered');
+        } catch (e) {
+          console.error('[Inbox Webhook] Error triggering auto-add-client:', e);
+        }
+      }
+    }
+
     // ===== OWNER NOTIFICATION SYSTEM =====
     // Only trigger for INCOMING messages (not fromMe)
     if (!fromMe && savedMessage) {
