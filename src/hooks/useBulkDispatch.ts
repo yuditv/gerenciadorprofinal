@@ -636,14 +636,73 @@ export function useBulkDispatch() {
             const errorMsg = typeof error === 'object' && error?.message ? error.message : String(error);
             const responseData = data as any;
             
+            // Detect instance disconnection errors — STOP immediately
+            const errorLower = errorMsg.toLowerCase();
+            const isInstanceDisconnected = 
+              errorLower.includes('disconnected') ||
+              errorLower.includes('desconectad') ||
+              errorLower.includes('not connected') ||
+              errorLower.includes('não conectad') ||
+              errorLower.includes('instance not found') ||
+              errorLower.includes('instância não encontrada') ||
+              errorLower.includes('session not found') ||
+              errorLower.includes('qr code') ||
+              errorLower.includes('logout') ||
+              errorLower.includes('connection closed') ||
+              errorLower.includes('conexão fechada') ||
+              (responseData?.statusCode === 403 && errorLower.includes('instance')) ||
+              (responseData?.statusCode === 404 && errorLower.includes('instance'));
+
+            if (isInstanceDisconnected) {
+              addLog('error', `🔌 INSTÂNCIA DESCONECTADA — Disparo interrompido imediatamente!`);
+              addLog('warning', `⚠️ ${contacts.length - i} contatos restantes foram mantidos na lista de contatos.`);
+              
+              // Abort the dispatch
+              abortControllerRef.current?.abort();
+              
+              // Clear persisted state
+              clearPersistedState();
+
+              // Update history record as stopped
+              if (historyRecordId) {
+                await supabase
+                  .from('bulk_dispatch_history')
+                  .update({
+                    success_count: sentCount,
+                    failed_count: failedCount,
+                    status: 'stopped_disconnected',
+                    completed_at: new Date().toISOString()
+                  })
+                  .eq('id', historyRecordId);
+              }
+
+              setProgress(prev => ({
+                ...prev,
+                sent: sentCount,
+                failed: failedCount,
+                pending: contacts.length - sentCount - failedCount,
+                isRunning: false,
+                isPaused: false,
+              }));
+
+              toast({
+                title: '🔌 Instância Desconectada',
+                description: `Disparo parado. ${sentCount} enviados. ${contacts.length - i} contatos mantidos na lista.`,
+                variant: 'destructive',
+              });
+
+              playDispatchComplete();
+              return; // Exit the entire function
+            }
+
             const isInvalidNumber = 
               responseData?.invalid_number === true || 
-              errorMsg.toLowerCase().includes('not on whatsapp') ||
-              errorMsg.toLowerCase().includes('não está no whatsapp') ||
-              errorMsg.toLowerCase().includes('não encontrado no whatsapp') ||
-              errorMsg.toLowerCase().includes('number does not exist') ||
-              errorMsg.toLowerCase().includes('número inativo') ||
-              errorMsg.toLowerCase().includes('not registered');
+              errorLower.includes('not on whatsapp') ||
+              errorLower.includes('não está no whatsapp') ||
+              errorLower.includes('não encontrado no whatsapp') ||
+              errorLower.includes('number does not exist') ||
+              errorLower.includes('número inativo') ||
+              errorLower.includes('not registered');
             
             const errorReason = isInvalidNumber ? 'no_whatsapp' : 'connection_error';
             
