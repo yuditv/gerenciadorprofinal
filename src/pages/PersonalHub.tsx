@@ -221,12 +221,18 @@ export default function PersonalHub() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center space-y-1"
+        className="flex items-center justify-between"
       >
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-          <span className="text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.5)]">Hub</span> Pessoal
-        </h1>
-        <p className="text-sm text-muted-foreground">Seu centro de controle</p>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            <span className="text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.5)]">Hub</span> Pessoal
+          </h1>
+          <p className="text-sm text-muted-foreground">Seu centro de controle</p>
+        </div>
+        <Button onClick={() => navigate('/')} variant="outline" className="gap-2">
+          <LayoutGrid className="h-4 w-4" />
+          Painel Principal
+        </Button>
       </motion.div>
 
       {/* Grid Layout */}
