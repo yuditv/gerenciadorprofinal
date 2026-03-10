@@ -55,7 +55,7 @@ export function MainLayout() {
   });
   useEffect(() => {
     const section = searchParams.get('section') as AppSection;
-    if (section && ['hub', 'clients', 'whatsapp', 'atendimento', 'filter-numbers', 'ai-agent', 'warm-chips', 'crm-kanban'].includes(section)) {
+    if (section && ['clients', 'whatsapp', 'atendimento', 'filter-numbers', 'ai-agent', 'warm-chips', 'crm-kanban'].includes(section)) {
       setActiveSection(section);
     }
   }, [searchParams]);
