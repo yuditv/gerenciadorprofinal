@@ -62,6 +62,8 @@ export function MainLayout() {
   }, [searchParams]);
   const renderContent = () => {
     switch (activeSection) {
+      case "hub":
+        return <PersonalHub />;
       case "clients":
         return <Index />;
       case "whatsapp":
@@ -77,7 +79,7 @@ export function MainLayout() {
       case "crm-kanban":
         return <CRMKanban />;
       default:
-        return <Index />;
+        return <PersonalHub />;
     }
   };
   return <div className="min-h-screen flex flex-col w-full relative">
