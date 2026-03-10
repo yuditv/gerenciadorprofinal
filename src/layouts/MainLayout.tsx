@@ -11,6 +11,7 @@ import { useGlobalInboxNotifications } from "@/hooks/useGlobalInboxNotifications
 
 // Lazy load heavy components
 const Index = lazy(() => import("@/pages/Index"));
+const PersonalHub = lazy(() => import("@/pages/PersonalHub"));
 const WhatsApp = lazy(() => import("@/pages/WhatsApp"));
 const FilterNumbers = lazy(() => import("@/pages/FilterNumbers"));
 const AIAgent = lazy(() => import("@/pages/AIAgent"));
