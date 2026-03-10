@@ -37,6 +37,7 @@ const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const CRMKanban = lazy(() => import("./pages/CRMKanban"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PersonalHub = lazy(() => import("./pages/PersonalHub"));
 
 const VPNTest = lazy(() => import("./pages/VPNTest"));
 
@@ -111,7 +112,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/hub" replace />;
   }
 
   return <>{children}</>;
@@ -137,6 +138,11 @@ const AppRoutes = () => (
       />
       <Route path="/email-confirmed" element={<EmailConfirmed />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/hub" element={
+        <ProtectedRoute>
+          <PersonalHub />
+        </ProtectedRoute>
+      } />
       <Route path="/" element={
         <ProtectedRoute>
           <MainLayout />

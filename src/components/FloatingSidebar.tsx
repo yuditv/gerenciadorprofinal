@@ -27,7 +27,7 @@ const WhatsAppIcon = memo(({ className }: { className?: string }) => (
 ));
 WhatsAppIcon.displayName = 'WhatsAppIcon';
 
-export type AppSection = "hub" | "clients" | "whatsapp" | "filter-numbers" | "ai-agent" | "warm-chips" | "revenda" | "iptv" | "admin" | "atendimento" | "crm-kanban";
+export type AppSection = "clients" | "whatsapp" | "filter-numbers" | "ai-agent" | "warm-chips" | "revenda" | "iptv" | "admin" | "atendimento" | "crm-kanban";
 
 type PermissionKey = 
   | 'can_view_clients'
@@ -48,13 +48,6 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  {
-    id: "hub",
-    title: "Hub",
-    icon: LayoutGrid,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500",
-  },
   {
     id: "admin",
     title: "Painel Admin",
