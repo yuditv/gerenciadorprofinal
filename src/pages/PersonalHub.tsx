@@ -239,7 +239,7 @@ export default function PersonalHub() {
     return 'Boa noite';
   }, []);
 
-  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Usuário';
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'Usuário';
 
   return (
     <TooltipProvider delayDuration={200}>
