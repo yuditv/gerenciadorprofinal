@@ -49,13 +49,6 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    id: "hub",
-    title: "Hub",
-    icon: LayoutGrid,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500",
-  },
-  {
     id: "admin",
     title: "Painel Admin",
     icon: Crown,
