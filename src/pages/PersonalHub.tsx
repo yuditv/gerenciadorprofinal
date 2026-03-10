@@ -75,16 +75,7 @@ function saveJSON<T>(key: string, val: T) {
 
 // ── Sidebar nav items ──────────────────────────────────
 const navItems = [
-  { id: 'clients', label: 'Gerenciador', icon: Users, route: '/?section=clients' },
-  { id: 'whatsapp', label: 'WhatsApp', icon: Smartphone, route: '/?section=whatsapp' },
-  { id: 'atendimento', label: 'Atendimento', icon: Headset, route: '/?section=atendimento' },
-  { id: 'ai-agent', label: 'Agente IA', icon: Bot, route: '/?section=ai-agent' },
-  { id: 'warm-chips', label: 'Aquecimento', icon: Flame, route: '/?section=warm-chips' },
-  { id: 'crm-kanban', label: 'CRM Kanban', icon: Kanban, route: '/?section=crm-kanban' },
-  { id: 'filter-numbers', label: 'Filtrar Números', icon: Filter, route: '/?section=filter-numbers' },
-  { id: 'dashboard', label: 'Dashboard', icon: BarChart3, route: '/dashboard' },
-  { id: 'settings', label: 'Configurações', icon: Settings, route: '/settings' },
-  { id: 'profile', label: 'Perfil', icon: User, route: '/profile' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: Smartphone, route: '/' },
 ];
 
 // ── Digital Clock Widget ───────────────────────────────
