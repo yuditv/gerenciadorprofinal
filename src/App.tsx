@@ -37,6 +37,7 @@ const PaymentHistory = lazy(() => import("./pages/PaymentHistory"));
 const FilterNumbers = lazy(() => import("./pages/FilterNumbers"));
 const CRMKanban = lazy(() => import("./pages/CRMKanban"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const PersonalHub = lazy(() => import("./pages/PersonalHub"));
 
 const VPNTest = lazy(() => import("./pages/VPNTest"));
 
