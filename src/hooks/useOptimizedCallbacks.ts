@@ -98,7 +98,7 @@ export function useBatchedUpdates<T>(
 ): [T, (updater: (prev: T) => T) => void, () => void] {
   const valueRef = useRef<T>(initialValue);
   const pendingUpdatesRef = useRef<Array<(prev: T) => T>>([]);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const forceUpdateRef = useRef<() => void>(() => {});
 
   // Force update mechanism
