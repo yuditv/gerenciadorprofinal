@@ -11,6 +11,7 @@ import { useGlobalInboxNotifications } from "@/hooks/useGlobalInboxNotifications
 
 // Lazy load heavy components
 const Index = lazy(() => import("@/pages/Index"));
+const PersonalHub = lazy(() => import("@/pages/PersonalHub"));
 const WhatsApp = lazy(() => import("@/pages/WhatsApp"));
 const FilterNumbers = lazy(() => import("@/pages/FilterNumbers"));
 const AIAgent = lazy(() => import("@/pages/AIAgent"));
@@ -27,7 +28,7 @@ const ContentLoader = () => <div className="flex items-center justify-center h-f
     </div>
   </div>;
 export function MainLayout() {
-  const [activeSection, setActiveSection] = usePersistedState<AppSection>("app-active-section", "clients");
+  const [activeSection, setActiveSection] = usePersistedState<AppSection>("app-active-section", "hub");
   const [searchParams] = useSearchParams();
   
   // Global inbox notifications - plays loud sounds for new messages on ANY page
@@ -55,12 +56,14 @@ export function MainLayout() {
   });
   useEffect(() => {
     const section = searchParams.get('section') as AppSection;
-    if (section && ['clients', 'whatsapp', 'atendimento', 'filter-numbers', 'ai-agent', 'warm-chips', 'crm-kanban'].includes(section)) {
+    if (section && ['hub', 'clients', 'whatsapp', 'atendimento', 'filter-numbers', 'ai-agent', 'warm-chips', 'crm-kanban'].includes(section)) {
       setActiveSection(section);
     }
   }, [searchParams]);
   const renderContent = () => {
     switch (activeSection) {
+      case "hub":
+        return <PersonalHub />;
       case "clients":
         return <Index />;
       case "whatsapp":
@@ -76,7 +79,7 @@ export function MainLayout() {
       case "crm-kanban":
         return <CRMKanban />;
       default:
-        return <Index />;
+        return <PersonalHub />;
     }
   };
   return <div className="min-h-screen flex flex-col w-full relative">
