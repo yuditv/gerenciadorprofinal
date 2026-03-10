@@ -138,6 +138,11 @@ const AppRoutes = () => (
       />
       <Route path="/email-confirmed" element={<EmailConfirmed />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/hub" element={
+        <ProtectedRoute>
+          <PersonalHub />
+        </ProtectedRoute>
+      } />
       <Route path="/" element={
         <ProtectedRoute>
           <MainLayout />
