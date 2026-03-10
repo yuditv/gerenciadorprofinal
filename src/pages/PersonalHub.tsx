@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Target, Quote, ExternalLink, Plus, Check, Trash2, ChevronRight, Zap, Star, Trophy, Flame } from 'lucide-react';
+import { Clock, Target, Quote, ExternalLink, Plus, Check, Trash2, ChevronRight, Zap, Star, Trophy, Flame, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
