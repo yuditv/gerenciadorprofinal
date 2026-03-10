@@ -27,7 +27,7 @@ const ContentLoader = () => <div className="flex items-center justify-center h-f
     </div>
   </div>;
 export function MainLayout() {
-  const [activeSection, setActiveSection] = usePersistedState<AppSection>("app-active-section", "hub");
+  const [activeSection, setActiveSection] = usePersistedState<AppSection>("app-active-section", "clients");
   const [searchParams] = useSearchParams();
   
   // Global inbox notifications - plays loud sounds for new messages on ANY page
