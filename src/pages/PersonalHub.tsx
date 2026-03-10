@@ -120,6 +120,7 @@ function DigitalClock({ alarms, onAlarmTriggered }: { alarms: Alarm[]; onAlarmTr
 
 // ── Main Component ─────────────────────────────────────
 export default function PersonalHub() {
+  const navigate = useNavigate();
   // State
   const [goals, setGoals] = useState<Goal[]>(() => loadJSON('hub-goals', []));
   const [links, setLinks] = useState<QuickLink[]>(() => loadJSON('hub-links', []));
