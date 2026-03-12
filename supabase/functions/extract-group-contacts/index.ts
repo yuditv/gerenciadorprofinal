@@ -100,6 +100,7 @@ async function listGroups(baseUrl: string, providerType: string, headers: Record
         headers,
       });
       const data = await res.json();
+      console.log('[extract-group-contacts] Evolution response type:', typeof data, 'isArray:', Array.isArray(data));
       return Array.isArray(data) ? data : (data?.groups || data?.data || []);
     }
     case 'waha': {
@@ -116,29 +117,67 @@ async function listGroups(baseUrl: string, providerType: string, headers: Record
     case 'uazapi':
     case 'custom':
     default: {
-      // Try primary endpoint
-      const res = await fetch(`${baseUrl}/chat/fetchAllChats`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ type: 'group' }),
-      });
-
-      if (!res.ok) {
-        // Fallback
-        const res2 = await fetch(`${baseUrl}/group/fetchAllGroups`, {
+      // Try group-specific endpoint first
+      console.log(`[extract-group-contacts] Trying ${baseUrl}/group/fetchAllGroups`);
+      try {
+        const res = await fetch(`${baseUrl}/group/fetchAllGroups`, {
           method: 'POST',
           headers,
           body: JSON.stringify({}),
         });
-        const data = await res2.json();
-        return Array.isArray(data) ? data : (data?.groups || data?.data || []);
+        const rawText = await res.text();
+        console.log(`[extract-group-contacts] UAZAPI group response status: ${res.status}, body length: ${rawText.length}, preview: ${rawText.substring(0, 500)}`);
+        
+        if (res.ok && rawText) {
+          const data = JSON.parse(rawText);
+          // UAZAPI may return: array directly, { groups: [...] }, { data: [...] }, or object with group IDs as keys
+          if (Array.isArray(data)) {
+            return data;
+          }
+          if (data?.groups && Array.isArray(data.groups)) {
+            return data.groups;
+          }
+          if (data?.data && Array.isArray(data.data)) {
+            return data.data;
+          }
+          // Could be an object with properties - try to extract arrays
+          const values = Object.values(data);
+          if (values.length > 0 && Array.isArray(values[0])) {
+            return values[0] as Record<string, unknown>[];
+          }
+          // Single object or empty
+          console.log('[extract-group-contacts] Unexpected data structure, keys:', Object.keys(data));
+          return [];
+        }
+      } catch (e) {
+        console.log('[extract-group-contacts] fetchAllGroups failed:', e);
       }
 
-      const data = await res.json();
-      const allChats = Array.isArray(data) ? data : (data?.chats || data?.data || []);
-      return allChats.filter((c: Record<string, unknown>) =>
-        c.isGroup === true || (typeof c.id === 'string' && (c.id as string).includes('@g.us'))
-      );
+      // Fallback: fetchAllChats filtering groups
+      console.log(`[extract-group-contacts] Fallback: ${baseUrl}/chat/fetchAllChats`);
+      try {
+        const res2 = await fetch(`${baseUrl}/chat/fetchAllChats`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ type: 'group' }),
+        });
+        const rawText2 = await res2.text();
+        console.log(`[extract-group-contacts] UAZAPI chat response status: ${res2.status}, body length: ${rawText2.length}, preview: ${rawText2.substring(0, 500)}`);
+        
+        if (res2.ok && rawText2) {
+          const data2 = JSON.parse(rawText2);
+          const allChats = Array.isArray(data2) ? data2 : (data2?.chats || data2?.data || []);
+          if (Array.isArray(allChats)) {
+            return allChats.filter((c: Record<string, unknown>) =>
+              c.isGroup === true || (typeof c.id === 'string' && (c.id as string).includes('@g.us'))
+            );
+          }
+        }
+      } catch (e2) {
+        console.log('[extract-group-contacts] fetchAllChats also failed:', e2);
+      }
+
+      return [];
     }
   }
 }
