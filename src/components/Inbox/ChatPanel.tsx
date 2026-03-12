@@ -196,7 +196,7 @@ export function ChatPanel({
   } = usePresence(conversation?.id || null);
   
   // Debounce timer for stopping composing presence
-  const composingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const composingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Send composing presence with auto-stop after 3 seconds of inactivity
   const handleComposingPresence = useCallback(() => {

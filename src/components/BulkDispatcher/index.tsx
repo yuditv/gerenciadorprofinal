@@ -122,7 +122,7 @@ export function BulkDispatcher() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSaveContacts = useCallback(async (contactsToSave: { name: string; phone: string; email?: string }[]) => {
     setIsSavingContacts(true);
