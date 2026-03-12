@@ -46,7 +46,7 @@ export function useCustomerMessages(
   const initialLoadDone = useRef(false);
   const lastSyncTimestamp = useRef<string | null>(null);
   const pollIntervalRef = useRef(BASE_POLL_INTERVAL);
-  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacksRef = useRef(callbacks);
 
   // Keep callbacks ref updated
