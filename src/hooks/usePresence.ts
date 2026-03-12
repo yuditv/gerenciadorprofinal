@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 type PresenceType = 'composing' | 'recording' | 'paused';
 
 export function usePresence(conversationId: string | null) {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSentRef = useRef<{ type: PresenceType; time: number } | null>(null);
   const isActiveRef = useRef(false);
 

@@ -8,7 +8,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
   callback: T,
   delay: number
 ): T {
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const callbackRef = useRef(callback);
 
   // Keep callback ref updated
@@ -47,7 +47,7 @@ export function useThrottledCallback<T extends (...args: any[]) => any>(
   limit: number
 ): T {
   const lastRunRef = useRef<number>(0);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const callbackRef = useRef(callback);
 
   // Keep callback ref updated
@@ -98,7 +98,7 @@ export function useBatchedUpdates<T>(
 ): [T, (updater: (prev: T) => T) => void, () => void] {
   const valueRef = useRef<T>(initialValue);
   const pendingUpdatesRef = useRef<Array<(prev: T) => T>>([]);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const forceUpdateRef = useRef<() => void>(() => {});
 
   // Force update mechanism

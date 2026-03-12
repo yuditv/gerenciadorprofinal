@@ -530,7 +530,7 @@ export function useInboxConversations() {
 
   // Real-time subscription
   // Throttled refetch for real-time events - prevents cascade re-fetches
-  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refetchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const throttledRefetch = useCallback(() => {
     if (refetchTimerRef.current) return; // Already scheduled
     refetchTimerRef.current = setTimeout(() => {

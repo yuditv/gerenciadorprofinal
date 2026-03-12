@@ -15,7 +15,7 @@ export function useInstanceStatusMonitor(
   onStatusChange?: (instanceId: string, newStatus: string) => void
 ) {
   const { user } = useAuth();
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isActiveRef = useRef(false);
   const lastStatusRef = useRef<Record<string, string>>({});
 

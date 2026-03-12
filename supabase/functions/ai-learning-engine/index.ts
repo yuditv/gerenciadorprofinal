@@ -16,31 +16,11 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
       return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // --- Authentication ---
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const token = authHeader.replace(/^[Bb]earer\s+/, "");
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const anonClient = createClient(supabaseUrl, supabaseAnonKey);
-    const { data: { user: authUser }, error: authError } = await anonClient.auth.getUser(token);
-    if (authError || !authUser) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -56,14 +36,6 @@ serve(async (req: Request) => {
     if (!userId) {
       return new Response(JSON.stringify({ error: "userId is required" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Enforce that the caller can only access their own data
-    if (userId !== authUser.id) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

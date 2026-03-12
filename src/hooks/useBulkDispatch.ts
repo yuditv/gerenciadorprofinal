@@ -8,7 +8,7 @@ import { useSoundEffects } from '@/hooks/useSoundEffects';
 // Throttle utility for reducing state update frequency
 const throttle = <T extends (...args: any[]) => void>(func: T, limit: number): T => {
   let lastRun = 0;
-  let timeout: ReturnType<typeof setTimeout> | null = null;
+  let timeout: NodeJS.Timeout | null = null;
   
   return ((...args: any[]) => {
     const now = Date.now();
