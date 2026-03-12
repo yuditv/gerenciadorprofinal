@@ -117,66 +117,63 @@ async function listGroups(baseUrl: string, providerType: string, headers: Record
     case 'uazapi':
     case 'custom':
     default: {
-      // Try group-specific endpoint first
-      console.log(`[extract-group-contacts] Trying ${baseUrl}/group/fetchAllGroups`);
-      try {
-        const res = await fetch(`${baseUrl}/group/fetchAllGroups`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({}),
-        });
-        const rawText = await res.text();
-        console.log(`[extract-group-contacts] UAZAPI group response status: ${res.status}, body length: ${rawText.length}, preview: ${rawText.substring(0, 500)}`);
-        
-        if (res.ok && rawText) {
-          const data = JSON.parse(rawText);
-          // UAZAPI may return: array directly, { groups: [...] }, { data: [...] }, or object with group IDs as keys
-          if (Array.isArray(data)) {
-            return data;
-          }
-          if (data?.groups && Array.isArray(data.groups)) {
-            return data.groups;
-          }
-          if (data?.data && Array.isArray(data.data)) {
-            return data.data;
-          }
-          // Could be an object with properties - try to extract arrays
-          const values = Object.values(data);
-          if (values.length > 0 && Array.isArray(values[0])) {
-            return values[0] as Record<string, unknown>[];
-          }
-          // Single object or empty
-          console.log('[extract-group-contacts] Unexpected data structure, keys:', Object.keys(data));
-          return [];
-        }
-      } catch (e) {
-        console.log('[extract-group-contacts] fetchAllGroups failed:', e);
-      }
+      // UAZAPI uses GET for listing endpoints
+      const endpoints = [
+        { url: `${baseUrl}/group/fetchAllGroups`, method: 'GET' },
+        { url: `${baseUrl}/group/fetchAllGroups`, method: 'POST' },
+        { url: `${baseUrl}/chat/fetchAllChats`, method: 'GET' },
+        { url: `${baseUrl}/chat/fetchAllChats`, method: 'POST' },
+      ];
 
-      // Fallback: fetchAllChats filtering groups
-      console.log(`[extract-group-contacts] Fallback: ${baseUrl}/chat/fetchAllChats`);
-      try {
-        const res2 = await fetch(`${baseUrl}/chat/fetchAllChats`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ type: 'group' }),
-        });
-        const rawText2 = await res2.text();
-        console.log(`[extract-group-contacts] UAZAPI chat response status: ${res2.status}, body length: ${rawText2.length}, preview: ${rawText2.substring(0, 500)}`);
-        
-        if (res2.ok && rawText2) {
-          const data2 = JSON.parse(rawText2);
-          const allChats = Array.isArray(data2) ? data2 : (data2?.chats || data2?.data || []);
-          if (Array.isArray(allChats)) {
-            return allChats.filter((c: Record<string, unknown>) =>
+      for (const ep of endpoints) {
+        console.log(`[extract-group-contacts] Trying ${ep.method} ${ep.url}`);
+        try {
+          const fetchOpts: RequestInit = { method: ep.method, headers };
+          if (ep.method === 'POST') {
+            fetchOpts.body = JSON.stringify(ep.url.includes('fetchAllChats') ? { type: 'group' } : {});
+          }
+          const res = await fetch(ep.url, fetchOpts);
+          const rawText = await res.text();
+          console.log(`[extract-group-contacts] Response: status=${res.status}, length=${rawText.length}, preview=${rawText.substring(0, 500)}`);
+
+          if (!res.ok || !rawText || rawText.length < 3) continue;
+
+          const data = JSON.parse(rawText);
+
+          // Handle various response formats
+          let groups: Record<string, unknown>[] = [];
+          if (Array.isArray(data)) {
+            groups = data;
+          } else if (data?.groups && Array.isArray(data.groups)) {
+            groups = data.groups;
+          } else if (data?.data && Array.isArray(data.data)) {
+            groups = data.data;
+          } else if (typeof data === 'object' && data !== null) {
+            // Try extracting first array value
+            const values = Object.values(data);
+            const firstArray = values.find(v => Array.isArray(v));
+            if (firstArray) {
+              groups = firstArray as Record<string, unknown>[];
+            }
+          }
+
+          // If fetchAllChats, filter only groups
+          if (ep.url.includes('fetchAllChats') && groups.length > 0) {
+            groups = groups.filter((c) =>
               c.isGroup === true || (typeof c.id === 'string' && (c.id as string).includes('@g.us'))
             );
           }
+
+          if (groups.length > 0) {
+            console.log(`[extract-group-contacts] Found ${groups.length} groups via ${ep.method} ${ep.url}`);
+            return groups;
+          }
+        } catch (e) {
+          console.log(`[extract-group-contacts] ${ep.method} ${ep.url} failed:`, e);
         }
-      } catch (e2) {
-        console.log('[extract-group-contacts] fetchAllChats also failed:', e2);
       }
 
+      console.log('[extract-group-contacts] All UAZAPI endpoints exhausted, 0 groups found');
       return [];
     }
   }
